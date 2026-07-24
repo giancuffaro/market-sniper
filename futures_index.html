@@ -1,0 +1,377 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>MARKET SNIPER FUTURES</title>
+<style>
+  :root{
+    --bg:#0c0e0d;--panel:#111413;--panel2:#161a18;--line:#242a27;
+    --txt:#e7ece9;--dim:#8f9a94;--dimmer:#6a736c;
+    --green:#3ad07e;--green-deep:#0f2a1c;--green-btn:#57d98a;
+    --red:#e0574f;--red-deep:#2a1211;--amber:#e0b64a;--blue:#4aa3e0;
+    --mono:'SFMono-Regular',ui-monospace,'DejaVu Sans Mono',Menlo,Consolas,monospace;
+  }
+  body[data-theme="light"]{
+    --bg:#f2f4f2;--panel:#fff;--panel2:#e9ede9;--line:#c9d2cb;
+    --txt:#141b16;--dim:#4a564e;--dimmer:#6c776f;
+    --green:#0c7a44;--green-deep:#d9f0e2;--green-btn:#1a9c5c;
+    --red:#b3261e;--red-deep:#f7dedc;--amber:#8a6410;--blue:#1a5c8a;
+  }
+  *{box-sizing:border-box}
+  html,body{margin:0;background:#000;color:var(--txt);font-family:var(--mono)}
+  body[data-theme="light"]{background:#dfe3df}
+  .wrap{max-width:430px;margin:0 auto;min-height:100vh;background:var(--bg);position:relative;overflow:hidden}
+  .app{padding:0 16px 24px}
+  .hidden{display:none!important}
+  .connect{padding:40px 22px}
+  .connect h1{font-size:20px;letter-spacing:.16em;font-weight:800;margin:0 0 4px}
+  .connect .sub{color:var(--blue);font-size:11px;letter-spacing:.16em;margin-bottom:22px}
+  .modes{display:flex;gap:10px;margin-bottom:16px}
+  .modes button{flex:1;border:1px solid var(--line);background:var(--panel);color:var(--dim);border-radius:10px;
+    padding:14px 0;font-family:var(--mono);font-size:12px;font-weight:700;cursor:pointer}
+  .modes button.on{border-color:var(--green);background:var(--green-deep);color:var(--green)}
+  .go{width:100%;border:0;border-radius:12px;padding:18px 0;background:var(--green-btn);color:#fff;
+    font-family:var(--mono);font-weight:800;font-size:16px;cursor:pointer}
+  body:not([data-theme="light"]) .go{color:#08130c}
+  .err{color:var(--red);font-size:12px;margin-top:12px;min-height:16px}
+  .note{color:var(--dimmer);font-size:10px;line-height:1.6;margin-top:16px}
+  .themebtn,.setbtn{border:1px solid var(--line);border-radius:6px;padding:3px 9px;color:var(--dim);font-size:9px;cursor:pointer;background:var(--panel)}
+  .top{display:flex;align-items:center;justify-content:space-between;padding:16px 6px 12px;font-size:11px}
+  .brand{display:flex;align-items:center;gap:8px;font-weight:700;letter-spacing:.12em}
+  .backbtn{border:1px solid var(--line);background:var(--panel);color:var(--dim);border-radius:8px;width:30px;height:30px;font-size:16px;cursor:pointer}
+  .dot{width:8px;height:8px;border-radius:50%;background:var(--blue);box-shadow:0 0 8px var(--blue)}
+  .meta{display:flex;gap:8px;align-items:center;color:var(--dim);flex-wrap:wrap;justify-content:flex-end}
+  .pill{border:1px solid var(--blue);color:var(--blue);border-radius:6px;padding:3px 8px;font-size:9px}
+  .prices{display:flex;gap:8px;margin-bottom:12px}
+  .pchip{flex:1;border:1px solid var(--line);border-radius:10px;background:var(--panel);padding:9px;text-align:center}
+  .pchip .s{font-size:10px;color:var(--dim);letter-spacing:.14em}
+  .pchip .p{font-size:16px;font-weight:700;margin-top:2px}
+  .pchip .c{font-size:10px;color:var(--dim)}
+  .pchip.up .c{color:var(--green)}.pchip.dn .c{color:var(--red)}
+  .hero{border:1px solid var(--line);border-radius:14px;background:var(--panel);padding:22px;text-align:center;margin-bottom:14px}
+  .hero .big{font-size:40px;font-weight:800;letter-spacing:.08em;color:var(--dim)}
+  .hero .sub{color:var(--dim);font-size:11px;letter-spacing:.16em;margin-top:10px;text-transform:uppercase}
+  .hero.long{background:var(--green-deep);border-color:var(--green)} .hero.long .big{color:var(--green)}
+  .hero.short{background:var(--red-deep);border-color:var(--red)} .hero.short .big{color:var(--red)}
+  .pnl{text-align:center;margin:2px 0 12px}
+  .pnl .n{font-size:38px;font-weight:800;color:var(--green)}.pnl .n.neg{color:var(--red)}
+  .pnl .spot{color:var(--dim);font-size:11px;margin-top:6px}
+  .event,.reject{display:none;border-radius:10px;padding:12px 14px;margin-bottom:12px;position:relative;border:1px solid}
+  .event.show,.reject.show{display:block}
+  .event{border-color:var(--green);background:var(--green-deep)}
+  .event.sl{border-color:var(--red);background:var(--red-deep)}
+  .event .h{color:var(--green);font-size:11px;font-weight:700}.event.sl .h{color:var(--red)}
+  .reject{border-color:var(--red);background:var(--red-deep)}
+  .reject .h{color:var(--red);font-size:11px;font-weight:700}
+  .reject .b{font-size:12px;margin-top:4px}
+  .x{position:absolute;top:9px;right:12px;color:var(--dim);cursor:pointer}
+  .seg{display:flex;border:1px solid var(--line);border-radius:12px;overflow:hidden;margin-bottom:12px}
+  .seg button{flex:1;background:transparent;color:var(--dim);border:0;padding:15px 0;font-family:var(--mono);font-size:15px;font-weight:700;cursor:pointer;letter-spacing:.14em}
+  .seg button.on{background:var(--panel2);color:var(--txt);box-shadow:inset 0 0 0 1px var(--line)}
+  .seg button:disabled{opacity:.35}
+  .row{display:flex;align-items:center;justify-content:space-between;border:1px solid var(--line);border-radius:12px;padding:15px 18px;margin-bottom:12px}
+  .row .lbl{color:var(--dim);font-size:11px;letter-spacing:.16em}
+  .stepper{display:flex;align-items:center;gap:16px}
+  .stepper button{width:26px;height:26px;border-radius:6px;border:1px solid var(--line);background:transparent;color:var(--txt);font-size:16px;cursor:pointer}
+  .stepper .v{font-size:20px;font-weight:700}
+  .duo{display:flex;gap:12px;margin-bottom:16px}
+  .duo button{flex:1;border-radius:12px;padding:17px 0;font-family:var(--mono);font-weight:800;font-size:16px;cursor:pointer;border:1px solid}
+  .b-long{background:var(--green-deep);border-color:var(--green);color:var(--green)}
+  .b-short{background:var(--red-deep);border-color:var(--red);color:var(--red)}
+  .duo small{display:block;font-weight:600;font-size:10px;color:var(--dim);margin-top:5px}
+  .close-btn{width:100%;border:0;border-radius:12px;padding:20px 0;background:var(--green-btn);color:#fff;font-family:var(--mono);font-weight:800;font-size:17px;cursor:pointer;margin-bottom:16px}
+  body:not([data-theme="light"]) .close-btn{color:#08130c}
+  .close-btn small{display:block;font-size:10px;margin-top:5px;opacity:.85}
+  .blotter{border-top:1px solid var(--line);padding-top:12px}
+  .blotter .hd{display:flex;justify-content:space-between;color:var(--dim);font-size:11px;margin-bottom:8px}
+  .net{color:var(--green)}.net.neg{color:var(--red)}
+  .trow{display:flex;justify-content:space-between;font-size:12px;color:var(--dim);padding:4px 0}
+  .trow .s{flex:1;color:var(--txt)}
+  .pl.up{color:var(--green)}.pl.dn{color:var(--red)}
+  .footer{color:var(--dimmer);font-size:9px;text-align:center;padding:14px 0 2px;letter-spacing:.14em}
+  .scrim{position:absolute;inset:0;background:rgba(0,0,0,.6);display:none;align-items:center;justify-content:center;padding:22px;z-index:5}
+  .scrim.show{display:flex}
+  .smodal{width:100%;max-width:380px;border:1px solid var(--line);border-radius:16px;background:var(--panel);padding:24px 20px;max-height:90vh;overflow-y:auto}
+  .smodal h2{margin:0 0 16px;font-size:13px;letter-spacing:.18em;text-align:center}
+  .sgroup{border:1px solid var(--line);border-radius:12px;padding:14px;margin-bottom:12px}
+  .glbl{color:var(--dim);font-size:10px;letter-spacing:.14em;margin-bottom:8px}
+  .srow{display:flex;align-items:center;gap:10px;margin-top:6px}
+  .srow input[type=number]{flex:1;background:var(--panel2);border:1px solid var(--line);border-radius:8px;color:var(--txt);font-family:var(--mono);font-size:14px;padding:10px;min-width:0}
+  .srow label{display:flex;align-items:center;gap:8px;color:var(--dim);font-size:11px}
+  .srow input[type=checkbox]{width:16px;height:16px;accent-color:var(--green)}
+  .shint{color:var(--dimmer);font-size:9.5px;line-height:1.5;margin-top:8px}
+  .sactions{display:flex;gap:10px}
+  .sactions button{flex:1;border-radius:10px;padding:14px 0;font-family:var(--mono);font-weight:800;font-size:13px;cursor:pointer}
+  .ssave{border:0;background:var(--green-btn);color:#fff}
+  body:not([data-theme="light"]) .ssave{color:#08130c}
+  .scancel{border:1px solid var(--line);background:transparent;color:var(--dim)}
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <div id="connectScreen" class="connect">
+    <div style="display:flex;justify-content:space-between">
+      <div><h1>MARKET SNIPER</h1><div class="sub">FUTURES · MNQ / MES · <span id="appVer">v?</span></div></div>
+      <button class="themebtn" onclick="FZ.toggleTheme()">☀/☾</button>
+    </div>
+    <div class="modes" id="modes">
+      <button data-m="PAPER" class="on">PAPER</button>
+      <button data-m="LIVE">LIVE</button>
+    </div>
+    <button class="go" id="connectBtn">START</button>
+    <div class="err" id="connectErr"></div>
+    <div class="note">PAPER futures is fully working with live prices — no keys needed, just hit START.
+    LIVE futures needs futures approval + CME data on your Webull account and is not wired yet;
+    it will tell you exactly that if you try. This app is completely separate from the options app
+    (runs on its own port, 8010).</div>
+  </div>
+
+  <div id="dash" class="app hidden">
+    <div class="top">
+      <div class="brand">
+        <button class="backbtn" onclick="FZ.back()">‹</button>
+        <span class="dot"></span>FUTURES
+      </div>
+      <div class="meta">
+        <span class="pill" id="modePill">PAPER</span>
+        <span>BAL <b id="bp">$0.00</b></span>
+        <span class="setbtn" onclick="FZ.openSettings()">CONFIGURATION</span>
+        <span class="setbtn" onclick="FZ.toggleTheme()">☀/☾</span>
+        <span class="setbtn" onclick="FZ.back()">🔒</span>
+      </div>
+    </div>
+
+    <div class="prices">
+      <div class="pchip" data-s="MNQ"><div class="s">MNQ</div><div class="p">—</div><div class="c">—</div></div>
+      <div class="pchip" data-s="MES"><div class="s">MES</div><div class="p">—</div><div class="c">—</div></div>
+    </div>
+
+    <div id="hero" class="hero">
+      <div id="heroBig" class="big">FLAT</div>
+      <div id="heroSub" class="sub">No open position</div>
+    </div>
+
+    <div id="pnlBlock" class="pnl hidden">
+      <div><span id="pnlN" class="n">+$0.00</span></div>
+      <div class="spot" id="pnlPts"></div>
+      <div class="spot" id="bracketLine" style="color:var(--amber)"></div>
+    </div>
+
+    <div id="eventBanner" class="event"><div class="x" onclick="FZ.hideEvent()">✕</div>
+      <div class="h" id="eventHead"></div></div>
+    <div id="reject" class="reject"><div class="x" onclick="FZ.hideReject()">✕</div>
+      <div class="h" id="rejectHead">◆ ORDER REJECTED</div><div class="b" id="rejectBody"></div></div>
+
+    <div class="seg" id="seg">
+      <button data-s="MNQ" class="on">MNQ</button>
+      <button data-s="MES">MES</button>
+    </div>
+
+    <div class="row">
+      <div class="lbl">CONTRACTS</div>
+      <div class="stepper">
+        <button onclick="FZ.step(-1)">–</button>
+        <div class="v" id="qty">1</div>
+        <button onclick="FZ.step(1)">+</button>
+      </div>
+    </div>
+
+    <div id="flatActions">
+      <div class="duo">
+        <button class="b-long" onclick="FZ.open('LONG')">BUY / LONG<small id="longSub">—</small></button>
+        <button class="b-short" onclick="FZ.open('SHORT')">SELL / SHORT<small id="shortSub">—</small></button>
+      </div>
+    </div>
+
+    <div id="tradeActions" class="hidden">
+      <button class="close-btn" onclick="FZ.close()">CLOSE POSITION<small id="closeSub"></small></button>
+    </div>
+
+    <div class="blotter">
+      <div class="hd"><span>TODAY</span><span>DAY NET <b class="net" id="dayNet">$0.00</b></span></div>
+      <div id="blotterRows"></div>
+    </div>
+    <div class="footer" id="footMode">◦ PAPER — SIMULATED FILLS · LIVE PRICES ◦</div>
+  </div>
+
+  <!-- CONFIGURATION -->
+  <div id="setScrim" class="scrim">
+    <div class="smodal">
+      <h2>FUTURES CONFIGURATION</h2>
+
+      <div class="sgroup">
+        <div class="glbl">TAKE PROFIT (points)</div>
+        <div class="srow"><label><input type="checkbox" id="tpE"> ON</label>
+          <input type="number" id="tpV" min="0.25" step="0.25" placeholder="10"></div>
+        <div class="shint">Closes when the trade is up this many points.
+        MNQ: 1 pt = $2/contract · MES: 1 pt = $5/contract. Ex: LONG MNQ +10 pts = +$20 per contract.</div>
+      </div>
+
+      <div class="sgroup">
+        <div class="glbl">STOP LOSS (points)</div>
+        <div class="srow"><label><input type="checkbox" id="slE"> ON</label>
+          <input type="number" id="slV" min="0.25" step="0.25" placeholder="5"></div>
+        <div class="shint">Closes when the trade is down this many points. Works for both LONG and SHORT.</div>
+      </div>
+
+      <div class="sgroup">
+        <div class="glbl">TRAILING STOP (points)</div>
+        <div class="srow"><label><input type="checkbox" id="trE"> ON</label>
+          <input type="number" id="trV" min="0.25" step="0.25" placeholder="5"></div>
+        <div class="shint">The stop follows the best price by this distance. Ex: LONG from 23150 with a
+        5-pt trail — price runs to 23170, the stop rides up to 23165; a pullback there closes you out,
+        keeping most of the move. Shown live under your P&amp;L while in a trade.</div>
+      </div>
+
+      <div class="sactions">
+        <button class="scancel" onclick="FZ.closeSettings()">CANCEL</button>
+        <button class="ssave" onclick="FZ.saveSettings()">SAVE</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+const FZ = (function(){
+  const LSS="ezfut_settings", LST="ezexec_theme";
+  let mode="PAPER", sym="MNQ", qty=1, inTrade=false, poll=null, priceTimer=null;
+  let settings={tp_enabled:false,tp_points:10,sl_enabled:false,sl_points:5,trail_enabled:false,trail_points:5};
+  const $=id=>document.getElementById(id);
+  const api=(p,b)=>fetch(p,{method:b?'POST':'GET',headers:{'Content-Type':'application/json'},
+                           body:b?JSON.stringify(b):undefined}).then(r=>r.json());
+  try{ const sv=JSON.parse(localStorage.getItem(LSS)||"null"); if(sv) settings={...settings,...sv}; }catch(e){}
+
+  function applyTheme(t){ document.body.dataset.theme=t; localStorage.setItem(LST,t); }
+  applyTheme(localStorage.getItem(LST)||"dark");
+  function toggleTheme(){ applyTheme(document.body.dataset.theme==="light"?"dark":"light"); }
+
+  fetch('/api/health').then(r=>r.json()).then(h=>{$('appVer').textContent='v'+h.version;})
+    .catch(()=>{$('appVer').textContent='server not running';});
+
+  document.querySelectorAll('#modes button').forEach(b=>b.onclick=()=>{
+    mode=b.dataset.m;
+    document.querySelectorAll('#modes button').forEach(x=>x.classList.toggle('on',x===b));
+  });
+
+  $('connectBtn').onclick=async()=>{
+    $('connectErr').textContent='';
+    const r=await api('/api/connect',{app_key:'',app_secret:'',mode});
+    if(r.detail){ $('connectErr').textContent=r.detail; return; }
+    $('connectScreen').classList.add('hidden'); $('dash').classList.remove('hidden');
+    $('modePill').textContent=mode;
+    $('footMode').textContent = mode==='PAPER' ? '◦ PAPER — SIMULATED FILLS · LIVE PRICES ◦' : '● LIVE ●';
+    render(r); refreshPrices();
+    api('/api/settings',settings);
+    poll=setInterval(tick,1000);
+    priceTimer=setInterval(refreshPrices,5000);
+  };
+
+  async function refreshPrices(){
+    const d=await api('/api/prices');
+    ['MNQ','MES'].forEach(s=>{
+      const q=d[s]; if(!q) return;
+      const el=document.querySelector(`.pchip[data-s="${s}"]`);
+      const up=(q.change||0)>=0;
+      el.className='pchip '+(up?'up':'dn');
+      el.querySelector('.p').textContent=q.price.toLocaleString(undefined,{minimumFractionDigits:2});
+      el.querySelector('.c').textContent=`${up?'+':'−'}${Math.abs(q.change).toFixed(2)} (${up?'+':'−'}${Math.abs(q.change_pct).toFixed(2)}%)`+(q.live?'':' ·delayed');
+      const sub=`@ ${q.price.toFixed(2)}`;
+      if(s===sym){ $('longSub').textContent=sub; $('shortSub').textContent=sub; }
+    });
+  }
+
+  document.querySelectorAll('#seg button').forEach(b=>b.onclick=()=>{
+    if(inTrade) return;
+    document.querySelectorAll('#seg button').forEach(x=>x.classList.remove('on'));
+    b.classList.add('on'); sym=b.dataset.s; refreshPrices();
+  });
+  function step(d){ if(inTrade)return; qty=Math.max(1,qty+d); $('qty').textContent=qty; }
+
+  async function open(side){
+    const r=await api('/api/order/place',{symbol:sym,side,qty});
+    if(!r.ok && r.rejected){ showReject(r.reason); return; }
+    if(r.detail){ showReject(r.detail); return; }
+    inTrade=true; hideReject(); await tick();
+  }
+  async function close(){
+    const r=await api('/api/order/close',{});
+    if(!r.ok && r.rejected){ showReject(r.reason); return; }
+    inTrade=false; await tick();
+  }
+  async function tick(){ render(await api('/api/state')); }
+
+  function render(st){
+    if(!st) return;
+    if(st.event) showEvent(st.event);
+    if(st.settings) settings={...settings,...st.settings};
+    $('bp').textContent='$'+Number(st.buying_power||0).toLocaleString(undefined,{minimumFractionDigits:2,maximumFractionDigits:2});
+    const dn=Number(st.day_realized||0);
+    const el=$('dayNet'); el.textContent=(dn<0?'−$':'$')+Math.abs(dn).toFixed(2); el.className='net'+(dn<0?' neg':'');
+    $('blotterRows').innerHTML=(st.blotter||[]).slice().reverse().map(t=>{
+      const up=t.pnl>=0;
+      return `<div class="trow"><span>${t.time}</span><span class="s">&nbsp;${t.desc}</span>
+        <span>${t.move}</span><span class="pl ${up?'up':'dn'}">&nbsp;${up?'+':'−'}$${Math.abs(t.pnl).toFixed(2)}</span></div>`;
+    }).join('');
+    const pos=st.position; inTrade=!!pos;
+    document.querySelectorAll('#seg button').forEach(b=>b.disabled=inTrade);
+    if(pos){
+      $('flatActions').classList.add('hidden'); $('tradeActions').classList.remove('hidden'); $('pnlBlock').classList.remove('hidden');
+      $('heroBig').textContent=pos.side+' '+pos.symbol;
+      $('heroSub').textContent=`× ${pos.qty} · IN ${pos.opened_at} @ ${pos.entry.toFixed(2)}`;
+      const pnl=Number(pos.pnl||0);
+      $('pnlN').textContent=(pnl<0?'−$':'+$')+Math.abs(pnl).toFixed(2);
+      $('pnlN').className='n'+(pnl<0?' neg':'');
+      $('pnlPts').textContent=`MARK ${pos.mark.toFixed(2)} · ${(pos.points>=0?'+':'')+(pos.points||0).toFixed(2)} pts`;
+      const parts=[];
+      if(settings.tp_enabled) parts.push('TP +'+settings.tp_points+' pts');
+      if(settings.sl_enabled) parts.push('SL −'+settings.sl_points+' pts');
+      if(settings.trail_enabled && pos.trail_stop!=null) parts.push('TRAIL @ '+pos.trail_stop.toFixed(2));
+      $('bracketLine').textContent=parts.join('  ·  ');
+      $('closeSub').textContent=`MARKET · ${pos.symbol} ${pos.side} × ${pos.qty}`;
+      $('hero').className='hero '+(pos.side==='LONG'?'long':'short');
+    }else{
+      $('flatActions').classList.remove('hidden'); $('tradeActions').classList.add('hidden'); $('pnlBlock').classList.add('hidden');
+      $('heroBig').textContent='FLAT'; $('heroSub').textContent='No open position'; $('hero').className='hero';
+    }
+  }
+
+  function openSettings(){
+    $('tpE').checked=settings.tp_enabled; $('tpV').value=settings.tp_points;
+    $('slE').checked=settings.sl_enabled; $('slV').value=settings.sl_points;
+    $('trE').checked=settings.trail_enabled; $('trV').value=settings.trail_points;
+    $('setScrim').classList.add('show');
+  }
+  function closeSettings(){ $('setScrim').classList.remove('show'); }
+  async function saveSettings(){
+    settings={tp_enabled:$('tpE').checked, tp_points:parseFloat($('tpV').value)||settings.tp_points,
+              sl_enabled:$('slE').checked, sl_points:parseFloat($('slV').value)||settings.sl_points,
+              trail_enabled:$('trE').checked, trail_points:parseFloat($('trV').value)||settings.trail_points};
+    localStorage.setItem(LSS,JSON.stringify(settings));
+    await api('/api/settings',settings);
+    closeSettings();
+  }
+
+  function showEvent(msg){
+    const sl=/STOP LOSS|blocked/i.test(msg);
+    $('eventBanner').className='event show'+(sl?' sl':'');
+    $('eventHead').textContent=(sl?'◆ ':'✔ ')+msg;
+  }
+  function hideEvent(){ $('eventBanner').classList.remove('show'); }
+  function showReject(msg){
+    $('rejectHead').textContent='◆ ORDER REJECTED · '+new Date().toLocaleTimeString('en-US',{hour12:false});
+    $('rejectBody').textContent=msg; $('reject').classList.add('show');
+  }
+  function hideReject(){ $('reject').classList.remove('show'); }
+
+  async function back(){
+    if(inTrade && !confirm('You have an OPEN position. Leave anyway?')) return;
+    await api('/api/disconnect',{}); clearInterval(poll); clearInterval(priceTimer); location.reload();
+  }
+
+  return {step,open,close,back,toggleTheme,openSettings,closeSettings,saveSettings,hideEvent,hideReject};
+})();
+</script>
+</body>
+</html>

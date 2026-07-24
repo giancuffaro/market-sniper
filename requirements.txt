@@ -1,0 +1,13 @@
+# EZEXECUTION backend
+fastapi>=0.110
+uvicorn[standard]>=0.29
+pydantic>=2.0
+
+# Live prices (quotes.py) use only the Python standard library — no package needed.
+
+# --- Webull official SDK (LIVE mode only; PAPER mode does NOT need these) ---
+# Install per Webull's SDK page: https://developer.webull.com/apis/docs/sdk
+# Package names from the webull-openapi-python-sdk project (VERIFY current names):
+#   pip install webull-python-sdk-core
+#   pip install webull-python-sdk-trade
+#   pip install webull-python-sdk-mdata

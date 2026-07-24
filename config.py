@@ -1,0 +1,65 @@
+"""MARKET SNIPER — central config. v3.1"""
+
+APP_VERSION = "3.1"
+APP_NAME = "MARKET SNIPER"
+REGION = "us"
+
+LIVE_TRADE_ENDPOINT    = "api.webull.com"
+SANDBOX_TRADE_ENDPOINT = "us-openapi-alb.uat.webullbroker.com"
+LIVE_EVENTS_ENDPOINT    = "events-api.webull.com"
+SANDBOX_EVENTS_ENDPOINT = "us-openapi-events.uat.webullbroker.com"
+
+PREFERRED_ACCOUNT_TYPE = None   # "MARGIN"/"CASH" to skip the login picker
+
+# Webull's API labels FUTURES accounts as "MARGIN". List the last characters
+# of your futures account id(s) so the app labels them correctly and
+# redirects to the futures app.
+FUTURES_ACCOUNT_SUFFIXES = ["3T0B"]
+
+# SPX stays disabled: it's an INDEX option and Webull's option-snapshot API
+# serves US stock/ETF options only (their docs). SPY/QQQ are the live pair.
+SYMBOLS = {
+    "SPY": {"strike_step": 1.0, "style": "american", "settles": "shares", "enabled": True},
+    "QQQ": {"strike_step": 1.0, "style": "american", "settles": "shares", "enabled": True},
+    "SPX": {"strike_step": 5.0, "style": "european", "settles": "cash",   "enabled": False},
+}
+
+def build_option_order(client_order_id, symbol, strike, expiration, option_type,
+                       side, quantity, limit_price):
+    leg = {
+        "side": side, "quantity": str(quantity), "symbol": symbol,
+        "strike_price": f"{float(strike):.2f}",
+        "option_expire_date": expiration,
+        "instrument_type": "OPTION", "option_type": option_type, "market": "US",
+    }
+    return [{
+        "client_order_id": client_order_id, "combo_type": "NORMAL",
+        "option_strategy": "SINGLE", "order_type": "LIMIT",
+        "limit_price": f"{float(limit_price):.2f}", "quantity": str(quantity),
+        "side": side, "time_in_force": "DAY", "entrust_type": "QTY",
+        "instrument_type": "OPTION", "market": "US", "symbol": symbol, "legs": [leg],
+    }]
+
+MARKETABLE_BUFFER_PCT = 0.02
+MARKETABLE_BUFFER_MIN = 0.02
+SIM_DELTA = 0.45
+
+MAX_CONTRACTS       = 10
+DAILY_LOSS_LIMIT    = 500.0
+REQUIRE_LIVE_ENV_OK = True
+GUARDRAIL_WARN_AT_MINUTES_TO_CLOSE = 15
+AUTO_FLATTEN_DEFAULT = False
+
+# The 3:40 PM cutoff is OUR safety buffer, not a broker rule — options trade
+# until 4:00 PM ET everywhere. Change ENTRY_CUTOFF to (15, 55) to trade later.
+ENFORCE_MARKET_HOURS = True
+MARKET_OPEN        = (9, 30)
+ENTRY_CUTOFF       = (15, 40)
+MARKET_CLOSE_HARD  = (16, 0)
+ENFORCE_MARKET_HOURS_IN_PAPER = True
+
+DEFAULT_SETTINGS = {
+    "strike_mode": "OTM1",
+    "tp_enabled": False, "tp_value": 30.0, "tp_unit": "cents",
+    "sl_enabled": False, "sl_value": 20.0, "sl_unit": "cents",
+}

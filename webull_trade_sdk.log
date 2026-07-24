@@ -1,0 +1,3288 @@
+3312 2026-07-23 20:06:03,199 webull.core.http.initializer.client_initializer INFO _check_token_enable result is False
+3312 2026-07-23 20:06:03,859 webull.core.client ERROR ServerException occurred. Host:api.webull.com SDK-Version:2.0.14 Request:{
+  "_version": "v2",
+  "_action_name": "/openapi/assets/balance",
+  "_protocol_type": "https",
+  "_accept_format": "JSON",
+  "_params": {
+    "account_id": "R8IECPMDTO73FABD0UH7UT3T0B"
+  },
+  "_method": "GET",
+  "_header": {
+    "x-version": "v2",
+    "Accept-Encoding": "gzip",
+    "x-app-key": "53a77ca9e6c56a74be896b66272e4859",
+    "x-timestamp": "2026-07-24T00:06:03Z",
+    "x-signature-version": "1.0",
+    "x-signature-algorithm": "HMAC-SHA256",
+    "x-signature-nonce": "8c965d24-8e39-5fc0-8ea0-6c39f45bc62a",
+    "x-signature": "ajnUbpuuZw0GkhuLSaQkVx5uOuxOhIWWTdBxgND4BpI=",
+    "User-Agent": "WebullApiSDK (Windows 10;AMD64) Python/3.14.6 Core/2.0.14 python-requests/2.34.2",
+    "x-webull-client-source": "sdk"
+  },
+  "_body_params": null,
+  "_uri_pattern": null,
+  "_uri_params": null,
+  "_content": null,
+  "_extra_user_agent": {},
+  "string_to_sign": "",
+  "_request_connect_timeout": null,
+  "_request_read_timeout": null,
+  "endpoint": "api.webull.com",
+  "_signer_spec": "<module 'webull.core.auth.algorithm.sha_hmac1' from 'C:\\\\Users\\\\Hulk\\\\Desktop\\\\asdas\\\\.venv\\\\Lib\\\\site-packages\\\\webull\\\\core\\\\auth\\\\algorithm\\\\sha_hmac1.py'>"
+} Response:{'message': 'Too many requests', 'error_code': 'TOO_MANY_REQUESTS'} ServerException:HTTP Status: 429, Code: TOO_MANY_REQUESTS, Msg: Too many requests, RequestID: c7268e96-2d77-46d3-98ed-84b7371ff3a0
+3312 2026-07-23 20:06:03,861 webull.core.client ERROR get_response exception. {
+  "error_code": "TOO_MANY_REQUESTS",
+  "error_msg": "Too many requests",
+  "http_status": 429,
+  "request_id": "c7268e96-2d77-46d3-98ed-84b7371ff3a0"
+}
+3312 2026-07-23 20:06:16,379 webull.core.http.initializer.client_initializer INFO _check_token_enable result is False
+3312 2026-07-23 20:06:16,379 webull.core.http.initializer.client_initializer INFO _check_token_enable result is False
+17416 2026-07-23 20:06:17,096 webull.core.http.initializer.client_initializer INFO _check_token_enable result is False
+17416 2026-07-23 20:06:17,096 webull.core.http.initializer.client_initializer INFO _check_token_enable result is False
+3868 2026-07-23 20:06:19,565 webull.core.client ERROR ServerException occurred. Host:api.webull.com SDK-Version:2.0.14 Request:{
+  "_version": "v2",
+  "_action_name": "/openapi/market-data/option/snapshot",
+  "_protocol_type": "https",
+  "_accept_format": "JSON",
+  "_params": {
+    "symbols": "SPX260723C07410000",
+    "category": "US_OPTION"
+  },
+  "_method": "GET",
+  "_header": {
+    "x-version": "v2",
+    "Accept-Encoding": "gzip",
+    "x-app-key": "53a77ca9e6c56a74be896b66272e4859",
+    "x-timestamp": "2026-07-24T00:06:19Z",
+    "x-signature-version": "1.0",
+    "x-signature-algorithm": "HMAC-SHA256",
+    "x-signature-nonce": "cab7edde-b712-5e39-aa82-973dcd27ce1b",
+    "x-signature": "4RoxU7JbWXgR/6qawQGTlqbcx2tzjV8c3lnv5Kk88RY=",
+    "User-Agent": "WebullApiSDK (Windows 10;AMD64) Python/3.14.6 Core/2.0.14 python-requests/2.34.2",
+    "x-webull-client-source": "sdk"
+  },
+  "_body_params": null,
+  "_uri_pattern": null,
+  "_uri_params": null,
+  "_content": null,
+  "_extra_user_agent": {},
+  "string_to_sign": "",
+  "_request_connect_timeout": null,
+  "_request_read_timeout": null,
+  "endpoint": "api.webull.com",
+  "_signer_spec": "<module 'webull.core.auth.algorithm.sha_hmac1' from 'C:\\\\Users\\\\Hulk\\\\Desktop\\\\asdas\\\\.venv\\\\Lib\\\\site-packages\\\\webull\\\\core\\\\auth\\\\algorithm\\\\sha_hmac1.py'>"
+} Response:{'error_code': 'INVALID_SYMBOL', 'message': 'Invalid Symbol:[SPX260723C07410000].', 'status': 417} ServerException:HTTP Status: 417, Code: INVALID_SYMBOL, Msg: Invalid Symbol:[SPX260723C07410000]., RequestID: 358d03ec-e85b-4f57-b6bc-5830d39f6859
+3868 2026-07-23 20:06:19,565 webull.core.client ERROR ServerException occurred. Host:api.webull.com SDK-Version:2.0.14 Request:{
+  "_version": "v2",
+  "_action_name": "/openapi/market-data/option/snapshot",
+  "_protocol_type": "https",
+  "_accept_format": "JSON",
+  "_params": {
+    "symbols": "SPX260723C07410000",
+    "category": "US_OPTION"
+  },
+  "_method": "GET",
+  "_header": {
+    "x-version": "v2",
+    "Accept-Encoding": "gzip",
+    "x-app-key": "53a77ca9e6c56a74be896b66272e4859",
+    "x-timestamp": "2026-07-24T00:06:19Z",
+    "x-signature-version": "1.0",
+    "x-signature-algorithm": "HMAC-SHA256",
+    "x-signature-nonce": "cab7edde-b712-5e39-aa82-973dcd27ce1b",
+    "x-signature": "4RoxU7JbWXgR/6qawQGTlqbcx2tzjV8c3lnv5Kk88RY=",
+    "User-Agent": "WebullApiSDK (Windows 10;AMD64) Python/3.14.6 Core/2.0.14 python-requests/2.34.2",
+    "x-webull-client-source": "sdk"
+  },
+  "_body_params": null,
+  "_uri_pattern": null,
+  "_uri_params": null,
+  "_content": null,
+  "_extra_user_agent": {},
+  "string_to_sign": "",
+  "_request_connect_timeout": null,
+  "_request_read_timeout": null,
+  "endpoint": "api.webull.com",
+  "_signer_spec": "<module 'webull.core.auth.algorithm.sha_hmac1' from 'C:\\\\Users\\\\Hulk\\\\Desktop\\\\asdas\\\\.venv\\\\Lib\\\\site-packages\\\\webull\\\\core\\\\auth\\\\algorithm\\\\sha_hmac1.py'>"
+} Response:{'error_code': 'INVALID_SYMBOL', 'message': 'Invalid Symbol:[SPX260723C07410000].', 'status': 417} ServerException:HTTP Status: 417, Code: INVALID_SYMBOL, Msg: Invalid Symbol:[SPX260723C07410000]., RequestID: 358d03ec-e85b-4f57-b6bc-5830d39f6859
+3868 2026-07-23 20:06:19,566 webull.core.client ERROR get_response exception. {
+  "error_code": "INVALID_SYMBOL",
+  "error_msg": "Invalid Symbol:[SPX260723C07410000].",
+  "http_status": 417,
+  "request_id": "358d03ec-e85b-4f57-b6bc-5830d39f6859"
+}
+3868 2026-07-23 20:06:19,566 webull.core.client ERROR get_response exception. {
+  "error_code": "INVALID_SYMBOL",
+  "error_msg": "Invalid Symbol:[SPX260723C07410000].",
+  "http_status": 417,
+  "request_id": "358d03ec-e85b-4f57-b6bc-5830d39f6859"
+}
+3868 2026-07-23 20:06:19,705 webull.core.client ERROR ServerException occurred. Host:api.webull.com SDK-Version:2.0.14 Request:{
+  "_version": "v2",
+  "_action_name": "/openapi/market-data/option/snapshot",
+  "_protocol_type": "https",
+  "_accept_format": "JSON",
+  "_params": {
+    "symbols": "SPX260723C07410000",
+    "category": "US_OPTION"
+  },
+  "_method": "GET",
+  "_header": {
+    "x-version": "v2",
+    "Accept-Encoding": "gzip",
+    "x-app-key": "53a77ca9e6c56a74be896b66272e4859",
+    "x-timestamp": "2026-07-24T00:06:19Z",
+    "x-signature-version": "1.0",
+    "x-signature-algorithm": "HMAC-SHA256",
+    "x-signature-nonce": "81bb3ba9-8879-5f7b-80da-63a9e644c357",
+    "x-signature": "8r1Wlpc8AWyPyDX8wDNi46Pm0qQaiZ/gXxF0ICUbFX0=",
+    "User-Agent": "WebullApiSDK (Windows 10;AMD64) Python/3.14.6 Core/2.0.14 python-requests/2.34.2",
+    "x-webull-client-source": "sdk"
+  },
+  "_body_params": null,
+  "_uri_pattern": null,
+  "_uri_params": null,
+  "_content": null,
+  "_extra_user_agent": {},
+  "string_to_sign": "",
+  "_request_connect_timeout": null,
+  "_request_read_timeout": null,
+  "endpoint": "api.webull.com",
+  "_signer_spec": "<module 'webull.core.auth.algorithm.sha_hmac1' from 'C:\\\\Users\\\\Hulk\\\\Desktop\\\\asdas\\\\.venv\\\\Lib\\\\site-packages\\\\webull\\\\core\\\\auth\\\\algorithm\\\\sha_hmac1.py'>"
+} Response:{'error_code': 'INVALID_SYMBOL', 'message': 'Invalid Symbol:[SPX260723C07410000].', 'status': 417} ServerException:HTTP Status: 417, Code: INVALID_SYMBOL, Msg: Invalid Symbol:[SPX260723C07410000]., RequestID: bfaa6385-3143-4071-8b33-b11ca0660153
+3868 2026-07-23 20:06:19,705 webull.core.client ERROR ServerException occurred. Host:api.webull.com SDK-Version:2.0.14 Request:{
+  "_version": "v2",
+  "_action_name": "/openapi/market-data/option/snapshot",
+  "_protocol_type": "https",
+  "_accept_format": "JSON",
+  "_params": {
+    "symbols": "SPX260723C07410000",
+    "category": "US_OPTION"
+  },
+  "_method": "GET",
+  "_header": {
+    "x-version": "v2",
+    "Accept-Encoding": "gzip",
+    "x-app-key": "53a77ca9e6c56a74be896b66272e4859",
+    "x-timestamp": "2026-07-24T00:06:19Z",
+    "x-signature-version": "1.0",
+    "x-signature-algorithm": "HMAC-SHA256",
+    "x-signature-nonce": "81bb3ba9-8879-5f7b-80da-63a9e644c357",
+    "x-signature": "8r1Wlpc8AWyPyDX8wDNi46Pm0qQaiZ/gXxF0ICUbFX0=",
+    "User-Agent": "WebullApiSDK (Windows 10;AMD64) Python/3.14.6 Core/2.0.14 python-requests/2.34.2",
+    "x-webull-client-source": "sdk"
+  },
+  "_body_params": null,
+  "_uri_pattern": null,
+  "_uri_params": null,
+  "_content": null,
+  "_extra_user_agent": {},
+  "string_to_sign": "",
+  "_request_connect_timeout": null,
+  "_request_read_timeout": null,
+  "endpoint": "api.webull.com",
+  "_signer_spec": "<module 'webull.core.auth.algorithm.sha_hmac1' from 'C:\\\\Users\\\\Hulk\\\\Desktop\\\\asdas\\\\.venv\\\\Lib\\\\site-packages\\\\webull\\\\core\\\\auth\\\\algorithm\\\\sha_hmac1.py'>"
+} Response:{'error_code': 'INVALID_SYMBOL', 'message': 'Invalid Symbol:[SPX260723C07410000].', 'status': 417} ServerException:HTTP Status: 417, Code: INVALID_SYMBOL, Msg: Invalid Symbol:[SPX260723C07410000]., RequestID: bfaa6385-3143-4071-8b33-b11ca0660153
+3868 2026-07-23 20:06:19,706 webull.core.client ERROR get_response exception. {
+  "error_code": "INVALID_SYMBOL",
+  "error_msg": "Invalid Symbol:[SPX260723C07410000].",
+  "http_status": 417,
+  "request_id": "bfaa6385-3143-4071-8b33-b11ca0660153"
+}
+3868 2026-07-23 20:06:19,706 webull.core.client ERROR get_response exception. {
+  "error_code": "INVALID_SYMBOL",
+  "error_msg": "Invalid Symbol:[SPX260723C07410000].",
+  "http_status": 417,
+  "request_id": "bfaa6385-3143-4071-8b33-b11ca0660153"
+}
+3868 2026-07-23 20:06:19,851 webull.core.client ERROR ServerException occurred. Host:api.webull.com SDK-Version:2.0.14 Request:{
+  "_version": "v2",
+  "_action_name": "/openapi/market-data/option/snapshot",
+  "_protocol_type": "https",
+  "_accept_format": "JSON",
+  "_params": {
+    "symbols": "SPX260723C07410000",
+    "category": "US_OPTION"
+  },
+  "_method": "GET",
+  "_header": {
+    "x-version": "v2",
+    "Accept-Encoding": "gzip",
+    "x-app-key": "53a77ca9e6c56a74be896b66272e4859",
+    "x-timestamp": "2026-07-24T00:06:19Z",
+    "x-signature-version": "1.0",
+    "x-signature-algorithm": "HMAC-SHA256",
+    "x-signature-nonce": "4e75af3b-2a12-5e40-adc2-b9f48f572bfe",
+    "x-signature": "2o2fO4qLYT5xNt0OAW4ZdVDF5UbIZ7lxm+ueFGIfx4k=",
+    "User-Agent": "WebullApiSDK (Windows 10;AMD64) Python/3.14.6 Core/2.0.14 python-requests/2.34.2",
+    "x-webull-client-source": "sdk"
+  },
+  "_body_params": null,
+  "_uri_pattern": null,
+  "_uri_params": null,
+  "_content": null,
+  "_extra_user_agent": {},
+  "string_to_sign": "",
+  "_request_connect_timeout": null,
+  "_request_read_timeout": null,
+  "endpoint": "api.webull.com",
+  "_signer_spec": "<module 'webull.core.auth.algorithm.sha_hmac1' from 'C:\\\\Users\\\\Hulk\\\\Desktop\\\\asdas\\\\.venv\\\\Lib\\\\site-packages\\\\webull\\\\core\\\\auth\\\\algorithm\\\\sha_hmac1.py'>"
+} Response:{'error_code': 'INVALID_SYMBOL', 'message': 'Invalid Symbol:[SPX260723C07410000].', 'status': 417} ServerException:HTTP Status: 417, Code: INVALID_SYMBOL, Msg: Invalid Symbol:[SPX260723C07410000]., RequestID: 53251845-1008-4048-888d-b4d59b6bb348
+3868 2026-07-23 20:06:19,851 webull.core.client ERROR ServerException occurred. Host:api.webull.com SDK-Version:2.0.14 Request:{
+  "_version": "v2",
+  "_action_name": "/openapi/market-data/option/snapshot",
+  "_protocol_type": "https",
+  "_accept_format": "JSON",
+  "_params": {
+    "symbols": "SPX260723C07410000",
+    "category": "US_OPTION"
+  },
+  "_method": "GET",
+  "_header": {
+    "x-version": "v2",
+    "Accept-Encoding": "gzip",
+    "x-app-key": "53a77ca9e6c56a74be896b66272e4859",
+    "x-timestamp": "2026-07-24T00:06:19Z",
+    "x-signature-version": "1.0",
+    "x-signature-algorithm": "HMAC-SHA256",
+    "x-signature-nonce": "4e75af3b-2a12-5e40-adc2-b9f48f572bfe",
+    "x-signature": "2o2fO4qLYT5xNt0OAW4ZdVDF5UbIZ7lxm+ueFGIfx4k=",
+    "User-Agent": "WebullApiSDK (Windows 10;AMD64) Python/3.14.6 Core/2.0.14 python-requests/2.34.2",
+    "x-webull-client-source": "sdk"
+  },
+  "_body_params": null,
+  "_uri_pattern": null,
+  "_uri_params": null,
+  "_content": null,
+  "_extra_user_agent": {},
+  "string_to_sign": "",
+  "_request_connect_timeout": null,
+  "_request_read_timeout": null,
+  "endpoint": "api.webull.com",
+  "_signer_spec": "<module 'webull.core.auth.algorithm.sha_hmac1' from 'C:\\\\Users\\\\Hulk\\\\Desktop\\\\asdas\\\\.venv\\\\Lib\\\\site-packages\\\\webull\\\\core\\\\auth\\\\algorithm\\\\sha_hmac1.py'>"
+} Response:{'error_code': 'INVALID_SYMBOL', 'message': 'Invalid Symbol:[SPX260723C07410000].', 'status': 417} ServerException:HTTP Status: 417, Code: INVALID_SYMBOL, Msg: Invalid Symbol:[SPX260723C07410000]., RequestID: 53251845-1008-4048-888d-b4d59b6bb348
+3868 2026-07-23 20:06:19,852 webull.core.client ERROR get_response exception. {
+  "error_code": "INVALID_SYMBOL",
+  "error_msg": "Invalid Symbol:[SPX260723C07410000].",
+  "http_status": 417,
+  "request_id": "53251845-1008-4048-888d-b4d59b6bb348"
+}
+3868 2026-07-23 20:06:19,852 webull.core.client ERROR get_response exception. {
+  "error_code": "INVALID_SYMBOL",
+  "error_msg": "Invalid Symbol:[SPX260723C07410000].",
+  "http_status": 417,
+  "request_id": "53251845-1008-4048-888d-b4d59b6bb348"
+}
+3868 2026-07-23 20:06:19,993 webull.core.client ERROR ServerException occurred. Host:api.webull.com SDK-Version:2.0.14 Request:{
+  "_version": "v2",
+  "_action_name": "/openapi/market-data/option/snapshot",
+  "_protocol_type": "https",
+  "_accept_format": "JSON",
+  "_params": {
+    "symbols": "SPX260723C07410000",
+    "category": "US_OPTION"
+  },
+  "_method": "GET",
+  "_header": {
+    "x-version": "v2",
+    "Accept-Encoding": "gzip",
+    "x-app-key": "53a77ca9e6c56a74be896b66272e4859",
+    "x-timestamp": "2026-07-24T00:06:19Z",
+    "x-signature-version": "1.0",
+    "x-signature-algorithm": "HMAC-SHA256",
+    "x-signature-nonce": "b7596e45-4295-5457-ad24-bc40af35603f",
+    "x-signature": "T0Nb/Lok25Zn1PVC27L8NZSEDnNAGkMaKJ1rhdXjavg=",
+    "User-Agent": "WebullApiSDK (Windows 10;AMD64) Python/3.14.6 Core/2.0.14 python-requests/2.34.2",
+    "x-webull-client-source": "sdk"
+  },
+  "_body_params": null,
+  "_uri_pattern": null,
+  "_uri_params": null,
+  "_content": null,
+  "_extra_user_agent": {},
+  "string_to_sign": "",
+  "_request_connect_timeout": null,
+  "_request_read_timeout": null,
+  "endpoint": "api.webull.com",
+  "_signer_spec": "<module 'webull.core.auth.algorithm.sha_hmac1' from 'C:\\\\Users\\\\Hulk\\\\Desktop\\\\asdas\\\\.venv\\\\Lib\\\\site-packages\\\\webull\\\\core\\\\auth\\\\algorithm\\\\sha_hmac1.py'>"
+} Response:{'error_code': 'INVALID_SYMBOL', 'message': 'Invalid Symbol:[SPX260723C07410000].', 'status': 417} ServerException:HTTP Status: 417, Code: INVALID_SYMBOL, Msg: Invalid Symbol:[SPX260723C07410000]., RequestID: 4ee65261-dde6-407a-91e5-0ee5bbdeea5f
+3868 2026-07-23 20:06:19,993 webull.core.client ERROR ServerException occurred. Host:api.webull.com SDK-Version:2.0.14 Request:{
+  "_version": "v2",
+  "_action_name": "/openapi/market-data/option/snapshot",
+  "_protocol_type": "https",
+  "_accept_format": "JSON",
+  "_params": {
+    "symbols": "SPX260723C07410000",
+    "category": "US_OPTION"
+  },
+  "_method": "GET",
+  "_header": {
+    "x-version": "v2",
+    "Accept-Encoding": "gzip",
+    "x-app-key": "53a77ca9e6c56a74be896b66272e4859",
+    "x-timestamp": "2026-07-24T00:06:19Z",
+    "x-signature-version": "1.0",
+    "x-signature-algorithm": "HMAC-SHA256",
+    "x-signature-nonce": "b7596e45-4295-5457-ad24-bc40af35603f",
+    "x-signature": "T0Nb/Lok25Zn1PVC27L8NZSEDnNAGkMaKJ1rhdXjavg=",
+    "User-Agent": "WebullApiSDK (Windows 10;AMD64) Python/3.14.6 Core/2.0.14 python-requests/2.34.2",
+    "x-webull-client-source": "sdk"
+  },
+  "_body_params": null,
+  "_uri_pattern": null,
+  "_uri_params": null,
+  "_content": null,
+  "_extra_user_agent": {},
+  "string_to_sign": "",
+  "_request_connect_timeout": null,
+  "_request_read_timeout": null,
+  "endpoint": "api.webull.com",
+  "_signer_spec": "<module 'webull.core.auth.algorithm.sha_hmac1' from 'C:\\\\Users\\\\Hulk\\\\Desktop\\\\asdas\\\\.venv\\\\Lib\\\\site-packages\\\\webull\\\\core\\\\auth\\\\algorithm\\\\sha_hmac1.py'>"
+} Response:{'error_code': 'INVALID_SYMBOL', 'message': 'Invalid Symbol:[SPX260723C07410000].', 'status': 417} ServerException:HTTP Status: 417, Code: INVALID_SYMBOL, Msg: Invalid Symbol:[SPX260723C07410000]., RequestID: 4ee65261-dde6-407a-91e5-0ee5bbdeea5f
+3868 2026-07-23 20:06:19,993 webull.core.client ERROR get_response exception. {
+  "error_code": "INVALID_SYMBOL",
+  "error_msg": "Invalid Symbol:[SPX260723C07410000].",
+  "http_status": 417,
+  "request_id": "4ee65261-dde6-407a-91e5-0ee5bbdeea5f"
+}
+3868 2026-07-23 20:06:19,993 webull.core.client ERROR get_response exception. {
+  "error_code": "INVALID_SYMBOL",
+  "error_msg": "Invalid Symbol:[SPX260723C07410000].",
+  "http_status": 417,
+  "request_id": "4ee65261-dde6-407a-91e5-0ee5bbdeea5f"
+}
+17136 2026-07-23 20:06:21,228 webull.core.client ERROR ServerException occurred. Host:api.webull.com SDK-Version:2.0.14 Request:{
+  "_version": "v2",
+  "_action_name": "/openapi/market-data/option/snapshot",
+  "_protocol_type": "https",
+  "_accept_format": "JSON",
+  "_params": {
+    "symbols": "SPX260723C07410000",
+    "category": "US_OPTION"
+  },
+  "_method": "GET",
+  "_header": {
+    "x-version": "v2",
+    "Accept-Encoding": "gzip",
+    "x-app-key": "53a77ca9e6c56a74be896b66272e4859",
+    "x-timestamp": "2026-07-24T00:06:21Z",
+    "x-signature-version": "1.0",
+    "x-signature-algorithm": "HMAC-SHA256",
+    "x-signature-nonce": "0aa2e5b7-d53a-54f2-8f54-6fd7cea4b5be",
+    "x-signature": "e3cphgdWfu3Xb31JdZLt92hRAeJzgsDEtH7A35Gniz0=",
+    "User-Agent": "WebullApiSDK (Windows 10;AMD64) Python/3.14.6 Core/2.0.14 python-requests/2.34.2",
+    "x-webull-client-source": "sdk"
+  },
+  "_body_params": null,
+  "_uri_pattern": null,
+  "_uri_params": null,
+  "_content": null,
+  "_extra_user_agent": {},
+  "string_to_sign": "",
+  "_request_connect_timeout": null,
+  "_request_read_timeout": null,
+  "endpoint": "api.webull.com",
+  "_signer_spec": "<module 'webull.core.auth.algorithm.sha_hmac1' from 'C:\\\\Users\\\\Hulk\\\\Desktop\\\\asdas\\\\.venv\\\\Lib\\\\site-packages\\\\webull\\\\core\\\\auth\\\\algorithm\\\\sha_hmac1.py'>"
+} Response:{'error_code': 'INVALID_SYMBOL', 'message': 'Invalid Symbol:[SPX260723C07410000].', 'status': 417} ServerException:HTTP Status: 417, Code: INVALID_SYMBOL, Msg: Invalid Symbol:[SPX260723C07410000]., RequestID: ebbbd1b0-803d-451e-b62c-bf4f13dc4485
+17136 2026-07-23 20:06:21,228 webull.core.client ERROR ServerException occurred. Host:api.webull.com SDK-Version:2.0.14 Request:{
+  "_version": "v2",
+  "_action_name": "/openapi/market-data/option/snapshot",
+  "_protocol_type": "https",
+  "_accept_format": "JSON",
+  "_params": {
+    "symbols": "SPX260723C07410000",
+    "category": "US_OPTION"
+  },
+  "_method": "GET",
+  "_header": {
+    "x-version": "v2",
+    "Accept-Encoding": "gzip",
+    "x-app-key": "53a77ca9e6c56a74be896b66272e4859",
+    "x-timestamp": "2026-07-24T00:06:21Z",
+    "x-signature-version": "1.0",
+    "x-signature-algorithm": "HMAC-SHA256",
+    "x-signature-nonce": "0aa2e5b7-d53a-54f2-8f54-6fd7cea4b5be",
+    "x-signature": "e3cphgdWfu3Xb31JdZLt92hRAeJzgsDEtH7A35Gniz0=",
+    "User-Agent": "WebullApiSDK (Windows 10;AMD64) Python/3.14.6 Core/2.0.14 python-requests/2.34.2",
+    "x-webull-client-source": "sdk"
+  },
+  "_body_params": null,
+  "_uri_pattern": null,
+  "_uri_params": null,
+  "_content": null,
+  "_extra_user_agent": {},
+  "string_to_sign": "",
+  "_request_connect_timeout": null,
+  "_request_read_timeout": null,
+  "endpoint": "api.webull.com",
+  "_signer_spec": "<module 'webull.core.auth.algorithm.sha_hmac1' from 'C:\\\\Users\\\\Hulk\\\\Desktop\\\\asdas\\\\.venv\\\\Lib\\\\site-packages\\\\webull\\\\core\\\\auth\\\\algorithm\\\\sha_hmac1.py'>"
+} Response:{'error_code': 'INVALID_SYMBOL', 'message': 'Invalid Symbol:[SPX260723C07410000].', 'status': 417} ServerException:HTTP Status: 417, Code: INVALID_SYMBOL, Msg: Invalid Symbol:[SPX260723C07410000]., RequestID: ebbbd1b0-803d-451e-b62c-bf4f13dc4485
+17136 2026-07-23 20:06:21,229 webull.core.client ERROR get_response exception. {
+  "error_code": "INVALID_SYMBOL",
+  "error_msg": "Invalid Symbol:[SPX260723C07410000].",
+  "http_status": 417,
+  "request_id": "ebbbd1b0-803d-451e-b62c-bf4f13dc4485"
+}
+17136 2026-07-23 20:06:21,229 webull.core.client ERROR get_response exception. {
+  "error_code": "INVALID_SYMBOL",
+  "error_msg": "Invalid Symbol:[SPX260723C07410000].",
+  "http_status": 417,
+  "request_id": "ebbbd1b0-803d-451e-b62c-bf4f13dc4485"
+}
+17136 2026-07-23 20:06:21,357 webull.core.client ERROR ServerException occurred. Host:api.webull.com SDK-Version:2.0.14 Request:{
+  "_version": "v2",
+  "_action_name": "/openapi/market-data/option/snapshot",
+  "_protocol_type": "https",
+  "_accept_format": "JSON",
+  "_params": {
+    "symbols": "SPX260723C07410000",
+    "category": "US_OPTION"
+  },
+  "_method": "GET",
+  "_header": {
+    "x-version": "v2",
+    "Accept-Encoding": "gzip",
+    "x-app-key": "53a77ca9e6c56a74be896b66272e4859",
+    "x-timestamp": "2026-07-24T00:06:21Z",
+    "x-signature-version": "1.0",
+    "x-signature-algorithm": "HMAC-SHA256",
+    "x-signature-nonce": "753482ba-381b-5f8b-b38c-38e725736d55",
+    "x-signature": "Ah+3xf88X4WqpNeTZ2twMbIHQfjWPVYSd5YFczTUao8=",
+    "User-Agent": "WebullApiSDK (Windows 10;AMD64) Python/3.14.6 Core/2.0.14 python-requests/2.34.2",
+    "x-webull-client-source": "sdk"
+  },
+  "_body_params": null,
+  "_uri_pattern": null,
+  "_uri_params": null,
+  "_content": null,
+  "_extra_user_agent": {},
+  "string_to_sign": "",
+  "_request_connect_timeout": null,
+  "_request_read_timeout": null,
+  "endpoint": "api.webull.com",
+  "_signer_spec": "<module 'webull.core.auth.algorithm.sha_hmac1' from 'C:\\\\Users\\\\Hulk\\\\Desktop\\\\asdas\\\\.venv\\\\Lib\\\\site-packages\\\\webull\\\\core\\\\auth\\\\algorithm\\\\sha_hmac1.py'>"
+} Response:{'error_code': 'INVALID_SYMBOL', 'message': 'Invalid Symbol:[SPX260723C07410000].', 'status': 417} ServerException:HTTP Status: 417, Code: INVALID_SYMBOL, Msg: Invalid Symbol:[SPX260723C07410000]., RequestID: 9a60f9fc-bee1-4895-853c-d965b30e19e7
+17136 2026-07-23 20:06:21,357 webull.core.client ERROR ServerException occurred. Host:api.webull.com SDK-Version:2.0.14 Request:{
+  "_version": "v2",
+  "_action_name": "/openapi/market-data/option/snapshot",
+  "_protocol_type": "https",
+  "_accept_format": "JSON",
+  "_params": {
+    "symbols": "SPX260723C07410000",
+    "category": "US_OPTION"
+  },
+  "_method": "GET",
+  "_header": {
+    "x-version": "v2",
+    "Accept-Encoding": "gzip",
+    "x-app-key": "53a77ca9e6c56a74be896b66272e4859",
+    "x-timestamp": "2026-07-24T00:06:21Z",
+    "x-signature-version": "1.0",
+    "x-signature-algorithm": "HMAC-SHA256",
+    "x-signature-nonce": "753482ba-381b-5f8b-b38c-38e725736d55",
+    "x-signature": "Ah+3xf88X4WqpNeTZ2twMbIHQfjWPVYSd5YFczTUao8=",
+    "User-Agent": "WebullApiSDK (Windows 10;AMD64) Python/3.14.6 Core/2.0.14 python-requests/2.34.2",
+    "x-webull-client-source": "sdk"
+  },
+  "_body_params": null,
+  "_uri_pattern": null,
+  "_uri_params": null,
+  "_content": null,
+  "_extra_user_agent": {},
+  "string_to_sign": "",
+  "_request_connect_timeout": null,
+  "_request_read_timeout": null,
+  "endpoint": "api.webull.com",
+  "_signer_spec": "<module 'webull.core.auth.algorithm.sha_hmac1' from 'C:\\\\Users\\\\Hulk\\\\Desktop\\\\asdas\\\\.venv\\\\Lib\\\\site-packages\\\\webull\\\\core\\\\auth\\\\algorithm\\\\sha_hmac1.py'>"
+} Response:{'error_code': 'INVALID_SYMBOL', 'message': 'Invalid Symbol:[SPX260723C07410000].', 'status': 417} ServerException:HTTP Status: 417, Code: INVALID_SYMBOL, Msg: Invalid Symbol:[SPX260723C07410000]., RequestID: 9a60f9fc-bee1-4895-853c-d965b30e19e7
+17136 2026-07-23 20:06:21,358 webull.core.client ERROR get_response exception. {
+  "error_code": "INVALID_SYMBOL",
+  "error_msg": "Invalid Symbol:[SPX260723C07410000].",
+  "http_status": 417,
+  "request_id": "9a60f9fc-bee1-4895-853c-d965b30e19e7"
+}
+17136 2026-07-23 20:06:21,358 webull.core.client ERROR get_response exception. {
+  "error_code": "INVALID_SYMBOL",
+  "error_msg": "Invalid Symbol:[SPX260723C07410000].",
+  "http_status": 417,
+  "request_id": "9a60f9fc-bee1-4895-853c-d965b30e19e7"
+}
+17136 2026-07-23 20:06:21,496 webull.core.client ERROR ServerException occurred. Host:api.webull.com SDK-Version:2.0.14 Request:{
+  "_version": "v2",
+  "_action_name": "/openapi/market-data/option/snapshot",
+  "_protocol_type": "https",
+  "_accept_format": "JSON",
+  "_params": {
+    "symbols": "SPX260723C07410000",
+    "category": "US_OPTION"
+  },
+  "_method": "GET",
+  "_header": {
+    "x-version": "v2",
+    "Accept-Encoding": "gzip",
+    "x-app-key": "53a77ca9e6c56a74be896b66272e4859",
+    "x-timestamp": "2026-07-24T00:06:21Z",
+    "x-signature-version": "1.0",
+    "x-signature-algorithm": "HMAC-SHA256",
+    "x-signature-nonce": "1263c9d5-4658-56d5-9db2-4bdcf5892255",
+    "x-signature": "vyfk2dEOrQ64FJCYmR5RnhHlabCpRyMregFJXX9/0qg=",
+    "User-Agent": "WebullApiSDK (Windows 10;AMD64) Python/3.14.6 Core/2.0.14 python-requests/2.34.2",
+    "x-webull-client-source": "sdk"
+  },
+  "_body_params": null,
+  "_uri_pattern": null,
+  "_uri_params": null,
+  "_content": null,
+  "_extra_user_agent": {},
+  "string_to_sign": "",
+  "_request_connect_timeout": null,
+  "_request_read_timeout": null,
+  "endpoint": "api.webull.com",
+  "_signer_spec": "<module 'webull.core.auth.algorithm.sha_hmac1' from 'C:\\\\Users\\\\Hulk\\\\Desktop\\\\asdas\\\\.venv\\\\Lib\\\\site-packages\\\\webull\\\\core\\\\auth\\\\algorithm\\\\sha_hmac1.py'>"
+} Response:{'error_code': 'INVALID_SYMBOL', 'message': 'Invalid Symbol:[SPX260723C07410000].', 'status': 417} ServerException:HTTP Status: 417, Code: INVALID_SYMBOL, Msg: Invalid Symbol:[SPX260723C07410000]., RequestID: f0329d17-7f9f-4400-965a-99a269ba3796
+17136 2026-07-23 20:06:21,496 webull.core.client ERROR ServerException occurred. Host:api.webull.com SDK-Version:2.0.14 Request:{
+  "_version": "v2",
+  "_action_name": "/openapi/market-data/option/snapshot",
+  "_protocol_type": "https",
+  "_accept_format": "JSON",
+  "_params": {
+    "symbols": "SPX260723C07410000",
+    "category": "US_OPTION"
+  },
+  "_method": "GET",
+  "_header": {
+    "x-version": "v2",
+    "Accept-Encoding": "gzip",
+    "x-app-key": "53a77ca9e6c56a74be896b66272e4859",
+    "x-timestamp": "2026-07-24T00:06:21Z",
+    "x-signature-version": "1.0",
+    "x-signature-algorithm": "HMAC-SHA256",
+    "x-signature-nonce": "1263c9d5-4658-56d5-9db2-4bdcf5892255",
+    "x-signature": "vyfk2dEOrQ64FJCYmR5RnhHlabCpRyMregFJXX9/0qg=",
+    "User-Agent": "WebullApiSDK (Windows 10;AMD64) Python/3.14.6 Core/2.0.14 python-requests/2.34.2",
+    "x-webull-client-source": "sdk"
+  },
+  "_body_params": null,
+  "_uri_pattern": null,
+  "_uri_params": null,
+  "_content": null,
+  "_extra_user_agent": {},
+  "string_to_sign": "",
+  "_request_connect_timeout": null,
+  "_request_read_timeout": null,
+  "endpoint": "api.webull.com",
+  "_signer_spec": "<module 'webull.core.auth.algorithm.sha_hmac1' from 'C:\\\\Users\\\\Hulk\\\\Desktop\\\\asdas\\\\.venv\\\\Lib\\\\site-packages\\\\webull\\\\core\\\\auth\\\\algorithm\\\\sha_hmac1.py'>"
+} Response:{'error_code': 'INVALID_SYMBOL', 'message': 'Invalid Symbol:[SPX260723C07410000].', 'status': 417} ServerException:HTTP Status: 417, Code: INVALID_SYMBOL, Msg: Invalid Symbol:[SPX260723C07410000]., RequestID: f0329d17-7f9f-4400-965a-99a269ba3796
+17136 2026-07-23 20:06:21,496 webull.core.client ERROR get_response exception. {
+  "error_code": "INVALID_SYMBOL",
+  "error_msg": "Invalid Symbol:[SPX260723C07410000].",
+  "http_status": 417,
+  "request_id": "f0329d17-7f9f-4400-965a-99a269ba3796"
+}
+17136 2026-07-23 20:06:21,496 webull.core.client ERROR get_response exception. {
+  "error_code": "INVALID_SYMBOL",
+  "error_msg": "Invalid Symbol:[SPX260723C07410000].",
+  "http_status": 417,
+  "request_id": "f0329d17-7f9f-4400-965a-99a269ba3796"
+}
+17136 2026-07-23 20:06:21,640 webull.core.client ERROR ServerException occurred. Host:api.webull.com SDK-Version:2.0.14 Request:{
+  "_version": "v2",
+  "_action_name": "/openapi/market-data/option/snapshot",
+  "_protocol_type": "https",
+  "_accept_format": "JSON",
+  "_params": {
+    "symbols": "SPX260723C07410000",
+    "category": "US_OPTION"
+  },
+  "_method": "GET",
+  "_header": {
+    "x-version": "v2",
+    "Accept-Encoding": "gzip",
+    "x-app-key": "53a77ca9e6c56a74be896b66272e4859",
+    "x-timestamp": "2026-07-24T00:06:21Z",
+    "x-signature-version": "1.0",
+    "x-signature-algorithm": "HMAC-SHA256",
+    "x-signature-nonce": "22f5a0df-5265-583d-9c16-ce7d448b89c7",
+    "x-signature": "V8s/3fv1slM5QqzR3wdX+S1a0YpC4BiJzz1PDFZ6fpc=",
+    "User-Agent": "WebullApiSDK (Windows 10;AMD64) Python/3.14.6 Core/2.0.14 python-requests/2.34.2",
+    "x-webull-client-source": "sdk"
+  },
+  "_body_params": null,
+  "_uri_pattern": null,
+  "_uri_params": null,
+  "_content": null,
+  "_extra_user_agent": {},
+  "string_to_sign": "",
+  "_request_connect_timeout": null,
+  "_request_read_timeout": null,
+  "endpoint": "api.webull.com",
+  "_signer_spec": "<module 'webull.core.auth.algorithm.sha_hmac1' from 'C:\\\\Users\\\\Hulk\\\\Desktop\\\\asdas\\\\.venv\\\\Lib\\\\site-packages\\\\webull\\\\core\\\\auth\\\\algorithm\\\\sha_hmac1.py'>"
+} Response:{'error_code': 'INVALID_SYMBOL', 'message': 'Invalid Symbol:[SPX260723C07410000].', 'status': 417} ServerException:HTTP Status: 417, Code: INVALID_SYMBOL, Msg: Invalid Symbol:[SPX260723C07410000]., RequestID: 871ebb93-f8b1-495e-b51b-d627f41de6a9
+17136 2026-07-23 20:06:21,640 webull.core.client ERROR ServerException occurred. Host:api.webull.com SDK-Version:2.0.14 Request:{
+  "_version": "v2",
+  "_action_name": "/openapi/market-data/option/snapshot",
+  "_protocol_type": "https",
+  "_accept_format": "JSON",
+  "_params": {
+    "symbols": "SPX260723C07410000",
+    "category": "US_OPTION"
+  },
+  "_method": "GET",
+  "_header": {
+    "x-version": "v2",
+    "Accept-Encoding": "gzip",
+    "x-app-key": "53a77ca9e6c56a74be896b66272e4859",
+    "x-timestamp": "2026-07-24T00:06:21Z",
+    "x-signature-version": "1.0",
+    "x-signature-algorithm": "HMAC-SHA256",
+    "x-signature-nonce": "22f5a0df-5265-583d-9c16-ce7d448b89c7",
+    "x-signature": "V8s/3fv1slM5QqzR3wdX+S1a0YpC4BiJzz1PDFZ6fpc=",
+    "User-Agent": "WebullApiSDK (Windows 10;AMD64) Python/3.14.6 Core/2.0.14 python-requests/2.34.2",
+    "x-webull-client-source": "sdk"
+  },
+  "_body_params": null,
+  "_uri_pattern": null,
+  "_uri_params": null,
+  "_content": null,
+  "_extra_user_agent": {},
+  "string_to_sign": "",
+  "_request_connect_timeout": null,
+  "_request_read_timeout": null,
+  "endpoint": "api.webull.com",
+  "_signer_spec": "<module 'webull.core.auth.algorithm.sha_hmac1' from 'C:\\\\Users\\\\Hulk\\\\Desktop\\\\asdas\\\\.venv\\\\Lib\\\\site-packages\\\\webull\\\\core\\\\auth\\\\algorithm\\\\sha_hmac1.py'>"
+} Response:{'error_code': 'INVALID_SYMBOL', 'message': 'Invalid Symbol:[SPX260723C07410000].', 'status': 417} ServerException:HTTP Status: 417, Code: INVALID_SYMBOL, Msg: Invalid Symbol:[SPX260723C07410000]., RequestID: 871ebb93-f8b1-495e-b51b-d627f41de6a9
+17136 2026-07-23 20:06:21,641 webull.core.client ERROR get_response exception. {
+  "error_code": "INVALID_SYMBOL",
+  "error_msg": "Invalid Symbol:[SPX260723C07410000].",
+  "http_status": 417,
+  "request_id": "871ebb93-f8b1-495e-b51b-d627f41de6a9"
+}
+17136 2026-07-23 20:06:21,641 webull.core.client ERROR get_response exception. {
+  "error_code": "INVALID_SYMBOL",
+  "error_msg": "Invalid Symbol:[SPX260723C07410000].",
+  "http_status": 417,
+  "request_id": "871ebb93-f8b1-495e-b51b-d627f41de6a9"
+}
+3868 2026-07-23 20:06:21,845 webull.core.client ERROR ServerException occurred. Host:api.webull.com SDK-Version:2.0.14 Request:{
+  "_version": "v2",
+  "_action_name": "/openapi/market-data/option/snapshot",
+  "_protocol_type": "https",
+  "_accept_format": "JSON",
+  "_params": {
+    "symbols": "SPX260723C07410000",
+    "category": "US_OPTION"
+  },
+  "_method": "GET",
+  "_header": {
+    "x-version": "v2",
+    "Accept-Encoding": "gzip",
+    "x-app-key": "53a77ca9e6c56a74be896b66272e4859",
+    "x-timestamp": "2026-07-24T00:06:21Z",
+    "x-signature-version": "1.0",
+    "x-signature-algorithm": "HMAC-SHA256",
+    "x-signature-nonce": "586dd37a-fd3c-51ac-a029-c75cc6f46ebe",
+    "x-signature": "lCcAih4ZkhZ8TTdcU2oBF6JU0ypVEqc6xgKdl3HY2hM=",
+    "User-Agent": "WebullApiSDK (Windows 10;AMD64) Python/3.14.6 Core/2.0.14 python-requests/2.34.2",
+    "x-webull-client-source": "sdk"
+  },
+  "_body_params": null,
+  "_uri_pattern": null,
+  "_uri_params": null,
+  "_content": null,
+  "_extra_user_agent": {},
+  "string_to_sign": "",
+  "_request_connect_timeout": null,
+  "_request_read_timeout": null,
+  "endpoint": "api.webull.com",
+  "_signer_spec": "<module 'webull.core.auth.algorithm.sha_hmac1' from 'C:\\\\Users\\\\Hulk\\\\Desktop\\\\asdas\\\\.venv\\\\Lib\\\\site-packages\\\\webull\\\\core\\\\auth\\\\algorithm\\\\sha_hmac1.py'>"
+} Response:{'error_code': 'INVALID_SYMBOL', 'message': 'Invalid Symbol:[SPX260723C07410000].', 'status': 417} ServerException:HTTP Status: 417, Code: INVALID_SYMBOL, Msg: Invalid Symbol:[SPX260723C07410000]., RequestID: 7d9dc026-d822-4d3f-b493-862f22d5ec8c
+3868 2026-07-23 20:06:21,845 webull.core.client ERROR ServerException occurred. Host:api.webull.com SDK-Version:2.0.14 Request:{
+  "_version": "v2",
+  "_action_name": "/openapi/market-data/option/snapshot",
+  "_protocol_type": "https",
+  "_accept_format": "JSON",
+  "_params": {
+    "symbols": "SPX260723C07410000",
+    "category": "US_OPTION"
+  },
+  "_method": "GET",
+  "_header": {
+    "x-version": "v2",
+    "Accept-Encoding": "gzip",
+    "x-app-key": "53a77ca9e6c56a74be896b66272e4859",
+    "x-timestamp": "2026-07-24T00:06:21Z",
+    "x-signature-version": "1.0",
+    "x-signature-algorithm": "HMAC-SHA256",
+    "x-signature-nonce": "586dd37a-fd3c-51ac-a029-c75cc6f46ebe",
+    "x-signature": "lCcAih4ZkhZ8TTdcU2oBF6JU0ypVEqc6xgKdl3HY2hM=",
+    "User-Agent": "WebullApiSDK (Windows 10;AMD64) Python/3.14.6 Core/2.0.14 python-requests/2.34.2",
+    "x-webull-client-source": "sdk"
+  },
+  "_body_params": null,
+  "_uri_pattern": null,
+  "_uri_params": null,
+  "_content": null,
+  "_extra_user_agent": {},
+  "string_to_sign": "",
+  "_request_connect_timeout": null,
+  "_request_read_timeout": null,
+  "endpoint": "api.webull.com",
+  "_signer_spec": "<module 'webull.core.auth.algorithm.sha_hmac1' from 'C:\\\\Users\\\\Hulk\\\\Desktop\\\\asdas\\\\.venv\\\\Lib\\\\site-packages\\\\webull\\\\core\\\\auth\\\\algorithm\\\\sha_hmac1.py'>"
+} Response:{'error_code': 'INVALID_SYMBOL', 'message': 'Invalid Symbol:[SPX260723C07410000].', 'status': 417} ServerException:HTTP Status: 417, Code: INVALID_SYMBOL, Msg: Invalid Symbol:[SPX260723C07410000]., RequestID: 7d9dc026-d822-4d3f-b493-862f22d5ec8c
+3868 2026-07-23 20:06:21,846 webull.core.client ERROR get_response exception. {
+  "error_code": "INVALID_SYMBOL",
+  "error_msg": "Invalid Symbol:[SPX260723C07410000].",
+  "http_status": 417,
+  "request_id": "7d9dc026-d822-4d3f-b493-862f22d5ec8c"
+}
+3868 2026-07-23 20:06:21,846 webull.core.client ERROR get_response exception. {
+  "error_code": "INVALID_SYMBOL",
+  "error_msg": "Invalid Symbol:[SPX260723C07410000].",
+  "http_status": 417,
+  "request_id": "7d9dc026-d822-4d3f-b493-862f22d5ec8c"
+}
+3868 2026-07-23 20:06:22,046 webull.core.client ERROR ServerException occurred. Host:api.webull.com SDK-Version:2.0.14 Request:{
+  "_version": "v2",
+  "_action_name": "/openapi/market-data/option/snapshot",
+  "_protocol_type": "https",
+  "_accept_format": "JSON",
+  "_params": {
+    "symbols": "SPX260723C07410000",
+    "category": "US_OPTION"
+  },
+  "_method": "GET",
+  "_header": {
+    "x-version": "v2",
+    "Accept-Encoding": "gzip",
+    "x-app-key": "53a77ca9e6c56a74be896b66272e4859",
+    "x-timestamp": "2026-07-24T00:06:21Z",
+    "x-signature-version": "1.0",
+    "x-signature-algorithm": "HMAC-SHA256",
+    "x-signature-nonce": "da64576c-99ac-5094-802d-da55ae98dccd",
+    "x-signature": "N09b1NGLBANogGVgsdeok20isINU/4ATvyDXyamF9IA=",
+    "User-Agent": "WebullApiSDK (Windows 10;AMD64) Python/3.14.6 Core/2.0.14 python-requests/2.34.2",
+    "x-webull-client-source": "sdk"
+  },
+  "_body_params": null,
+  "_uri_pattern": null,
+  "_uri_params": null,
+  "_content": null,
+  "_extra_user_agent": {},
+  "string_to_sign": "",
+  "_request_connect_timeout": null,
+  "_request_read_timeout": null,
+  "endpoint": "api.webull.com",
+  "_signer_spec": "<module 'webull.core.auth.algorithm.sha_hmac1' from 'C:\\\\Users\\\\Hulk\\\\Desktop\\\\asdas\\\\.venv\\\\Lib\\\\site-packages\\\\webull\\\\core\\\\auth\\\\algorithm\\\\sha_hmac1.py'>"
+} Response:{'error_code': 'INVALID_SYMBOL', 'message': 'Invalid Symbol:[SPX260723C07410000].', 'status': 417} ServerException:HTTP Status: 417, Code: INVALID_SYMBOL, Msg: Invalid Symbol:[SPX260723C07410000]., RequestID: bdf55299-2e12-4a63-a4c5-ed0b92e1400c
+3868 2026-07-23 20:06:22,046 webull.core.client ERROR ServerException occurred. Host:api.webull.com SDK-Version:2.0.14 Request:{
+  "_version": "v2",
+  "_action_name": "/openapi/market-data/option/snapshot",
+  "_protocol_type": "https",
+  "_accept_format": "JSON",
+  "_params": {
+    "symbols": "SPX260723C07410000",
+    "category": "US_OPTION"
+  },
+  "_method": "GET",
+  "_header": {
+    "x-version": "v2",
+    "Accept-Encoding": "gzip",
+    "x-app-key": "53a77ca9e6c56a74be896b66272e4859",
+    "x-timestamp": "2026-07-24T00:06:21Z",
+    "x-signature-version": "1.0",
+    "x-signature-algorithm": "HMAC-SHA256",
+    "x-signature-nonce": "da64576c-99ac-5094-802d-da55ae98dccd",
+    "x-signature": "N09b1NGLBANogGVgsdeok20isINU/4ATvyDXyamF9IA=",
+    "User-Agent": "WebullApiSDK (Windows 10;AMD64) Python/3.14.6 Core/2.0.14 python-requests/2.34.2",
+    "x-webull-client-source": "sdk"
+  },
+  "_body_params": null,
+  "_uri_pattern": null,
+  "_uri_params": null,
+  "_content": null,
+  "_extra_user_agent": {},
+  "string_to_sign": "",
+  "_request_connect_timeout": null,
+  "_request_read_timeout": null,
+  "endpoint": "api.webull.com",
+  "_signer_spec": "<module 'webull.core.auth.algorithm.sha_hmac1' from 'C:\\\\Users\\\\Hulk\\\\Desktop\\\\asdas\\\\.venv\\\\Lib\\\\site-packages\\\\webull\\\\core\\\\auth\\\\algorithm\\\\sha_hmac1.py'>"
+} Response:{'error_code': 'INVALID_SYMBOL', 'message': 'Invalid Symbol:[SPX260723C07410000].', 'status': 417} ServerException:HTTP Status: 417, Code: INVALID_SYMBOL, Msg: Invalid Symbol:[SPX260723C07410000]., RequestID: bdf55299-2e12-4a63-a4c5-ed0b92e1400c
+3868 2026-07-23 20:06:22,048 webull.core.client ERROR get_response exception. {
+  "error_code": "INVALID_SYMBOL",
+  "error_msg": "Invalid Symbol:[SPX260723C07410000].",
+  "http_status": 417,
+  "request_id": "bdf55299-2e12-4a63-a4c5-ed0b92e1400c"
+}
+3868 2026-07-23 20:06:22,048 webull.core.client ERROR get_response exception. {
+  "error_code": "INVALID_SYMBOL",
+  "error_msg": "Invalid Symbol:[SPX260723C07410000].",
+  "http_status": 417,
+  "request_id": "bdf55299-2e12-4a63-a4c5-ed0b92e1400c"
+}
+3868 2026-07-23 20:06:22,183 webull.core.client ERROR ServerException occurred. Host:api.webull.com SDK-Version:2.0.14 Request:{
+  "_version": "v2",
+  "_action_name": "/openapi/market-data/option/snapshot",
+  "_protocol_type": "https",
+  "_accept_format": "JSON",
+  "_params": {
+    "symbols": "SPX260723C07410000",
+    "category": "US_OPTION"
+  },
+  "_method": "GET",
+  "_header": {
+    "x-version": "v2",
+    "Accept-Encoding": "gzip",
+    "x-app-key": "53a77ca9e6c56a74be896b66272e4859",
+    "x-timestamp": "2026-07-24T00:06:22Z",
+    "x-signature-version": "1.0",
+    "x-signature-algorithm": "HMAC-SHA256",
+    "x-signature-nonce": "292c5681-91f3-560c-8f13-fe71d115028b",
+    "x-signature": "+8tFTcgoXU5CoorVHs35d4hdd5nO1bNtaHroCPUZNHw=",
+    "User-Agent": "WebullApiSDK (Windows 10;AMD64) Python/3.14.6 Core/2.0.14 python-requests/2.34.2",
+    "x-webull-client-source": "sdk"
+  },
+  "_body_params": null,
+  "_uri_pattern": null,
+  "_uri_params": null,
+  "_content": null,
+  "_extra_user_agent": {},
+  "string_to_sign": "",
+  "_request_connect_timeout": null,
+  "_request_read_timeout": null,
+  "endpoint": "api.webull.com",
+  "_signer_spec": "<module 'webull.core.auth.algorithm.sha_hmac1' from 'C:\\\\Users\\\\Hulk\\\\Desktop\\\\asdas\\\\.venv\\\\Lib\\\\site-packages\\\\webull\\\\core\\\\auth\\\\algorithm\\\\sha_hmac1.py'>"
+} Response:{'error_code': 'INVALID_SYMBOL', 'message': 'Invalid Symbol:[SPX260723C07410000].', 'status': 417} ServerException:HTTP Status: 417, Code: INVALID_SYMBOL, Msg: Invalid Symbol:[SPX260723C07410000]., RequestID: e04475ba-0e42-4ad1-add2-d53b342d02ff
+3868 2026-07-23 20:06:22,183 webull.core.client ERROR ServerException occurred. Host:api.webull.com SDK-Version:2.0.14 Request:{
+  "_version": "v2",
+  "_action_name": "/openapi/market-data/option/snapshot",
+  "_protocol_type": "https",
+  "_accept_format": "JSON",
+  "_params": {
+    "symbols": "SPX260723C07410000",
+    "category": "US_OPTION"
+  },
+  "_method": "GET",
+  "_header": {
+    "x-version": "v2",
+    "Accept-Encoding": "gzip",
+    "x-app-key": "53a77ca9e6c56a74be896b66272e4859",
+    "x-timestamp": "2026-07-24T00:06:22Z",
+    "x-signature-version": "1.0",
+    "x-signature-algorithm": "HMAC-SHA256",
+    "x-signature-nonce": "292c5681-91f3-560c-8f13-fe71d115028b",
+    "x-signature": "+8tFTcgoXU5CoorVHs35d4hdd5nO1bNtaHroCPUZNHw=",
+    "User-Agent": "WebullApiSDK (Windows 10;AMD64) Python/3.14.6 Core/2.0.14 python-requests/2.34.2",
+    "x-webull-client-source": "sdk"
+  },
+  "_body_params": null,
+  "_uri_pattern": null,
+  "_uri_params": null,
+  "_content": null,
+  "_extra_user_agent": {},
+  "string_to_sign": "",
+  "_request_connect_timeout": null,
+  "_request_read_timeout": null,
+  "endpoint": "api.webull.com",
+  "_signer_spec": "<module 'webull.core.auth.algorithm.sha_hmac1' from 'C:\\\\Users\\\\Hulk\\\\Desktop\\\\asdas\\\\.venv\\\\Lib\\\\site-packages\\\\webull\\\\core\\\\auth\\\\algorithm\\\\sha_hmac1.py'>"
+} Response:{'error_code': 'INVALID_SYMBOL', 'message': 'Invalid Symbol:[SPX260723C07410000].', 'status': 417} ServerException:HTTP Status: 417, Code: INVALID_SYMBOL, Msg: Invalid Symbol:[SPX260723C07410000]., RequestID: e04475ba-0e42-4ad1-add2-d53b342d02ff
+3868 2026-07-23 20:06:22,183 webull.core.client ERROR get_response exception. {
+  "error_code": "INVALID_SYMBOL",
+  "error_msg": "Invalid Symbol:[SPX260723C07410000].",
+  "http_status": 417,
+  "request_id": "e04475ba-0e42-4ad1-add2-d53b342d02ff"
+}
+3868 2026-07-23 20:06:22,183 webull.core.client ERROR get_response exception. {
+  "error_code": "INVALID_SYMBOL",
+  "error_msg": "Invalid Symbol:[SPX260723C07410000].",
+  "http_status": 417,
+  "request_id": "e04475ba-0e42-4ad1-add2-d53b342d02ff"
+}
+3868 2026-07-23 20:06:22,331 webull.core.client ERROR ServerException occurred. Host:api.webull.com SDK-Version:2.0.14 Request:{
+  "_version": "v2",
+  "_action_name": "/openapi/market-data/option/snapshot",
+  "_protocol_type": "https",
+  "_accept_format": "JSON",
+  "_params": {
+    "symbols": "SPX260723C07410000",
+    "category": "US_OPTION"
+  },
+  "_method": "GET",
+  "_header": {
+    "x-version": "v2",
+    "Accept-Encoding": "gzip",
+    "x-app-key": "53a77ca9e6c56a74be896b66272e4859",
+    "x-timestamp": "2026-07-24T00:06:22Z",
+    "x-signature-version": "1.0",
+    "x-signature-algorithm": "HMAC-SHA256",
+    "x-signature-nonce": "0583bbcd-33ed-5cc5-96f5-3cc22c847c17",
+    "x-signature": "4CtFmQswV0SH0yATRYfa8aLhmR5+kTn0LcHRQJLh2bo=",
+    "User-Agent": "WebullApiSDK (Windows 10;AMD64) Python/3.14.6 Core/2.0.14 python-requests/2.34.2",
+    "x-webull-client-source": "sdk"
+  },
+  "_body_params": null,
+  "_uri_pattern": null,
+  "_uri_params": null,
+  "_content": null,
+  "_extra_user_agent": {},
+  "string_to_sign": "",
+  "_request_connect_timeout": null,
+  "_request_read_timeout": null,
+  "endpoint": "api.webull.com",
+  "_signer_spec": "<module 'webull.core.auth.algorithm.sha_hmac1' from 'C:\\\\Users\\\\Hulk\\\\Desktop\\\\asdas\\\\.venv\\\\Lib\\\\site-packages\\\\webull\\\\core\\\\auth\\\\algorithm\\\\sha_hmac1.py'>"
+} Response:{'error_code': 'INVALID_SYMBOL', 'message': 'Invalid Symbol:[SPX260723C07410000].', 'status': 417} ServerException:HTTP Status: 417, Code: INVALID_SYMBOL, Msg: Invalid Symbol:[SPX260723C07410000]., RequestID: 206c7e0f-c5d2-4b2f-a7c1-a978b39fbcec
+3868 2026-07-23 20:06:22,331 webull.core.client ERROR ServerException occurred. Host:api.webull.com SDK-Version:2.0.14 Request:{
+  "_version": "v2",
+  "_action_name": "/openapi/market-data/option/snapshot",
+  "_protocol_type": "https",
+  "_accept_format": "JSON",
+  "_params": {
+    "symbols": "SPX260723C07410000",
+    "category": "US_OPTION"
+  },
+  "_method": "GET",
+  "_header": {
+    "x-version": "v2",
+    "Accept-Encoding": "gzip",
+    "x-app-key": "53a77ca9e6c56a74be896b66272e4859",
+    "x-timestamp": "2026-07-24T00:06:22Z",
+    "x-signature-version": "1.0",
+    "x-signature-algorithm": "HMAC-SHA256",
+    "x-signature-nonce": "0583bbcd-33ed-5cc5-96f5-3cc22c847c17",
+    "x-signature": "4CtFmQswV0SH0yATRYfa8aLhmR5+kTn0LcHRQJLh2bo=",
+    "User-Agent": "WebullApiSDK (Windows 10;AMD64) Python/3.14.6 Core/2.0.14 python-requests/2.34.2",
+    "x-webull-client-source": "sdk"
+  },
+  "_body_params": null,
+  "_uri_pattern": null,
+  "_uri_params": null,
+  "_content": null,
+  "_extra_user_agent": {},
+  "string_to_sign": "",
+  "_request_connect_timeout": null,
+  "_request_read_timeout": null,
+  "endpoint": "api.webull.com",
+  "_signer_spec": "<module 'webull.core.auth.algorithm.sha_hmac1' from 'C:\\\\Users\\\\Hulk\\\\Desktop\\\\asdas\\\\.venv\\\\Lib\\\\site-packages\\\\webull\\\\core\\\\auth\\\\algorithm\\\\sha_hmac1.py'>"
+} Response:{'error_code': 'INVALID_SYMBOL', 'message': 'Invalid Symbol:[SPX260723C07410000].', 'status': 417} ServerException:HTTP Status: 417, Code: INVALID_SYMBOL, Msg: Invalid Symbol:[SPX260723C07410000]., RequestID: 206c7e0f-c5d2-4b2f-a7c1-a978b39fbcec
+3868 2026-07-23 20:06:22,331 webull.core.client ERROR get_response exception. {
+  "error_code": "INVALID_SYMBOL",
+  "error_msg": "Invalid Symbol:[SPX260723C07410000].",
+  "http_status": 417,
+  "request_id": "206c7e0f-c5d2-4b2f-a7c1-a978b39fbcec"
+}
+3868 2026-07-23 20:06:22,331 webull.core.client ERROR get_response exception. {
+  "error_code": "INVALID_SYMBOL",
+  "error_msg": "Invalid Symbol:[SPX260723C07410000].",
+  "http_status": 417,
+  "request_id": "206c7e0f-c5d2-4b2f-a7c1-a978b39fbcec"
+}
+17416 2026-07-23 20:06:27,130 webull.core.client ERROR ServerException occurred. Host:api.webull.com SDK-Version:2.0.14 Request:{
+  "_version": "v2",
+  "_action_name": "/openapi/market-data/option/snapshot",
+  "_protocol_type": "https",
+  "_accept_format": "JSON",
+  "_params": {
+    "symbols": "SPX260723C07410000",
+    "category": "US_OPTION"
+  },
+  "_method": "GET",
+  "_header": {
+    "x-version": "v2",
+    "Accept-Encoding": "gzip",
+    "x-app-key": "53a77ca9e6c56a74be896b66272e4859",
+    "x-timestamp": "2026-07-24T00:06:26Z",
+    "x-signature-version": "1.0",
+    "x-signature-algorithm": "HMAC-SHA256",
+    "x-signature-nonce": "b2d444bf-264b-5d1f-80e1-21b0a89abce2",
+    "x-signature": "Mx02+O+1vi/JcFwrWO4bTOZ1BQBAjla4VuTTrPJ8QT8=",
+    "User-Agent": "WebullApiSDK (Windows 10;AMD64) Python/3.14.6 Core/2.0.14 python-requests/2.34.2",
+    "x-webull-client-source": "sdk"
+  },
+  "_body_params": null,
+  "_uri_pattern": null,
+  "_uri_params": null,
+  "_content": null,
+  "_extra_user_agent": {},
+  "string_to_sign": "",
+  "_request_connect_timeout": null,
+  "_request_read_timeout": null,
+  "endpoint": "api.webull.com",
+  "_signer_spec": "<module 'webull.core.auth.algorithm.sha_hmac1' from 'C:\\\\Users\\\\Hulk\\\\Desktop\\\\asdas\\\\.venv\\\\Lib\\\\site-packages\\\\webull\\\\core\\\\auth\\\\algorithm\\\\sha_hmac1.py'>"
+} Response:{'error_code': 'INVALID_SYMBOL', 'message': 'Invalid Symbol:[SPX260723C07410000].', 'status': 417} ServerException:HTTP Status: 417, Code: INVALID_SYMBOL, Msg: Invalid Symbol:[SPX260723C07410000]., RequestID: 31d6d050-5a67-49f4-a791-bedee4a536ba
+17416 2026-07-23 20:06:27,130 webull.core.client ERROR ServerException occurred. Host:api.webull.com SDK-Version:2.0.14 Request:{
+  "_version": "v2",
+  "_action_name": "/openapi/market-data/option/snapshot",
+  "_protocol_type": "https",
+  "_accept_format": "JSON",
+  "_params": {
+    "symbols": "SPX260723C07410000",
+    "category": "US_OPTION"
+  },
+  "_method": "GET",
+  "_header": {
+    "x-version": "v2",
+    "Accept-Encoding": "gzip",
+    "x-app-key": "53a77ca9e6c56a74be896b66272e4859",
+    "x-timestamp": "2026-07-24T00:06:26Z",
+    "x-signature-version": "1.0",
+    "x-signature-algorithm": "HMAC-SHA256",
+    "x-signature-nonce": "b2d444bf-264b-5d1f-80e1-21b0a89abce2",
+    "x-signature": "Mx02+O+1vi/JcFwrWO4bTOZ1BQBAjla4VuTTrPJ8QT8=",
+    "User-Agent": "WebullApiSDK (Windows 10;AMD64) Python/3.14.6 Core/2.0.14 python-requests/2.34.2",
+    "x-webull-client-source": "sdk"
+  },
+  "_body_params": null,
+  "_uri_pattern": null,
+  "_uri_params": null,
+  "_content": null,
+  "_extra_user_agent": {},
+  "string_to_sign": "",
+  "_request_connect_timeout": null,
+  "_request_read_timeout": null,
+  "endpoint": "api.webull.com",
+  "_signer_spec": "<module 'webull.core.auth.algorithm.sha_hmac1' from 'C:\\\\Users\\\\Hulk\\\\Desktop\\\\asdas\\\\.venv\\\\Lib\\\\site-packages\\\\webull\\\\core\\\\auth\\\\algorithm\\\\sha_hmac1.py'>"
+} Response:{'error_code': 'INVALID_SYMBOL', 'message': 'Invalid Symbol:[SPX260723C07410000].', 'status': 417} ServerException:HTTP Status: 417, Code: INVALID_SYMBOL, Msg: Invalid Symbol:[SPX260723C07410000]., RequestID: 31d6d050-5a67-49f4-a791-bedee4a536ba
+17416 2026-07-23 20:06:27,131 webull.core.client ERROR get_response exception. {
+  "error_code": "INVALID_SYMBOL",
+  "error_msg": "Invalid Symbol:[SPX260723C07410000].",
+  "http_status": 417,
+  "request_id": "31d6d050-5a67-49f4-a791-bedee4a536ba"
+}
+17416 2026-07-23 20:06:27,131 webull.core.client ERROR get_response exception. {
+  "error_code": "INVALID_SYMBOL",
+  "error_msg": "Invalid Symbol:[SPX260723C07410000].",
+  "http_status": 417,
+  "request_id": "31d6d050-5a67-49f4-a791-bedee4a536ba"
+}
+17136 2026-07-23 20:06:27,184 webull.core.client ERROR ServerException occurred. Host:api.webull.com SDK-Version:2.0.14 Request:{
+  "_version": "v2",
+  "_action_name": "/openapi/market-data/option/snapshot",
+  "_protocol_type": "https",
+  "_accept_format": "JSON",
+  "_params": {
+    "symbols": "SPX260723P07405000",
+    "category": "US_OPTION"
+  },
+  "_method": "GET",
+  "_header": {
+    "x-version": "v2",
+    "Accept-Encoding": "gzip",
+    "x-app-key": "53a77ca9e6c56a74be896b66272e4859",
+    "x-timestamp": "2026-07-24T00:06:27Z",
+    "x-signature-version": "1.0",
+    "x-signature-algorithm": "HMAC-SHA256",
+    "x-signature-nonce": "b8f5e811-40ed-52b6-a2b9-e37aa3752186",
+    "x-signature": "yrLECuJa2YMg/GYySJ4Yaq4tjZFV0uqcutOFN9wGaH8=",
+    "User-Agent": "WebullApiSDK (Windows 10;AMD64) Python/3.14.6 Core/2.0.14 python-requests/2.34.2",
+    "x-webull-client-source": "sdk"
+  },
+  "_body_params": null,
+  "_uri_pattern": null,
+  "_uri_params": null,
+  "_content": null,
+  "_extra_user_agent": {},
+  "string_to_sign": "",
+  "_request_connect_timeout": null,
+  "_request_read_timeout": null,
+  "endpoint": "api.webull.com",
+  "_signer_spec": "<module 'webull.core.auth.algorithm.sha_hmac1' from 'C:\\\\Users\\\\Hulk\\\\Desktop\\\\asdas\\\\.venv\\\\Lib\\\\site-packages\\\\webull\\\\core\\\\auth\\\\algorithm\\\\sha_hmac1.py'>"
+} Response:{'error_code': 'INVALID_SYMBOL', 'message': 'Invalid Symbol:[SPX260723P07405000].', 'status': 417} ServerException:HTTP Status: 417, Code: INVALID_SYMBOL, Msg: Invalid Symbol:[SPX260723P07405000]., RequestID: 8a4a3e1b-d99e-4cb5-8562-16357025b8d4
+17136 2026-07-23 20:06:27,184 webull.core.client ERROR ServerException occurred. Host:api.webull.com SDK-Version:2.0.14 Request:{
+  "_version": "v2",
+  "_action_name": "/openapi/market-data/option/snapshot",
+  "_protocol_type": "https",
+  "_accept_format": "JSON",
+  "_params": {
+    "symbols": "SPX260723P07405000",
+    "category": "US_OPTION"
+  },
+  "_method": "GET",
+  "_header": {
+    "x-version": "v2",
+    "Accept-Encoding": "gzip",
+    "x-app-key": "53a77ca9e6c56a74be896b66272e4859",
+    "x-timestamp": "2026-07-24T00:06:27Z",
+    "x-signature-version": "1.0",
+    "x-signature-algorithm": "HMAC-SHA256",
+    "x-signature-nonce": "b8f5e811-40ed-52b6-a2b9-e37aa3752186",
+    "x-signature": "yrLECuJa2YMg/GYySJ4Yaq4tjZFV0uqcutOFN9wGaH8=",
+    "User-Agent": "WebullApiSDK (Windows 10;AMD64) Python/3.14.6 Core/2.0.14 python-requests/2.34.2",
+    "x-webull-client-source": "sdk"
+  },
+  "_body_params": null,
+  "_uri_pattern": null,
+  "_uri_params": null,
+  "_content": null,
+  "_extra_user_agent": {},
+  "string_to_sign": "",
+  "_request_connect_timeout": null,
+  "_request_read_timeout": null,
+  "endpoint": "api.webull.com",
+  "_signer_spec": "<module 'webull.core.auth.algorithm.sha_hmac1' from 'C:\\\\Users\\\\Hulk\\\\Desktop\\\\asdas\\\\.venv\\\\Lib\\\\site-packages\\\\webull\\\\core\\\\auth\\\\algorithm\\\\sha_hmac1.py'>"
+} Response:{'error_code': 'INVALID_SYMBOL', 'message': 'Invalid Symbol:[SPX260723P07405000].', 'status': 417} ServerException:HTTP Status: 417, Code: INVALID_SYMBOL, Msg: Invalid Symbol:[SPX260723P07405000]., RequestID: 8a4a3e1b-d99e-4cb5-8562-16357025b8d4
+17136 2026-07-23 20:06:27,185 webull.core.client ERROR get_response exception. {
+  "error_code": "INVALID_SYMBOL",
+  "error_msg": "Invalid Symbol:[SPX260723P07405000].",
+  "http_status": 417,
+  "request_id": "8a4a3e1b-d99e-4cb5-8562-16357025b8d4"
+}
+17136 2026-07-23 20:06:27,185 webull.core.client ERROR get_response exception. {
+  "error_code": "INVALID_SYMBOL",
+  "error_msg": "Invalid Symbol:[SPX260723P07405000].",
+  "http_status": 417,
+  "request_id": "8a4a3e1b-d99e-4cb5-8562-16357025b8d4"
+}
+17416 2026-07-23 20:06:27,256 webull.core.client ERROR ServerException occurred. Host:api.webull.com SDK-Version:2.0.14 Request:{
+  "_version": "v2",
+  "_action_name": "/openapi/market-data/option/snapshot",
+  "_protocol_type": "https",
+  "_accept_format": "JSON",
+  "_params": {
+    "symbols": "SPX260723C07410000",
+    "category": "US_OPTION"
+  },
+  "_method": "GET",
+  "_header": {
+    "x-version": "v2",
+    "Accept-Encoding": "gzip",
+    "x-app-key": "53a77ca9e6c56a74be896b66272e4859",
+    "x-timestamp": "2026-07-24T00:06:27Z",
+    "x-signature-version": "1.0",
+    "x-signature-algorithm": "HMAC-SHA256",
+    "x-signature-nonce": "f1e80dd8-eb6c-5d18-8ff6-ec01a1da1fb3",
+    "x-signature": "uY5iVSqq8+Hb8X4OOAg4qOzzIBmru9l2xoMyltCvmho=",
+    "User-Agent": "WebullApiSDK (Windows 10;AMD64) Python/3.14.6 Core/2.0.14 python-requests/2.34.2",
+    "x-webull-client-source": "sdk"
+  },
+  "_body_params": null,
+  "_uri_pattern": null,
+  "_uri_params": null,
+  "_content": null,
+  "_extra_user_agent": {},
+  "string_to_sign": "",
+  "_request_connect_timeout": null,
+  "_request_read_timeout": null,
+  "endpoint": "api.webull.com",
+  "_signer_spec": "<module 'webull.core.auth.algorithm.sha_hmac1' from 'C:\\\\Users\\\\Hulk\\\\Desktop\\\\asdas\\\\.venv\\\\Lib\\\\site-packages\\\\webull\\\\core\\\\auth\\\\algorithm\\\\sha_hmac1.py'>"
+} Response:{'error_code': 'INVALID_SYMBOL', 'message': 'Invalid Symbol:[SPX260723C07410000].', 'status': 417} ServerException:HTTP Status: 417, Code: INVALID_SYMBOL, Msg: Invalid Symbol:[SPX260723C07410000]., RequestID: 9b37349a-aa66-4ec7-ac13-169b40f04f20
+17416 2026-07-23 20:06:27,256 webull.core.client ERROR ServerException occurred. Host:api.webull.com SDK-Version:2.0.14 Request:{
+  "_version": "v2",
+  "_action_name": "/openapi/market-data/option/snapshot",
+  "_protocol_type": "https",
+  "_accept_format": "JSON",
+  "_params": {
+    "symbols": "SPX260723C07410000",
+    "category": "US_OPTION"
+  },
+  "_method": "GET",
+  "_header": {
+    "x-version": "v2",
+    "Accept-Encoding": "gzip",
+    "x-app-key": "53a77ca9e6c56a74be896b66272e4859",
+    "x-timestamp": "2026-07-24T00:06:27Z",
+    "x-signature-version": "1.0",
+    "x-signature-algorithm": "HMAC-SHA256",
+    "x-signature-nonce": "f1e80dd8-eb6c-5d18-8ff6-ec01a1da1fb3",
+    "x-signature": "uY5iVSqq8+Hb8X4OOAg4qOzzIBmru9l2xoMyltCvmho=",
+    "User-Agent": "WebullApiSDK (Windows 10;AMD64) Python/3.14.6 Core/2.0.14 python-requests/2.34.2",
+    "x-webull-client-source": "sdk"
+  },
+  "_body_params": null,
+  "_uri_pattern": null,
+  "_uri_params": null,
+  "_content": null,
+  "_extra_user_agent": {},
+  "string_to_sign": "",
+  "_request_connect_timeout": null,
+  "_request_read_timeout": null,
+  "endpoint": "api.webull.com",
+  "_signer_spec": "<module 'webull.core.auth.algorithm.sha_hmac1' from 'C:\\\\Users\\\\Hulk\\\\Desktop\\\\asdas\\\\.venv\\\\Lib\\\\site-packages\\\\webull\\\\core\\\\auth\\\\algorithm\\\\sha_hmac1.py'>"
+} Response:{'error_code': 'INVALID_SYMBOL', 'message': 'Invalid Symbol:[SPX260723C07410000].', 'status': 417} ServerException:HTTP Status: 417, Code: INVALID_SYMBOL, Msg: Invalid Symbol:[SPX260723C07410000]., RequestID: 9b37349a-aa66-4ec7-ac13-169b40f04f20
+17416 2026-07-23 20:06:27,257 webull.core.client ERROR get_response exception. {
+  "error_code": "INVALID_SYMBOL",
+  "error_msg": "Invalid Symbol:[SPX260723C07410000].",
+  "http_status": 417,
+  "request_id": "9b37349a-aa66-4ec7-ac13-169b40f04f20"
+}
+17416 2026-07-23 20:06:27,257 webull.core.client ERROR get_response exception. {
+  "error_code": "INVALID_SYMBOL",
+  "error_msg": "Invalid Symbol:[SPX260723C07410000].",
+  "http_status": 417,
+  "request_id": "9b37349a-aa66-4ec7-ac13-169b40f04f20"
+}
+17136 2026-07-23 20:06:27,309 webull.core.client ERROR ServerException occurred. Host:api.webull.com SDK-Version:2.0.14 Request:{
+  "_version": "v2",
+  "_action_name": "/openapi/market-data/option/snapshot",
+  "_protocol_type": "https",
+  "_accept_format": "JSON",
+  "_params": {
+    "symbols": "SPX260723P07405000",
+    "category": "US_OPTION"
+  },
+  "_method": "GET",
+  "_header": {
+    "x-version": "v2",
+    "Accept-Encoding": "gzip",
+    "x-app-key": "53a77ca9e6c56a74be896b66272e4859",
+    "x-timestamp": "2026-07-24T00:06:27Z",
+    "x-signature-version": "1.0",
+    "x-signature-algorithm": "HMAC-SHA256",
+    "x-signature-nonce": "0257548b-fb9e-5dd8-846f-d628c75af98b",
+    "x-signature": "aAWK6L5UVr08G9d9+8EquUBbB4LdcvQ/iGK9c49XeYE=",
+    "User-Agent": "WebullApiSDK (Windows 10;AMD64) Python/3.14.6 Core/2.0.14 python-requests/2.34.2",
+    "x-webull-client-source": "sdk"
+  },
+  "_body_params": null,
+  "_uri_pattern": null,
+  "_uri_params": null,
+  "_content": null,
+  "_extra_user_agent": {},
+  "string_to_sign": "",
+  "_request_connect_timeout": null,
+  "_request_read_timeout": null,
+  "endpoint": "api.webull.com",
+  "_signer_spec": "<module 'webull.core.auth.algorithm.sha_hmac1' from 'C:\\\\Users\\\\Hulk\\\\Desktop\\\\asdas\\\\.venv\\\\Lib\\\\site-packages\\\\webull\\\\core\\\\auth\\\\algorithm\\\\sha_hmac1.py'>"
+} Response:{'error_code': 'INVALID_SYMBOL', 'message': 'Invalid Symbol:[SPX260723P07405000].', 'status': 417} ServerException:HTTP Status: 417, Code: INVALID_SYMBOL, Msg: Invalid Symbol:[SPX260723P07405000]., RequestID: 2961ed80-7ee6-47c2-b01c-f49516dbafa6
+17136 2026-07-23 20:06:27,309 webull.core.client ERROR ServerException occurred. Host:api.webull.com SDK-Version:2.0.14 Request:{
+  "_version": "v2",
+  "_action_name": "/openapi/market-data/option/snapshot",
+  "_protocol_type": "https",
+  "_accept_format": "JSON",
+  "_params": {
+    "symbols": "SPX260723P07405000",
+    "category": "US_OPTION"
+  },
+  "_method": "GET",
+  "_header": {
+    "x-version": "v2",
+    "Accept-Encoding": "gzip",
+    "x-app-key": "53a77ca9e6c56a74be896b66272e4859",
+    "x-timestamp": "2026-07-24T00:06:27Z",
+    "x-signature-version": "1.0",
+    "x-signature-algorithm": "HMAC-SHA256",
+    "x-signature-nonce": "0257548b-fb9e-5dd8-846f-d628c75af98b",
+    "x-signature": "aAWK6L5UVr08G9d9+8EquUBbB4LdcvQ/iGK9c49XeYE=",
+    "User-Agent": "WebullApiSDK (Windows 10;AMD64) Python/3.14.6 Core/2.0.14 python-requests/2.34.2",
+    "x-webull-client-source": "sdk"
+  },
+  "_body_params": null,
+  "_uri_pattern": null,
+  "_uri_params": null,
+  "_content": null,
+  "_extra_user_agent": {},
+  "string_to_sign": "",
+  "_request_connect_timeout": null,
+  "_request_read_timeout": null,
+  "endpoint": "api.webull.com",
+  "_signer_spec": "<module 'webull.core.auth.algorithm.sha_hmac1' from 'C:\\\\Users\\\\Hulk\\\\Desktop\\\\asdas\\\\.venv\\\\Lib\\\\site-packages\\\\webull\\\\core\\\\auth\\\\algorithm\\\\sha_hmac1.py'>"
+} Response:{'error_code': 'INVALID_SYMBOL', 'message': 'Invalid Symbol:[SPX260723P07405000].', 'status': 417} ServerException:HTTP Status: 417, Code: INVALID_SYMBOL, Msg: Invalid Symbol:[SPX260723P07405000]., RequestID: 2961ed80-7ee6-47c2-b01c-f49516dbafa6
+17136 2026-07-23 20:06:27,310 webull.core.client ERROR get_response exception. {
+  "error_code": "INVALID_SYMBOL",
+  "error_msg": "Invalid Symbol:[SPX260723P07405000].",
+  "http_status": 417,
+  "request_id": "2961ed80-7ee6-47c2-b01c-f49516dbafa6"
+}
+17136 2026-07-23 20:06:27,310 webull.core.client ERROR get_response exception. {
+  "error_code": "INVALID_SYMBOL",
+  "error_msg": "Invalid Symbol:[SPX260723P07405000].",
+  "http_status": 417,
+  "request_id": "2961ed80-7ee6-47c2-b01c-f49516dbafa6"
+}
+17416 2026-07-23 20:06:27,391 webull.core.client ERROR ServerException occurred. Host:api.webull.com SDK-Version:2.0.14 Request:{
+  "_version": "v2",
+  "_action_name": "/openapi/market-data/option/snapshot",
+  "_protocol_type": "https",
+  "_accept_format": "JSON",
+  "_params": {
+    "symbols": "SPX260723C07410000",
+    "category": "US_OPTION"
+  },
+  "_method": "GET",
+  "_header": {
+    "x-version": "v2",
+    "Accept-Encoding": "gzip",
+    "x-app-key": "53a77ca9e6c56a74be896b66272e4859",
+    "x-timestamp": "2026-07-24T00:06:27Z",
+    "x-signature-version": "1.0",
+    "x-signature-algorithm": "HMAC-SHA256",
+    "x-signature-nonce": "85569bf2-6673-5b52-bcf7-071982dae7c6",
+    "x-signature": "blikCojaC1Tb3ywoKoIm2tKP52kLLrQwBSBa97Dxkc8=",
+    "User-Agent": "WebullApiSDK (Windows 10;AMD64) Python/3.14.6 Core/2.0.14 python-requests/2.34.2",
+    "x-webull-client-source": "sdk"
+  },
+  "_body_params": null,
+  "_uri_pattern": null,
+  "_uri_params": null,
+  "_content": null,
+  "_extra_user_agent": {},
+  "string_to_sign": "",
+  "_request_connect_timeout": null,
+  "_request_read_timeout": null,
+  "endpoint": "api.webull.com",
+  "_signer_spec": "<module 'webull.core.auth.algorithm.sha_hmac1' from 'C:\\\\Users\\\\Hulk\\\\Desktop\\\\asdas\\\\.venv\\\\Lib\\\\site-packages\\\\webull\\\\core\\\\auth\\\\algorithm\\\\sha_hmac1.py'>"
+} Response:{'error_code': 'INVALID_SYMBOL', 'message': 'Invalid Symbol:[SPX260723C07410000].', 'status': 417} ServerException:HTTP Status: 417, Code: INVALID_SYMBOL, Msg: Invalid Symbol:[SPX260723C07410000]., RequestID: 8da93bf8-f9d7-4f57-882b-27da76c868e9
+17416 2026-07-23 20:06:27,391 webull.core.client ERROR ServerException occurred. Host:api.webull.com SDK-Version:2.0.14 Request:{
+  "_version": "v2",
+  "_action_name": "/openapi/market-data/option/snapshot",
+  "_protocol_type": "https",
+  "_accept_format": "JSON",
+  "_params": {
+    "symbols": "SPX260723C07410000",
+    "category": "US_OPTION"
+  },
+  "_method": "GET",
+  "_header": {
+    "x-version": "v2",
+    "Accept-Encoding": "gzip",
+    "x-app-key": "53a77ca9e6c56a74be896b66272e4859",
+    "x-timestamp": "2026-07-24T00:06:27Z",
+    "x-signature-version": "1.0",
+    "x-signature-algorithm": "HMAC-SHA256",
+    "x-signature-nonce": "85569bf2-6673-5b52-bcf7-071982dae7c6",
+    "x-signature": "blikCojaC1Tb3ywoKoIm2tKP52kLLrQwBSBa97Dxkc8=",
+    "User-Agent": "WebullApiSDK (Windows 10;AMD64) Python/3.14.6 Core/2.0.14 python-requests/2.34.2",
+    "x-webull-client-source": "sdk"
+  },
+  "_body_params": null,
+  "_uri_pattern": null,
+  "_uri_params": null,
+  "_content": null,
+  "_extra_user_agent": {},
+  "string_to_sign": "",
+  "_request_connect_timeout": null,
+  "_request_read_timeout": null,
+  "endpoint": "api.webull.com",
+  "_signer_spec": "<module 'webull.core.auth.algorithm.sha_hmac1' from 'C:\\\\Users\\\\Hulk\\\\Desktop\\\\asdas\\\\.venv\\\\Lib\\\\site-packages\\\\webull\\\\core\\\\auth\\\\algorithm\\\\sha_hmac1.py'>"
+} Response:{'error_code': 'INVALID_SYMBOL', 'message': 'Invalid Symbol:[SPX260723C07410000].', 'status': 417} ServerException:HTTP Status: 417, Code: INVALID_SYMBOL, Msg: Invalid Symbol:[SPX260723C07410000]., RequestID: 8da93bf8-f9d7-4f57-882b-27da76c868e9
+17416 2026-07-23 20:06:27,392 webull.core.client ERROR get_response exception. {
+  "error_code": "INVALID_SYMBOL",
+  "error_msg": "Invalid Symbol:[SPX260723C07410000].",
+  "http_status": 417,
+  "request_id": "8da93bf8-f9d7-4f57-882b-27da76c868e9"
+}
+17416 2026-07-23 20:06:27,392 webull.core.client ERROR get_response exception. {
+  "error_code": "INVALID_SYMBOL",
+  "error_msg": "Invalid Symbol:[SPX260723C07410000].",
+  "http_status": 417,
+  "request_id": "8da93bf8-f9d7-4f57-882b-27da76c868e9"
+}
+17136 2026-07-23 20:06:27,444 webull.core.client ERROR ServerException occurred. Host:api.webull.com SDK-Version:2.0.14 Request:{
+  "_version": "v2",
+  "_action_name": "/openapi/market-data/option/snapshot",
+  "_protocol_type": "https",
+  "_accept_format": "JSON",
+  "_params": {
+    "symbols": "SPX260723P07405000",
+    "category": "US_OPTION"
+  },
+  "_method": "GET",
+  "_header": {
+    "x-version": "v2",
+    "Accept-Encoding": "gzip",
+    "x-app-key": "53a77ca9e6c56a74be896b66272e4859",
+    "x-timestamp": "2026-07-24T00:06:27Z",
+    "x-signature-version": "1.0",
+    "x-signature-algorithm": "HMAC-SHA256",
+    "x-signature-nonce": "abd99bd7-ff2a-5891-b379-474502524a31",
+    "x-signature": "bc27B+40+nvk5Gtp8+hrLcFX2f46fd2iuS8q8/AZOGI=",
+    "User-Agent": "WebullApiSDK (Windows 10;AMD64) Python/3.14.6 Core/2.0.14 python-requests/2.34.2",
+    "x-webull-client-source": "sdk"
+  },
+  "_body_params": null,
+  "_uri_pattern": null,
+  "_uri_params": null,
+  "_content": null,
+  "_extra_user_agent": {},
+  "string_to_sign": "",
+  "_request_connect_timeout": null,
+  "_request_read_timeout": null,
+  "endpoint": "api.webull.com",
+  "_signer_spec": "<module 'webull.core.auth.algorithm.sha_hmac1' from 'C:\\\\Users\\\\Hulk\\\\Desktop\\\\asdas\\\\.venv\\\\Lib\\\\site-packages\\\\webull\\\\core\\\\auth\\\\algorithm\\\\sha_hmac1.py'>"
+} Response:{'error_code': 'INVALID_SYMBOL', 'message': 'Invalid Symbol:[SPX260723P07405000].', 'status': 417} ServerException:HTTP Status: 417, Code: INVALID_SYMBOL, Msg: Invalid Symbol:[SPX260723P07405000]., RequestID: 6600b551-46c0-42cc-a43f-6dfcb7dff584
+17136 2026-07-23 20:06:27,444 webull.core.client ERROR ServerException occurred. Host:api.webull.com SDK-Version:2.0.14 Request:{
+  "_version": "v2",
+  "_action_name": "/openapi/market-data/option/snapshot",
+  "_protocol_type": "https",
+  "_accept_format": "JSON",
+  "_params": {
+    "symbols": "SPX260723P07405000",
+    "category": "US_OPTION"
+  },
+  "_method": "GET",
+  "_header": {
+    "x-version": "v2",
+    "Accept-Encoding": "gzip",
+    "x-app-key": "53a77ca9e6c56a74be896b66272e4859",
+    "x-timestamp": "2026-07-24T00:06:27Z",
+    "x-signature-version": "1.0",
+    "x-signature-algorithm": "HMAC-SHA256",
+    "x-signature-nonce": "abd99bd7-ff2a-5891-b379-474502524a31",
+    "x-signature": "bc27B+40+nvk5Gtp8+hrLcFX2f46fd2iuS8q8/AZOGI=",
+    "User-Agent": "WebullApiSDK (Windows 10;AMD64) Python/3.14.6 Core/2.0.14 python-requests/2.34.2",
+    "x-webull-client-source": "sdk"
+  },
+  "_body_params": null,
+  "_uri_pattern": null,
+  "_uri_params": null,
+  "_content": null,
+  "_extra_user_agent": {},
+  "string_to_sign": "",
+  "_request_connect_timeout": null,
+  "_request_read_timeout": null,
+  "endpoint": "api.webull.com",
+  "_signer_spec": "<module 'webull.core.auth.algorithm.sha_hmac1' from 'C:\\\\Users\\\\Hulk\\\\Desktop\\\\asdas\\\\.venv\\\\Lib\\\\site-packages\\\\webull\\\\core\\\\auth\\\\algorithm\\\\sha_hmac1.py'>"
+} Response:{'error_code': 'INVALID_SYMBOL', 'message': 'Invalid Symbol:[SPX260723P07405000].', 'status': 417} ServerException:HTTP Status: 417, Code: INVALID_SYMBOL, Msg: Invalid Symbol:[SPX260723P07405000]., RequestID: 6600b551-46c0-42cc-a43f-6dfcb7dff584
+17136 2026-07-23 20:06:27,445 webull.core.client ERROR get_response exception. {
+  "error_code": "INVALID_SYMBOL",
+  "error_msg": "Invalid Symbol:[SPX260723P07405000].",
+  "http_status": 417,
+  "request_id": "6600b551-46c0-42cc-a43f-6dfcb7dff584"
+}
+17136 2026-07-23 20:06:27,445 webull.core.client ERROR get_response exception. {
+  "error_code": "INVALID_SYMBOL",
+  "error_msg": "Invalid Symbol:[SPX260723P07405000].",
+  "http_status": 417,
+  "request_id": "6600b551-46c0-42cc-a43f-6dfcb7dff584"
+}
+17416 2026-07-23 20:06:27,547 webull.core.client ERROR ServerException occurred. Host:api.webull.com SDK-Version:2.0.14 Request:{
+  "_version": "v2",
+  "_action_name": "/openapi/market-data/option/snapshot",
+  "_protocol_type": "https",
+  "_accept_format": "JSON",
+  "_params": {
+    "symbols": "SPX260723C07410000",
+    "category": "US_OPTION"
+  },
+  "_method": "GET",
+  "_header": {
+    "x-version": "v2",
+    "Accept-Encoding": "gzip",
+    "x-app-key": "53a77ca9e6c56a74be896b66272e4859",
+    "x-timestamp": "2026-07-24T00:06:27Z",
+    "x-signature-version": "1.0",
+    "x-signature-algorithm": "HMAC-SHA256",
+    "x-signature-nonce": "2bdf7398-ad62-5b4d-ad46-7baecd3e2ac9",
+    "x-signature": "3yWWockxMoTkwbW6b+AGsQ35AP/psnGbKd6HSz2TF3Q=",
+    "User-Agent": "WebullApiSDK (Windows 10;AMD64) Python/3.14.6 Core/2.0.14 python-requests/2.34.2",
+    "x-webull-client-source": "sdk"
+  },
+  "_body_params": null,
+  "_uri_pattern": null,
+  "_uri_params": null,
+  "_content": null,
+  "_extra_user_agent": {},
+  "string_to_sign": "",
+  "_request_connect_timeout": null,
+  "_request_read_timeout": null,
+  "endpoint": "api.webull.com",
+  "_signer_spec": "<module 'webull.core.auth.algorithm.sha_hmac1' from 'C:\\\\Users\\\\Hulk\\\\Desktop\\\\asdas\\\\.venv\\\\Lib\\\\site-packages\\\\webull\\\\core\\\\auth\\\\algorithm\\\\sha_hmac1.py'>"
+} Response:{'error_code': 'INVALID_SYMBOL', 'message': 'Invalid Symbol:[SPX260723C07410000].', 'status': 417} ServerException:HTTP Status: 417, Code: INVALID_SYMBOL, Msg: Invalid Symbol:[SPX260723C07410000]., RequestID: 6ebd522a-a5b9-4d3a-a3a8-45ad0bc8660f
+17416 2026-07-23 20:06:27,547 webull.core.client ERROR ServerException occurred. Host:api.webull.com SDK-Version:2.0.14 Request:{
+  "_version": "v2",
+  "_action_name": "/openapi/market-data/option/snapshot",
+  "_protocol_type": "https",
+  "_accept_format": "JSON",
+  "_params": {
+    "symbols": "SPX260723C07410000",
+    "category": "US_OPTION"
+  },
+  "_method": "GET",
+  "_header": {
+    "x-version": "v2",
+    "Accept-Encoding": "gzip",
+    "x-app-key": "53a77ca9e6c56a74be896b66272e4859",
+    "x-timestamp": "2026-07-24T00:06:27Z",
+    "x-signature-version": "1.0",
+    "x-signature-algorithm": "HMAC-SHA256",
+    "x-signature-nonce": "2bdf7398-ad62-5b4d-ad46-7baecd3e2ac9",
+    "x-signature": "3yWWockxMoTkwbW6b+AGsQ35AP/psnGbKd6HSz2TF3Q=",
+    "User-Agent": "WebullApiSDK (Windows 10;AMD64) Python/3.14.6 Core/2.0.14 python-requests/2.34.2",
+    "x-webull-client-source": "sdk"
+  },
+  "_body_params": null,
+  "_uri_pattern": null,
+  "_uri_params": null,
+  "_content": null,
+  "_extra_user_agent": {},
+  "string_to_sign": "",
+  "_request_connect_timeout": null,
+  "_request_read_timeout": null,
+  "endpoint": "api.webull.com",
+  "_signer_spec": "<module 'webull.core.auth.algorithm.sha_hmac1' from 'C:\\\\Users\\\\Hulk\\\\Desktop\\\\asdas\\\\.venv\\\\Lib\\\\site-packages\\\\webull\\\\core\\\\auth\\\\algorithm\\\\sha_hmac1.py'>"
+} Response:{'error_code': 'INVALID_SYMBOL', 'message': 'Invalid Symbol:[SPX260723C07410000].', 'status': 417} ServerException:HTTP Status: 417, Code: INVALID_SYMBOL, Msg: Invalid Symbol:[SPX260723C07410000]., RequestID: 6ebd522a-a5b9-4d3a-a3a8-45ad0bc8660f
+17416 2026-07-23 20:06:27,547 webull.core.client ERROR get_response exception. {
+  "error_code": "INVALID_SYMBOL",
+  "error_msg": "Invalid Symbol:[SPX260723C07410000].",
+  "http_status": 417,
+  "request_id": "6ebd522a-a5b9-4d3a-a3a8-45ad0bc8660f"
+}
+17416 2026-07-23 20:06:27,547 webull.core.client ERROR get_response exception. {
+  "error_code": "INVALID_SYMBOL",
+  "error_msg": "Invalid Symbol:[SPX260723C07410000].",
+  "http_status": 417,
+  "request_id": "6ebd522a-a5b9-4d3a-a3a8-45ad0bc8660f"
+}
+17136 2026-07-23 20:06:27,582 webull.core.client ERROR ServerException occurred. Host:api.webull.com SDK-Version:2.0.14 Request:{
+  "_version": "v2",
+  "_action_name": "/openapi/market-data/option/snapshot",
+  "_protocol_type": "https",
+  "_accept_format": "JSON",
+  "_params": {
+    "symbols": "SPX260723P07405000",
+    "category": "US_OPTION"
+  },
+  "_method": "GET",
+  "_header": {
+    "x-version": "v2",
+    "Accept-Encoding": "gzip",
+    "x-app-key": "53a77ca9e6c56a74be896b66272e4859",
+    "x-timestamp": "2026-07-24T00:06:27Z",
+    "x-signature-version": "1.0",
+    "x-signature-algorithm": "HMAC-SHA256",
+    "x-signature-nonce": "da8460e9-6fbd-5c3a-b21f-3c14d4e7a86e",
+    "x-signature": "a3zJpuLuA3luwLbOUpY0GNsf0r8OBVP/eQoFqpU+QFY=",
+    "User-Agent": "WebullApiSDK (Windows 10;AMD64) Python/3.14.6 Core/2.0.14 python-requests/2.34.2",
+    "x-webull-client-source": "sdk"
+  },
+  "_body_params": null,
+  "_uri_pattern": null,
+  "_uri_params": null,
+  "_content": null,
+  "_extra_user_agent": {},
+  "string_to_sign": "",
+  "_request_connect_timeout": null,
+  "_request_read_timeout": null,
+  "endpoint": "api.webull.com",
+  "_signer_spec": "<module 'webull.core.auth.algorithm.sha_hmac1' from 'C:\\\\Users\\\\Hulk\\\\Desktop\\\\asdas\\\\.venv\\\\Lib\\\\site-packages\\\\webull\\\\core\\\\auth\\\\algorithm\\\\sha_hmac1.py'>"
+} Response:{'error_code': 'INVALID_SYMBOL', 'message': 'Invalid Symbol:[SPX260723P07405000].', 'status': 417} ServerException:HTTP Status: 417, Code: INVALID_SYMBOL, Msg: Invalid Symbol:[SPX260723P07405000]., RequestID: 9b1e3f8c-1aa6-4dae-a47f-ba131255247f
+17136 2026-07-23 20:06:27,582 webull.core.client ERROR ServerException occurred. Host:api.webull.com SDK-Version:2.0.14 Request:{
+  "_version": "v2",
+  "_action_name": "/openapi/market-data/option/snapshot",
+  "_protocol_type": "https",
+  "_accept_format": "JSON",
+  "_params": {
+    "symbols": "SPX260723P07405000",
+    "category": "US_OPTION"
+  },
+  "_method": "GET",
+  "_header": {
+    "x-version": "v2",
+    "Accept-Encoding": "gzip",
+    "x-app-key": "53a77ca9e6c56a74be896b66272e4859",
+    "x-timestamp": "2026-07-24T00:06:27Z",
+    "x-signature-version": "1.0",
+    "x-signature-algorithm": "HMAC-SHA256",
+    "x-signature-nonce": "da8460e9-6fbd-5c3a-b21f-3c14d4e7a86e",
+    "x-signature": "a3zJpuLuA3luwLbOUpY0GNsf0r8OBVP/eQoFqpU+QFY=",
+    "User-Agent": "WebullApiSDK (Windows 10;AMD64) Python/3.14.6 Core/2.0.14 python-requests/2.34.2",
+    "x-webull-client-source": "sdk"
+  },
+  "_body_params": null,
+  "_uri_pattern": null,
+  "_uri_params": null,
+  "_content": null,
+  "_extra_user_agent": {},
+  "string_to_sign": "",
+  "_request_connect_timeout": null,
+  "_request_read_timeout": null,
+  "endpoint": "api.webull.com",
+  "_signer_spec": "<module 'webull.core.auth.algorithm.sha_hmac1' from 'C:\\\\Users\\\\Hulk\\\\Desktop\\\\asdas\\\\.venv\\\\Lib\\\\site-packages\\\\webull\\\\core\\\\auth\\\\algorithm\\\\sha_hmac1.py'>"
+} Response:{'error_code': 'INVALID_SYMBOL', 'message': 'Invalid Symbol:[SPX260723P07405000].', 'status': 417} ServerException:HTTP Status: 417, Code: INVALID_SYMBOL, Msg: Invalid Symbol:[SPX260723P07405000]., RequestID: 9b1e3f8c-1aa6-4dae-a47f-ba131255247f
+17136 2026-07-23 20:06:27,583 webull.core.client ERROR get_response exception. {
+  "error_code": "INVALID_SYMBOL",
+  "error_msg": "Invalid Symbol:[SPX260723P07405000].",
+  "http_status": 417,
+  "request_id": "9b1e3f8c-1aa6-4dae-a47f-ba131255247f"
+}
+17136 2026-07-23 20:06:27,583 webull.core.client ERROR get_response exception. {
+  "error_code": "INVALID_SYMBOL",
+  "error_msg": "Invalid Symbol:[SPX260723P07405000].",
+  "http_status": 417,
+  "request_id": "9b1e3f8c-1aa6-4dae-a47f-ba131255247f"
+}
+17416 2026-07-23 20:06:31,869 webull.core.client ERROR ServerException occurred. Host:api.webull.com SDK-Version:2.0.14 Request:{
+  "_version": "v2",
+  "_action_name": "/openapi/market-data/option/snapshot",
+  "_protocol_type": "https",
+  "_accept_format": "JSON",
+  "_params": {
+    "symbols": "SPX260723C07410000",
+    "category": "US_OPTION"
+  },
+  "_method": "GET",
+  "_header": {
+    "x-version": "v2",
+    "Accept-Encoding": "gzip",
+    "x-app-key": "53a77ca9e6c56a74be896b66272e4859",
+    "x-timestamp": "2026-07-24T00:06:31Z",
+    "x-signature-version": "1.0",
+    "x-signature-algorithm": "HMAC-SHA256",
+    "x-signature-nonce": "f8ba46e5-b835-56c8-ba67-fbfcb1b15d50",
+    "x-signature": "/XHbgVYGz+bRmuxgOZpa7SNIrQqVDcq15w5rNtSPy9Y=",
+    "User-Agent": "WebullApiSDK (Windows 10;AMD64) Python/3.14.6 Core/2.0.14 python-requests/2.34.2",
+    "x-webull-client-source": "sdk"
+  },
+  "_body_params": null,
+  "_uri_pattern": null,
+  "_uri_params": null,
+  "_content": null,
+  "_extra_user_agent": {},
+  "string_to_sign": "",
+  "_request_connect_timeout": null,
+  "_request_read_timeout": null,
+  "endpoint": "api.webull.com",
+  "_signer_spec": "<module 'webull.core.auth.algorithm.sha_hmac1' from 'C:\\\\Users\\\\Hulk\\\\Desktop\\\\asdas\\\\.venv\\\\Lib\\\\site-packages\\\\webull\\\\core\\\\auth\\\\algorithm\\\\sha_hmac1.py'>"
+} Response:{'error_code': 'INVALID_SYMBOL', 'message': 'Invalid Symbol:[SPX260723C07410000].', 'status': 417} ServerException:HTTP Status: 417, Code: INVALID_SYMBOL, Msg: Invalid Symbol:[SPX260723C07410000]., RequestID: 3dc5696d-657e-4059-adf4-de506939d07a
+17416 2026-07-23 20:06:31,869 webull.core.client ERROR ServerException occurred. Host:api.webull.com SDK-Version:2.0.14 Request:{
+  "_version": "v2",
+  "_action_name": "/openapi/market-data/option/snapshot",
+  "_protocol_type": "https",
+  "_accept_format": "JSON",
+  "_params": {
+    "symbols": "SPX260723C07410000",
+    "category": "US_OPTION"
+  },
+  "_method": "GET",
+  "_header": {
+    "x-version": "v2",
+    "Accept-Encoding": "gzip",
+    "x-app-key": "53a77ca9e6c56a74be896b66272e4859",
+    "x-timestamp": "2026-07-24T00:06:31Z",
+    "x-signature-version": "1.0",
+    "x-signature-algorithm": "HMAC-SHA256",
+    "x-signature-nonce": "f8ba46e5-b835-56c8-ba67-fbfcb1b15d50",
+    "x-signature": "/XHbgVYGz+bRmuxgOZpa7SNIrQqVDcq15w5rNtSPy9Y=",
+    "User-Agent": "WebullApiSDK (Windows 10;AMD64) Python/3.14.6 Core/2.0.14 python-requests/2.34.2",
+    "x-webull-client-source": "sdk"
+  },
+  "_body_params": null,
+  "_uri_pattern": null,
+  "_uri_params": null,
+  "_content": null,
+  "_extra_user_agent": {},
+  "string_to_sign": "",
+  "_request_connect_timeout": null,
+  "_request_read_timeout": null,
+  "endpoint": "api.webull.com",
+  "_signer_spec": "<module 'webull.core.auth.algorithm.sha_hmac1' from 'C:\\\\Users\\\\Hulk\\\\Desktop\\\\asdas\\\\.venv\\\\Lib\\\\site-packages\\\\webull\\\\core\\\\auth\\\\algorithm\\\\sha_hmac1.py'>"
+} Response:{'error_code': 'INVALID_SYMBOL', 'message': 'Invalid Symbol:[SPX260723C07410000].', 'status': 417} ServerException:HTTP Status: 417, Code: INVALID_SYMBOL, Msg: Invalid Symbol:[SPX260723C07410000]., RequestID: 3dc5696d-657e-4059-adf4-de506939d07a
+17416 2026-07-23 20:06:31,870 webull.core.client ERROR get_response exception. {
+  "error_code": "INVALID_SYMBOL",
+  "error_msg": "Invalid Symbol:[SPX260723C07410000].",
+  "http_status": 417,
+  "request_id": "3dc5696d-657e-4059-adf4-de506939d07a"
+}
+17416 2026-07-23 20:06:31,870 webull.core.client ERROR get_response exception. {
+  "error_code": "INVALID_SYMBOL",
+  "error_msg": "Invalid Symbol:[SPX260723C07410000].",
+  "http_status": 417,
+  "request_id": "3dc5696d-657e-4059-adf4-de506939d07a"
+}
+17416 2026-07-23 20:06:32,029 webull.core.client ERROR ServerException occurred. Host:api.webull.com SDK-Version:2.0.14 Request:{
+  "_version": "v2",
+  "_action_name": "/openapi/market-data/option/snapshot",
+  "_protocol_type": "https",
+  "_accept_format": "JSON",
+  "_params": {
+    "symbols": "SPX260723C07410000",
+    "category": "US_OPTION"
+  },
+  "_method": "GET",
+  "_header": {
+    "x-version": "v2",
+    "Accept-Encoding": "gzip",
+    "x-app-key": "53a77ca9e6c56a74be896b66272e4859",
+    "x-timestamp": "2026-07-24T00:06:31Z",
+    "x-signature-version": "1.0",
+    "x-signature-algorithm": "HMAC-SHA256",
+    "x-signature-nonce": "8a4e1806-8823-5887-b6e6-c88ae0d99d05",
+    "x-signature": "h3/EP4WO3TltQ3A0I8jPP5LKhxn5JVL/DfivcL8Bzto=",
+    "User-Agent": "WebullApiSDK (Windows 10;AMD64) Python/3.14.6 Core/2.0.14 python-requests/2.34.2",
+    "x-webull-client-source": "sdk"
+  },
+  "_body_params": null,
+  "_uri_pattern": null,
+  "_uri_params": null,
+  "_content": null,
+  "_extra_user_agent": {},
+  "string_to_sign": "",
+  "_request_connect_timeout": null,
+  "_request_read_timeout": null,
+  "endpoint": "api.webull.com",
+  "_signer_spec": "<module 'webull.core.auth.algorithm.sha_hmac1' from 'C:\\\\Users\\\\Hulk\\\\Desktop\\\\asdas\\\\.venv\\\\Lib\\\\site-packages\\\\webull\\\\core\\\\auth\\\\algorithm\\\\sha_hmac1.py'>"
+} Response:{'error_code': 'INVALID_SYMBOL', 'message': 'Invalid Symbol:[SPX260723C07410000].', 'status': 417} ServerException:HTTP Status: 417, Code: INVALID_SYMBOL, Msg: Invalid Symbol:[SPX260723C07410000]., RequestID: 76f2cc36-7fde-4926-bfe5-92495d2a3a59
+17416 2026-07-23 20:06:32,029 webull.core.client ERROR ServerException occurred. Host:api.webull.com SDK-Version:2.0.14 Request:{
+  "_version": "v2",
+  "_action_name": "/openapi/market-data/option/snapshot",
+  "_protocol_type": "https",
+  "_accept_format": "JSON",
+  "_params": {
+    "symbols": "SPX260723C07410000",
+    "category": "US_OPTION"
+  },
+  "_method": "GET",
+  "_header": {
+    "x-version": "v2",
+    "Accept-Encoding": "gzip",
+    "x-app-key": "53a77ca9e6c56a74be896b66272e4859",
+    "x-timestamp": "2026-07-24T00:06:31Z",
+    "x-signature-version": "1.0",
+    "x-signature-algorithm": "HMAC-SHA256",
+    "x-signature-nonce": "8a4e1806-8823-5887-b6e6-c88ae0d99d05",
+    "x-signature": "h3/EP4WO3TltQ3A0I8jPP5LKhxn5JVL/DfivcL8Bzto=",
+    "User-Agent": "WebullApiSDK (Windows 10;AMD64) Python/3.14.6 Core/2.0.14 python-requests/2.34.2",
+    "x-webull-client-source": "sdk"
+  },
+  "_body_params": null,
+  "_uri_pattern": null,
+  "_uri_params": null,
+  "_content": null,
+  "_extra_user_agent": {},
+  "string_to_sign": "",
+  "_request_connect_timeout": null,
+  "_request_read_timeout": null,
+  "endpoint": "api.webull.com",
+  "_signer_spec": "<module 'webull.core.auth.algorithm.sha_hmac1' from 'C:\\\\Users\\\\Hulk\\\\Desktop\\\\asdas\\\\.venv\\\\Lib\\\\site-packages\\\\webull\\\\core\\\\auth\\\\algorithm\\\\sha_hmac1.py'>"
+} Response:{'error_code': 'INVALID_SYMBOL', 'message': 'Invalid Symbol:[SPX260723C07410000].', 'status': 417} ServerException:HTTP Status: 417, Code: INVALID_SYMBOL, Msg: Invalid Symbol:[SPX260723C07410000]., RequestID: 76f2cc36-7fde-4926-bfe5-92495d2a3a59
+17416 2026-07-23 20:06:32,030 webull.core.client ERROR get_response exception. {
+  "error_code": "INVALID_SYMBOL",
+  "error_msg": "Invalid Symbol:[SPX260723C07410000].",
+  "http_status": 417,
+  "request_id": "76f2cc36-7fde-4926-bfe5-92495d2a3a59"
+}
+17416 2026-07-23 20:06:32,030 webull.core.client ERROR get_response exception. {
+  "error_code": "INVALID_SYMBOL",
+  "error_msg": "Invalid Symbol:[SPX260723C07410000].",
+  "http_status": 417,
+  "request_id": "76f2cc36-7fde-4926-bfe5-92495d2a3a59"
+}
+17416 2026-07-23 20:06:32,158 webull.core.client ERROR ServerException occurred. Host:api.webull.com SDK-Version:2.0.14 Request:{
+  "_version": "v2",
+  "_action_name": "/openapi/market-data/option/snapshot",
+  "_protocol_type": "https",
+  "_accept_format": "JSON",
+  "_params": {
+    "symbols": "SPX260723C07410000",
+    "category": "US_OPTION"
+  },
+  "_method": "GET",
+  "_header": {
+    "x-version": "v2",
+    "Accept-Encoding": "gzip",
+    "x-app-key": "53a77ca9e6c56a74be896b66272e4859",
+    "x-timestamp": "2026-07-24T00:06:32Z",
+    "x-signature-version": "1.0",
+    "x-signature-algorithm": "HMAC-SHA256",
+    "x-signature-nonce": "1e440ceb-cde3-5092-91a5-e64cc41019bd",
+    "x-signature": "Dcj1VVEJin7M6lwkODEGZOb/Yga5KBCOSwXlDQeSPEA=",
+    "User-Agent": "WebullApiSDK (Windows 10;AMD64) Python/3.14.6 Core/2.0.14 python-requests/2.34.2",
+    "x-webull-client-source": "sdk"
+  },
+  "_body_params": null,
+  "_uri_pattern": null,
+  "_uri_params": null,
+  "_content": null,
+  "_extra_user_agent": {},
+  "string_to_sign": "",
+  "_request_connect_timeout": null,
+  "_request_read_timeout": null,
+  "endpoint": "api.webull.com",
+  "_signer_spec": "<module 'webull.core.auth.algorithm.sha_hmac1' from 'C:\\\\Users\\\\Hulk\\\\Desktop\\\\asdas\\\\.venv\\\\Lib\\\\site-packages\\\\webull\\\\core\\\\auth\\\\algorithm\\\\sha_hmac1.py'>"
+} Response:{'error_code': 'INVALID_SYMBOL', 'message': 'Invalid Symbol:[SPX260723C07410000].', 'status': 417} ServerException:HTTP Status: 417, Code: INVALID_SYMBOL, Msg: Invalid Symbol:[SPX260723C07410000]., RequestID: 72a329c1-ca1c-44e5-8f4d-06264b641333
+17416 2026-07-23 20:06:32,158 webull.core.client ERROR ServerException occurred. Host:api.webull.com SDK-Version:2.0.14 Request:{
+  "_version": "v2",
+  "_action_name": "/openapi/market-data/option/snapshot",
+  "_protocol_type": "https",
+  "_accept_format": "JSON",
+  "_params": {
+    "symbols": "SPX260723C07410000",
+    "category": "US_OPTION"
+  },
+  "_method": "GET",
+  "_header": {
+    "x-version": "v2",
+    "Accept-Encoding": "gzip",
+    "x-app-key": "53a77ca9e6c56a74be896b66272e4859",
+    "x-timestamp": "2026-07-24T00:06:32Z",
+    "x-signature-version": "1.0",
+    "x-signature-algorithm": "HMAC-SHA256",
+    "x-signature-nonce": "1e440ceb-cde3-5092-91a5-e64cc41019bd",
+    "x-signature": "Dcj1VVEJin7M6lwkODEGZOb/Yga5KBCOSwXlDQeSPEA=",
+    "User-Agent": "WebullApiSDK (Windows 10;AMD64) Python/3.14.6 Core/2.0.14 python-requests/2.34.2",
+    "x-webull-client-source": "sdk"
+  },
+  "_body_params": null,
+  "_uri_pattern": null,
+  "_uri_params": null,
+  "_content": null,
+  "_extra_user_agent": {},
+  "string_to_sign": "",
+  "_request_connect_timeout": null,
+  "_request_read_timeout": null,
+  "endpoint": "api.webull.com",
+  "_signer_spec": "<module 'webull.core.auth.algorithm.sha_hmac1' from 'C:\\\\Users\\\\Hulk\\\\Desktop\\\\asdas\\\\.venv\\\\Lib\\\\site-packages\\\\webull\\\\core\\\\auth\\\\algorithm\\\\sha_hmac1.py'>"
+} Response:{'error_code': 'INVALID_SYMBOL', 'message': 'Invalid Symbol:[SPX260723C07410000].', 'status': 417} ServerException:HTTP Status: 417, Code: INVALID_SYMBOL, Msg: Invalid Symbol:[SPX260723C07410000]., RequestID: 72a329c1-ca1c-44e5-8f4d-06264b641333
+17416 2026-07-23 20:06:32,159 webull.core.client ERROR get_response exception. {
+  "error_code": "INVALID_SYMBOL",
+  "error_msg": "Invalid Symbol:[SPX260723C07410000].",
+  "http_status": 417,
+  "request_id": "72a329c1-ca1c-44e5-8f4d-06264b641333"
+}
+17416 2026-07-23 20:06:32,159 webull.core.client ERROR get_response exception. {
+  "error_code": "INVALID_SYMBOL",
+  "error_msg": "Invalid Symbol:[SPX260723C07410000].",
+  "http_status": 417,
+  "request_id": "72a329c1-ca1c-44e5-8f4d-06264b641333"
+}
+17416 2026-07-23 20:06:32,296 webull.core.client ERROR ServerException occurred. Host:api.webull.com SDK-Version:2.0.14 Request:{
+  "_version": "v2",
+  "_action_name": "/openapi/market-data/option/snapshot",
+  "_protocol_type": "https",
+  "_accept_format": "JSON",
+  "_params": {
+    "symbols": "SPX260723C07410000",
+    "category": "US_OPTION"
+  },
+  "_method": "GET",
+  "_header": {
+    "x-version": "v2",
+    "Accept-Encoding": "gzip",
+    "x-app-key": "53a77ca9e6c56a74be896b66272e4859",
+    "x-timestamp": "2026-07-24T00:06:32Z",
+    "x-signature-version": "1.0",
+    "x-signature-algorithm": "HMAC-SHA256",
+    "x-signature-nonce": "a4bdc863-6140-50af-a555-1cbc82a3c372",
+    "x-signature": "3uR74rCgw1ueFYK+e1DTBw4+ZBxh34UngXZE4vrEyS0=",
+    "User-Agent": "WebullApiSDK (Windows 10;AMD64) Python/3.14.6 Core/2.0.14 python-requests/2.34.2",
+    "x-webull-client-source": "sdk"
+  },
+  "_body_params": null,
+  "_uri_pattern": null,
+  "_uri_params": null,
+  "_content": null,
+  "_extra_user_agent": {},
+  "string_to_sign": "",
+  "_request_connect_timeout": null,
+  "_request_read_timeout": null,
+  "endpoint": "api.webull.com",
+  "_signer_spec": "<module 'webull.core.auth.algorithm.sha_hmac1' from 'C:\\\\Users\\\\Hulk\\\\Desktop\\\\asdas\\\\.venv\\\\Lib\\\\site-packages\\\\webull\\\\core\\\\auth\\\\algorithm\\\\sha_hmac1.py'>"
+} Response:{'error_code': 'INVALID_SYMBOL', 'message': 'Invalid Symbol:[SPX260723C07410000].', 'status': 417} ServerException:HTTP Status: 417, Code: INVALID_SYMBOL, Msg: Invalid Symbol:[SPX260723C07410000]., RequestID: d55e66bf-c705-47fb-98be-4f06aceb0a41
+17416 2026-07-23 20:06:32,296 webull.core.client ERROR ServerException occurred. Host:api.webull.com SDK-Version:2.0.14 Request:{
+  "_version": "v2",
+  "_action_name": "/openapi/market-data/option/snapshot",
+  "_protocol_type": "https",
+  "_accept_format": "JSON",
+  "_params": {
+    "symbols": "SPX260723C07410000",
+    "category": "US_OPTION"
+  },
+  "_method": "GET",
+  "_header": {
+    "x-version": "v2",
+    "Accept-Encoding": "gzip",
+    "x-app-key": "53a77ca9e6c56a74be896b66272e4859",
+    "x-timestamp": "2026-07-24T00:06:32Z",
+    "x-signature-version": "1.0",
+    "x-signature-algorithm": "HMAC-SHA256",
+    "x-signature-nonce": "a4bdc863-6140-50af-a555-1cbc82a3c372",
+    "x-signature": "3uR74rCgw1ueFYK+e1DTBw4+ZBxh34UngXZE4vrEyS0=",
+    "User-Agent": "WebullApiSDK (Windows 10;AMD64) Python/3.14.6 Core/2.0.14 python-requests/2.34.2",
+    "x-webull-client-source": "sdk"
+  },
+  "_body_params": null,
+  "_uri_pattern": null,
+  "_uri_params": null,
+  "_content": null,
+  "_extra_user_agent": {},
+  "string_to_sign": "",
+  "_request_connect_timeout": null,
+  "_request_read_timeout": null,
+  "endpoint": "api.webull.com",
+  "_signer_spec": "<module 'webull.core.auth.algorithm.sha_hmac1' from 'C:\\\\Users\\\\Hulk\\\\Desktop\\\\asdas\\\\.venv\\\\Lib\\\\site-packages\\\\webull\\\\core\\\\auth\\\\algorithm\\\\sha_hmac1.py'>"
+} Response:{'error_code': 'INVALID_SYMBOL', 'message': 'Invalid Symbol:[SPX260723C07410000].', 'status': 417} ServerException:HTTP Status: 417, Code: INVALID_SYMBOL, Msg: Invalid Symbol:[SPX260723C07410000]., RequestID: d55e66bf-c705-47fb-98be-4f06aceb0a41
+17416 2026-07-23 20:06:32,296 webull.core.client ERROR get_response exception. {
+  "error_code": "INVALID_SYMBOL",
+  "error_msg": "Invalid Symbol:[SPX260723C07410000].",
+  "http_status": 417,
+  "request_id": "d55e66bf-c705-47fb-98be-4f06aceb0a41"
+}
+17416 2026-07-23 20:06:32,296 webull.core.client ERROR get_response exception. {
+  "error_code": "INVALID_SYMBOL",
+  "error_msg": "Invalid Symbol:[SPX260723C07410000].",
+  "http_status": 417,
+  "request_id": "d55e66bf-c705-47fb-98be-4f06aceb0a41"
+}
+17136 2026-07-23 20:06:37,020 webull.core.client ERROR ServerException occurred. Host:api.webull.com SDK-Version:2.0.14 Request:{
+  "_version": "v2",
+  "_action_name": "/openapi/market-data/option/snapshot",
+  "_protocol_type": "https",
+  "_accept_format": "JSON",
+  "_params": {
+    "symbols": "SPX260723C07410000",
+    "category": "US_OPTION"
+  },
+  "_method": "GET",
+  "_header": {
+    "x-version": "v2",
+    "Accept-Encoding": "gzip",
+    "x-app-key": "53a77ca9e6c56a74be896b66272e4859",
+    "x-timestamp": "2026-07-24T00:06:36Z",
+    "x-signature-version": "1.0",
+    "x-signature-algorithm": "HMAC-SHA256",
+    "x-signature-nonce": "60166999-5fcb-554d-a0c9-c241ee20945a",
+    "x-signature": "3mndTecMXwwQ6fTDFiExX68sWMtdNPLcYxtzh6y2hcM=",
+    "User-Agent": "WebullApiSDK (Windows 10;AMD64) Python/3.14.6 Core/2.0.14 python-requests/2.34.2",
+    "x-webull-client-source": "sdk"
+  },
+  "_body_params": null,
+  "_uri_pattern": null,
+  "_uri_params": null,
+  "_content": null,
+  "_extra_user_agent": {},
+  "string_to_sign": "",
+  "_request_connect_timeout": null,
+  "_request_read_timeout": null,
+  "endpoint": "api.webull.com",
+  "_signer_spec": "<module 'webull.core.auth.algorithm.sha_hmac1' from 'C:\\\\Users\\\\Hulk\\\\Desktop\\\\asdas\\\\.venv\\\\Lib\\\\site-packages\\\\webull\\\\core\\\\auth\\\\algorithm\\\\sha_hmac1.py'>"
+} Response:{'error_code': 'INVALID_SYMBOL', 'message': 'Invalid Symbol:[SPX260723C07410000].', 'status': 417} ServerException:HTTP Status: 417, Code: INVALID_SYMBOL, Msg: Invalid Symbol:[SPX260723C07410000]., RequestID: 990054a2-ff13-4761-815a-2d93b3ee2804
+17136 2026-07-23 20:06:37,020 webull.core.client ERROR ServerException occurred. Host:api.webull.com SDK-Version:2.0.14 Request:{
+  "_version": "v2",
+  "_action_name": "/openapi/market-data/option/snapshot",
+  "_protocol_type": "https",
+  "_accept_format": "JSON",
+  "_params": {
+    "symbols": "SPX260723C07410000",
+    "category": "US_OPTION"
+  },
+  "_method": "GET",
+  "_header": {
+    "x-version": "v2",
+    "Accept-Encoding": "gzip",
+    "x-app-key": "53a77ca9e6c56a74be896b66272e4859",
+    "x-timestamp": "2026-07-24T00:06:36Z",
+    "x-signature-version": "1.0",
+    "x-signature-algorithm": "HMAC-SHA256",
+    "x-signature-nonce": "60166999-5fcb-554d-a0c9-c241ee20945a",
+    "x-signature": "3mndTecMXwwQ6fTDFiExX68sWMtdNPLcYxtzh6y2hcM=",
+    "User-Agent": "WebullApiSDK (Windows 10;AMD64) Python/3.14.6 Core/2.0.14 python-requests/2.34.2",
+    "x-webull-client-source": "sdk"
+  },
+  "_body_params": null,
+  "_uri_pattern": null,
+  "_uri_params": null,
+  "_content": null,
+  "_extra_user_agent": {},
+  "string_to_sign": "",
+  "_request_connect_timeout": null,
+  "_request_read_timeout": null,
+  "endpoint": "api.webull.com",
+  "_signer_spec": "<module 'webull.core.auth.algorithm.sha_hmac1' from 'C:\\\\Users\\\\Hulk\\\\Desktop\\\\asdas\\\\.venv\\\\Lib\\\\site-packages\\\\webull\\\\core\\\\auth\\\\algorithm\\\\sha_hmac1.py'>"
+} Response:{'error_code': 'INVALID_SYMBOL', 'message': 'Invalid Symbol:[SPX260723C07410000].', 'status': 417} ServerException:HTTP Status: 417, Code: INVALID_SYMBOL, Msg: Invalid Symbol:[SPX260723C07410000]., RequestID: 990054a2-ff13-4761-815a-2d93b3ee2804
+17136 2026-07-23 20:06:37,021 webull.core.client ERROR get_response exception. {
+  "error_code": "INVALID_SYMBOL",
+  "error_msg": "Invalid Symbol:[SPX260723C07410000].",
+  "http_status": 417,
+  "request_id": "990054a2-ff13-4761-815a-2d93b3ee2804"
+}
+17136 2026-07-23 20:06:37,021 webull.core.client ERROR get_response exception. {
+  "error_code": "INVALID_SYMBOL",
+  "error_msg": "Invalid Symbol:[SPX260723C07410000].",
+  "http_status": 417,
+  "request_id": "990054a2-ff13-4761-815a-2d93b3ee2804"
+}
+17136 2026-07-23 20:06:37,169 webull.core.client ERROR ServerException occurred. Host:api.webull.com SDK-Version:2.0.14 Request:{
+  "_version": "v2",
+  "_action_name": "/openapi/market-data/option/snapshot",
+  "_protocol_type": "https",
+  "_accept_format": "JSON",
+  "_params": {
+    "symbols": "SPX260723C07410000",
+    "category": "US_OPTION"
+  },
+  "_method": "GET",
+  "_header": {
+    "x-version": "v2",
+    "Accept-Encoding": "gzip",
+    "x-app-key": "53a77ca9e6c56a74be896b66272e4859",
+    "x-timestamp": "2026-07-24T00:06:37Z",
+    "x-signature-version": "1.0",
+    "x-signature-algorithm": "HMAC-SHA256",
+    "x-signature-nonce": "b3841126-97de-5ad7-942f-4fd9b6bdebc4",
+    "x-signature": "1Jlo8xPt/Er2FiqkM2ciD9FlRIQkMAVbTUXz1OOVbBI=",
+    "User-Agent": "WebullApiSDK (Windows 10;AMD64) Python/3.14.6 Core/2.0.14 python-requests/2.34.2",
+    "x-webull-client-source": "sdk"
+  },
+  "_body_params": null,
+  "_uri_pattern": null,
+  "_uri_params": null,
+  "_content": null,
+  "_extra_user_agent": {},
+  "string_to_sign": "",
+  "_request_connect_timeout": null,
+  "_request_read_timeout": null,
+  "endpoint": "api.webull.com",
+  "_signer_spec": "<module 'webull.core.auth.algorithm.sha_hmac1' from 'C:\\\\Users\\\\Hulk\\\\Desktop\\\\asdas\\\\.venv\\\\Lib\\\\site-packages\\\\webull\\\\core\\\\auth\\\\algorithm\\\\sha_hmac1.py'>"
+} Response:{'error_code': 'INVALID_SYMBOL', 'message': 'Invalid Symbol:[SPX260723C07410000].', 'status': 417} ServerException:HTTP Status: 417, Code: INVALID_SYMBOL, Msg: Invalid Symbol:[SPX260723C07410000]., RequestID: 3e0e9763-d9b4-4c5e-84ab-54fbf2890b06
+17136 2026-07-23 20:06:37,169 webull.core.client ERROR ServerException occurred. Host:api.webull.com SDK-Version:2.0.14 Request:{
+  "_version": "v2",
+  "_action_name": "/openapi/market-data/option/snapshot",
+  "_protocol_type": "https",
+  "_accept_format": "JSON",
+  "_params": {
+    "symbols": "SPX260723C07410000",
+    "category": "US_OPTION"
+  },
+  "_method": "GET",
+  "_header": {
+    "x-version": "v2",
+    "Accept-Encoding": "gzip",
+    "x-app-key": "53a77ca9e6c56a74be896b66272e4859",
+    "x-timestamp": "2026-07-24T00:06:37Z",
+    "x-signature-version": "1.0",
+    "x-signature-algorithm": "HMAC-SHA256",
+    "x-signature-nonce": "b3841126-97de-5ad7-942f-4fd9b6bdebc4",
+    "x-signature": "1Jlo8xPt/Er2FiqkM2ciD9FlRIQkMAVbTUXz1OOVbBI=",
+    "User-Agent": "WebullApiSDK (Windows 10;AMD64) Python/3.14.6 Core/2.0.14 python-requests/2.34.2",
+    "x-webull-client-source": "sdk"
+  },
+  "_body_params": null,
+  "_uri_pattern": null,
+  "_uri_params": null,
+  "_content": null,
+  "_extra_user_agent": {},
+  "string_to_sign": "",
+  "_request_connect_timeout": null,
+  "_request_read_timeout": null,
+  "endpoint": "api.webull.com",
+  "_signer_spec": "<module 'webull.core.auth.algorithm.sha_hmac1' from 'C:\\\\Users\\\\Hulk\\\\Desktop\\\\asdas\\\\.venv\\\\Lib\\\\site-packages\\\\webull\\\\core\\\\auth\\\\algorithm\\\\sha_hmac1.py'>"
+} Response:{'error_code': 'INVALID_SYMBOL', 'message': 'Invalid Symbol:[SPX260723C07410000].', 'status': 417} ServerException:HTTP Status: 417, Code: INVALID_SYMBOL, Msg: Invalid Symbol:[SPX260723C07410000]., RequestID: 3e0e9763-d9b4-4c5e-84ab-54fbf2890b06
+17136 2026-07-23 20:06:37,170 webull.core.client ERROR get_response exception. {
+  "error_code": "INVALID_SYMBOL",
+  "error_msg": "Invalid Symbol:[SPX260723C07410000].",
+  "http_status": 417,
+  "request_id": "3e0e9763-d9b4-4c5e-84ab-54fbf2890b06"
+}
+17136 2026-07-23 20:06:37,170 webull.core.client ERROR get_response exception. {
+  "error_code": "INVALID_SYMBOL",
+  "error_msg": "Invalid Symbol:[SPX260723C07410000].",
+  "http_status": 417,
+  "request_id": "3e0e9763-d9b4-4c5e-84ab-54fbf2890b06"
+}
+17136 2026-07-23 20:06:37,305 webull.core.client ERROR ServerException occurred. Host:api.webull.com SDK-Version:2.0.14 Request:{
+  "_version": "v2",
+  "_action_name": "/openapi/market-data/option/snapshot",
+  "_protocol_type": "https",
+  "_accept_format": "JSON",
+  "_params": {
+    "symbols": "SPX260723C07410000",
+    "category": "US_OPTION"
+  },
+  "_method": "GET",
+  "_header": {
+    "x-version": "v2",
+    "Accept-Encoding": "gzip",
+    "x-app-key": "53a77ca9e6c56a74be896b66272e4859",
+    "x-timestamp": "2026-07-24T00:06:37Z",
+    "x-signature-version": "1.0",
+    "x-signature-algorithm": "HMAC-SHA256",
+    "x-signature-nonce": "1b25ff27-1ba2-566a-a287-be284f2479d1",
+    "x-signature": "vaQnNYAAnRmVCPJkPrtwDvZ0lyqRAaMiI6NSXV+Fl10=",
+    "User-Agent": "WebullApiSDK (Windows 10;AMD64) Python/3.14.6 Core/2.0.14 python-requests/2.34.2",
+    "x-webull-client-source": "sdk"
+  },
+  "_body_params": null,
+  "_uri_pattern": null,
+  "_uri_params": null,
+  "_content": null,
+  "_extra_user_agent": {},
+  "string_to_sign": "",
+  "_request_connect_timeout": null,
+  "_request_read_timeout": null,
+  "endpoint": "api.webull.com",
+  "_signer_spec": "<module 'webull.core.auth.algorithm.sha_hmac1' from 'C:\\\\Users\\\\Hulk\\\\Desktop\\\\asdas\\\\.venv\\\\Lib\\\\site-packages\\\\webull\\\\core\\\\auth\\\\algorithm\\\\sha_hmac1.py'>"
+} Response:{'error_code': 'INVALID_SYMBOL', 'message': 'Invalid Symbol:[SPX260723C07410000].', 'status': 417} ServerException:HTTP Status: 417, Code: INVALID_SYMBOL, Msg: Invalid Symbol:[SPX260723C07410000]., RequestID: f8afdf0e-4d2f-40c0-bd0c-a6aa6cd18691
+17136 2026-07-23 20:06:37,305 webull.core.client ERROR ServerException occurred. Host:api.webull.com SDK-Version:2.0.14 Request:{
+  "_version": "v2",
+  "_action_name": "/openapi/market-data/option/snapshot",
+  "_protocol_type": "https",
+  "_accept_format": "JSON",
+  "_params": {
+    "symbols": "SPX260723C07410000",
+    "category": "US_OPTION"
+  },
+  "_method": "GET",
+  "_header": {
+    "x-version": "v2",
+    "Accept-Encoding": "gzip",
+    "x-app-key": "53a77ca9e6c56a74be896b66272e4859",
+    "x-timestamp": "2026-07-24T00:06:37Z",
+    "x-signature-version": "1.0",
+    "x-signature-algorithm": "HMAC-SHA256",
+    "x-signature-nonce": "1b25ff27-1ba2-566a-a287-be284f2479d1",
+    "x-signature": "vaQnNYAAnRmVCPJkPrtwDvZ0lyqRAaMiI6NSXV+Fl10=",
+    "User-Agent": "WebullApiSDK (Windows 10;AMD64) Python/3.14.6 Core/2.0.14 python-requests/2.34.2",
+    "x-webull-client-source": "sdk"
+  },
+  "_body_params": null,
+  "_uri_pattern": null,
+  "_uri_params": null,
+  "_content": null,
+  "_extra_user_agent": {},
+  "string_to_sign": "",
+  "_request_connect_timeout": null,
+  "_request_read_timeout": null,
+  "endpoint": "api.webull.com",
+  "_signer_spec": "<module 'webull.core.auth.algorithm.sha_hmac1' from 'C:\\\\Users\\\\Hulk\\\\Desktop\\\\asdas\\\\.venv\\\\Lib\\\\site-packages\\\\webull\\\\core\\\\auth\\\\algorithm\\\\sha_hmac1.py'>"
+} Response:{'error_code': 'INVALID_SYMBOL', 'message': 'Invalid Symbol:[SPX260723C07410000].', 'status': 417} ServerException:HTTP Status: 417, Code: INVALID_SYMBOL, Msg: Invalid Symbol:[SPX260723C07410000]., RequestID: f8afdf0e-4d2f-40c0-bd0c-a6aa6cd18691
+17136 2026-07-23 20:06:37,306 webull.core.client ERROR get_response exception. {
+  "error_code": "INVALID_SYMBOL",
+  "error_msg": "Invalid Symbol:[SPX260723C07410000].",
+  "http_status": 417,
+  "request_id": "f8afdf0e-4d2f-40c0-bd0c-a6aa6cd18691"
+}
+17136 2026-07-23 20:06:37,306 webull.core.client ERROR get_response exception. {
+  "error_code": "INVALID_SYMBOL",
+  "error_msg": "Invalid Symbol:[SPX260723C07410000].",
+  "http_status": 417,
+  "request_id": "f8afdf0e-4d2f-40c0-bd0c-a6aa6cd18691"
+}
+17136 2026-07-23 20:06:37,443 webull.core.client ERROR ServerException occurred. Host:api.webull.com SDK-Version:2.0.14 Request:{
+  "_version": "v2",
+  "_action_name": "/openapi/market-data/option/snapshot",
+  "_protocol_type": "https",
+  "_accept_format": "JSON",
+  "_params": {
+    "symbols": "SPX260723C07410000",
+    "category": "US_OPTION"
+  },
+  "_method": "GET",
+  "_header": {
+    "x-version": "v2",
+    "Accept-Encoding": "gzip",
+    "x-app-key": "53a77ca9e6c56a74be896b66272e4859",
+    "x-timestamp": "2026-07-24T00:06:37Z",
+    "x-signature-version": "1.0",
+    "x-signature-algorithm": "HMAC-SHA256",
+    "x-signature-nonce": "344567db-53ab-5ab9-af2b-38e1ef418931",
+    "x-signature": "JgnLq+t/0c+xkqAiY4HS5gn4E406lH3+5uhstyLvClI=",
+    "User-Agent": "WebullApiSDK (Windows 10;AMD64) Python/3.14.6 Core/2.0.14 python-requests/2.34.2",
+    "x-webull-client-source": "sdk"
+  },
+  "_body_params": null,
+  "_uri_pattern": null,
+  "_uri_params": null,
+  "_content": null,
+  "_extra_user_agent": {},
+  "string_to_sign": "",
+  "_request_connect_timeout": null,
+  "_request_read_timeout": null,
+  "endpoint": "api.webull.com",
+  "_signer_spec": "<module 'webull.core.auth.algorithm.sha_hmac1' from 'C:\\\\Users\\\\Hulk\\\\Desktop\\\\asdas\\\\.venv\\\\Lib\\\\site-packages\\\\webull\\\\core\\\\auth\\\\algorithm\\\\sha_hmac1.py'>"
+} Response:{'error_code': 'INVALID_SYMBOL', 'message': 'Invalid Symbol:[SPX260723C07410000].', 'status': 417} ServerException:HTTP Status: 417, Code: INVALID_SYMBOL, Msg: Invalid Symbol:[SPX260723C07410000]., RequestID: 0449f1f0-b7d1-4c40-8ab8-6b81e1769165
+17136 2026-07-23 20:06:37,443 webull.core.client ERROR ServerException occurred. Host:api.webull.com SDK-Version:2.0.14 Request:{
+  "_version": "v2",
+  "_action_name": "/openapi/market-data/option/snapshot",
+  "_protocol_type": "https",
+  "_accept_format": "JSON",
+  "_params": {
+    "symbols": "SPX260723C07410000",
+    "category": "US_OPTION"
+  },
+  "_method": "GET",
+  "_header": {
+    "x-version": "v2",
+    "Accept-Encoding": "gzip",
+    "x-app-key": "53a77ca9e6c56a74be896b66272e4859",
+    "x-timestamp": "2026-07-24T00:06:37Z",
+    "x-signature-version": "1.0",
+    "x-signature-algorithm": "HMAC-SHA256",
+    "x-signature-nonce": "344567db-53ab-5ab9-af2b-38e1ef418931",
+    "x-signature": "JgnLq+t/0c+xkqAiY4HS5gn4E406lH3+5uhstyLvClI=",
+    "User-Agent": "WebullApiSDK (Windows 10;AMD64) Python/3.14.6 Core/2.0.14 python-requests/2.34.2",
+    "x-webull-client-source": "sdk"
+  },
+  "_body_params": null,
+  "_uri_pattern": null,
+  "_uri_params": null,
+  "_content": null,
+  "_extra_user_agent": {},
+  "string_to_sign": "",
+  "_request_connect_timeout": null,
+  "_request_read_timeout": null,
+  "endpoint": "api.webull.com",
+  "_signer_spec": "<module 'webull.core.auth.algorithm.sha_hmac1' from 'C:\\\\Users\\\\Hulk\\\\Desktop\\\\asdas\\\\.venv\\\\Lib\\\\site-packages\\\\webull\\\\core\\\\auth\\\\algorithm\\\\sha_hmac1.py'>"
+} Response:{'error_code': 'INVALID_SYMBOL', 'message': 'Invalid Symbol:[SPX260723C07410000].', 'status': 417} ServerException:HTTP Status: 417, Code: INVALID_SYMBOL, Msg: Invalid Symbol:[SPX260723C07410000]., RequestID: 0449f1f0-b7d1-4c40-8ab8-6b81e1769165
+17136 2026-07-23 20:06:37,444 webull.core.client ERROR get_response exception. {
+  "error_code": "INVALID_SYMBOL",
+  "error_msg": "Invalid Symbol:[SPX260723C07410000].",
+  "http_status": 417,
+  "request_id": "0449f1f0-b7d1-4c40-8ab8-6b81e1769165"
+}
+17136 2026-07-23 20:06:37,444 webull.core.client ERROR get_response exception. {
+  "error_code": "INVALID_SYMBOL",
+  "error_msg": "Invalid Symbol:[SPX260723C07410000].",
+  "http_status": 417,
+  "request_id": "0449f1f0-b7d1-4c40-8ab8-6b81e1769165"
+}
+17136 2026-07-23 20:06:41,931 webull.core.client ERROR ServerException occurred. Host:api.webull.com SDK-Version:2.0.14 Request:{
+  "_version": "v2",
+  "_action_name": "/openapi/market-data/option/snapshot",
+  "_protocol_type": "https",
+  "_accept_format": "JSON",
+  "_params": {
+    "symbols": "SPX260723C07410000",
+    "category": "US_OPTION"
+  },
+  "_method": "GET",
+  "_header": {
+    "x-version": "v2",
+    "Accept-Encoding": "gzip",
+    "x-app-key": "53a77ca9e6c56a74be896b66272e4859",
+    "x-timestamp": "2026-07-24T00:06:41Z",
+    "x-signature-version": "1.0",
+    "x-signature-algorithm": "HMAC-SHA256",
+    "x-signature-nonce": "5e8c63d6-b1aa-53d4-8f63-e987eb52d2ac",
+    "x-signature": "yv9FlZ1mKN/ZarCiF1ztsfSxJV8B5EoSMZsbNUysvY0=",
+    "User-Agent": "WebullApiSDK (Windows 10;AMD64) Python/3.14.6 Core/2.0.14 python-requests/2.34.2",
+    "x-webull-client-source": "sdk"
+  },
+  "_body_params": null,
+  "_uri_pattern": null,
+  "_uri_params": null,
+  "_content": null,
+  "_extra_user_agent": {},
+  "string_to_sign": "",
+  "_request_connect_timeout": null,
+  "_request_read_timeout": null,
+  "endpoint": "api.webull.com",
+  "_signer_spec": "<module 'webull.core.auth.algorithm.sha_hmac1' from 'C:\\\\Users\\\\Hulk\\\\Desktop\\\\asdas\\\\.venv\\\\Lib\\\\site-packages\\\\webull\\\\core\\\\auth\\\\algorithm\\\\sha_hmac1.py'>"
+} Response:{'error_code': 'INVALID_SYMBOL', 'message': 'Invalid Symbol:[SPX260723C07410000].', 'status': 417} ServerException:HTTP Status: 417, Code: INVALID_SYMBOL, Msg: Invalid Symbol:[SPX260723C07410000]., RequestID: 088fdb03-f66a-4a22-b23d-4f817998a1b5
+17136 2026-07-23 20:06:41,931 webull.core.client ERROR ServerException occurred. Host:api.webull.com SDK-Version:2.0.14 Request:{
+  "_version": "v2",
+  "_action_name": "/openapi/market-data/option/snapshot",
+  "_protocol_type": "https",
+  "_accept_format": "JSON",
+  "_params": {
+    "symbols": "SPX260723C07410000",
+    "category": "US_OPTION"
+  },
+  "_method": "GET",
+  "_header": {
+    "x-version": "v2",
+    "Accept-Encoding": "gzip",
+    "x-app-key": "53a77ca9e6c56a74be896b66272e4859",
+    "x-timestamp": "2026-07-24T00:06:41Z",
+    "x-signature-version": "1.0",
+    "x-signature-algorithm": "HMAC-SHA256",
+    "x-signature-nonce": "5e8c63d6-b1aa-53d4-8f63-e987eb52d2ac",
+    "x-signature": "yv9FlZ1mKN/ZarCiF1ztsfSxJV8B5EoSMZsbNUysvY0=",
+    "User-Agent": "WebullApiSDK (Windows 10;AMD64) Python/3.14.6 Core/2.0.14 python-requests/2.34.2",
+    "x-webull-client-source": "sdk"
+  },
+  "_body_params": null,
+  "_uri_pattern": null,
+  "_uri_params": null,
+  "_content": null,
+  "_extra_user_agent": {},
+  "string_to_sign": "",
+  "_request_connect_timeout": null,
+  "_request_read_timeout": null,
+  "endpoint": "api.webull.com",
+  "_signer_spec": "<module 'webull.core.auth.algorithm.sha_hmac1' from 'C:\\\\Users\\\\Hulk\\\\Desktop\\\\asdas\\\\.venv\\\\Lib\\\\site-packages\\\\webull\\\\core\\\\auth\\\\algorithm\\\\sha_hmac1.py'>"
+} Response:{'error_code': 'INVALID_SYMBOL', 'message': 'Invalid Symbol:[SPX260723C07410000].', 'status': 417} ServerException:HTTP Status: 417, Code: INVALID_SYMBOL, Msg: Invalid Symbol:[SPX260723C07410000]., RequestID: 088fdb03-f66a-4a22-b23d-4f817998a1b5
+17136 2026-07-23 20:06:41,932 webull.core.client ERROR get_response exception. {
+  "error_code": "INVALID_SYMBOL",
+  "error_msg": "Invalid Symbol:[SPX260723C07410000].",
+  "http_status": 417,
+  "request_id": "088fdb03-f66a-4a22-b23d-4f817998a1b5"
+}
+17136 2026-07-23 20:06:41,932 webull.core.client ERROR get_response exception. {
+  "error_code": "INVALID_SYMBOL",
+  "error_msg": "Invalid Symbol:[SPX260723C07410000].",
+  "http_status": 417,
+  "request_id": "088fdb03-f66a-4a22-b23d-4f817998a1b5"
+}
+17136 2026-07-23 20:06:42,075 webull.core.client ERROR ServerException occurred. Host:api.webull.com SDK-Version:2.0.14 Request:{
+  "_version": "v2",
+  "_action_name": "/openapi/market-data/option/snapshot",
+  "_protocol_type": "https",
+  "_accept_format": "JSON",
+  "_params": {
+    "symbols": "SPX260723C07410000",
+    "category": "US_OPTION"
+  },
+  "_method": "GET",
+  "_header": {
+    "x-version": "v2",
+    "Accept-Encoding": "gzip",
+    "x-app-key": "53a77ca9e6c56a74be896b66272e4859",
+    "x-timestamp": "2026-07-24T00:06:41Z",
+    "x-signature-version": "1.0",
+    "x-signature-algorithm": "HMAC-SHA256",
+    "x-signature-nonce": "ee7f8d2b-9190-551d-b622-71b4800fdc27",
+    "x-signature": "EEkaGDvSXqQowqHK6y1IcnXd+/opz3+wjyU/1+okKHM=",
+    "User-Agent": "WebullApiSDK (Windows 10;AMD64) Python/3.14.6 Core/2.0.14 python-requests/2.34.2",
+    "x-webull-client-source": "sdk"
+  },
+  "_body_params": null,
+  "_uri_pattern": null,
+  "_uri_params": null,
+  "_content": null,
+  "_extra_user_agent": {},
+  "string_to_sign": "",
+  "_request_connect_timeout": null,
+  "_request_read_timeout": null,
+  "endpoint": "api.webull.com",
+  "_signer_spec": "<module 'webull.core.auth.algorithm.sha_hmac1' from 'C:\\\\Users\\\\Hulk\\\\Desktop\\\\asdas\\\\.venv\\\\Lib\\\\site-packages\\\\webull\\\\core\\\\auth\\\\algorithm\\\\sha_hmac1.py'>"
+} Response:{'error_code': 'INVALID_SYMBOL', 'message': 'Invalid Symbol:[SPX260723C07410000].', 'status': 417} ServerException:HTTP Status: 417, Code: INVALID_SYMBOL, Msg: Invalid Symbol:[SPX260723C07410000]., RequestID: 63b9e4bd-8eb9-4f75-b809-37091d9e61a6
+17136 2026-07-23 20:06:42,075 webull.core.client ERROR ServerException occurred. Host:api.webull.com SDK-Version:2.0.14 Request:{
+  "_version": "v2",
+  "_action_name": "/openapi/market-data/option/snapshot",
+  "_protocol_type": "https",
+  "_accept_format": "JSON",
+  "_params": {
+    "symbols": "SPX260723C07410000",
+    "category": "US_OPTION"
+  },
+  "_method": "GET",
+  "_header": {
+    "x-version": "v2",
+    "Accept-Encoding": "gzip",
+    "x-app-key": "53a77ca9e6c56a74be896b66272e4859",
+    "x-timestamp": "2026-07-24T00:06:41Z",
+    "x-signature-version": "1.0",
+    "x-signature-algorithm": "HMAC-SHA256",
+    "x-signature-nonce": "ee7f8d2b-9190-551d-b622-71b4800fdc27",
+    "x-signature": "EEkaGDvSXqQowqHK6y1IcnXd+/opz3+wjyU/1+okKHM=",
+    "User-Agent": "WebullApiSDK (Windows 10;AMD64) Python/3.14.6 Core/2.0.14 python-requests/2.34.2",
+    "x-webull-client-source": "sdk"
+  },
+  "_body_params": null,
+  "_uri_pattern": null,
+  "_uri_params": null,
+  "_content": null,
+  "_extra_user_agent": {},
+  "string_to_sign": "",
+  "_request_connect_timeout": null,
+  "_request_read_timeout": null,
+  "endpoint": "api.webull.com",
+  "_signer_spec": "<module 'webull.core.auth.algorithm.sha_hmac1' from 'C:\\\\Users\\\\Hulk\\\\Desktop\\\\asdas\\\\.venv\\\\Lib\\\\site-packages\\\\webull\\\\core\\\\auth\\\\algorithm\\\\sha_hmac1.py'>"
+} Response:{'error_code': 'INVALID_SYMBOL', 'message': 'Invalid Symbol:[SPX260723C07410000].', 'status': 417} ServerException:HTTP Status: 417, Code: INVALID_SYMBOL, Msg: Invalid Symbol:[SPX260723C07410000]., RequestID: 63b9e4bd-8eb9-4f75-b809-37091d9e61a6
+17136 2026-07-23 20:06:42,076 webull.core.client ERROR get_response exception. {
+  "error_code": "INVALID_SYMBOL",
+  "error_msg": "Invalid Symbol:[SPX260723C07410000].",
+  "http_status": 417,
+  "request_id": "63b9e4bd-8eb9-4f75-b809-37091d9e61a6"
+}
+17136 2026-07-23 20:06:42,076 webull.core.client ERROR get_response exception. {
+  "error_code": "INVALID_SYMBOL",
+  "error_msg": "Invalid Symbol:[SPX260723C07410000].",
+  "http_status": 417,
+  "request_id": "63b9e4bd-8eb9-4f75-b809-37091d9e61a6"
+}
+17136 2026-07-23 20:06:42,223 webull.core.client ERROR ServerException occurred. Host:api.webull.com SDK-Version:2.0.14 Request:{
+  "_version": "v2",
+  "_action_name": "/openapi/market-data/option/snapshot",
+  "_protocol_type": "https",
+  "_accept_format": "JSON",
+  "_params": {
+    "symbols": "SPX260723C07410000",
+    "category": "US_OPTION"
+  },
+  "_method": "GET",
+  "_header": {
+    "x-version": "v2",
+    "Accept-Encoding": "gzip",
+    "x-app-key": "53a77ca9e6c56a74be896b66272e4859",
+    "x-timestamp": "2026-07-24T00:06:42Z",
+    "x-signature-version": "1.0",
+    "x-signature-algorithm": "HMAC-SHA256",
+    "x-signature-nonce": "06964068-c2fe-597f-9580-52c4ac84d6f9",
+    "x-signature": "JnyL10SBmkgUv706zaMxQ9gNtLGHU7dbqdmuPlxNbw4=",
+    "User-Agent": "WebullApiSDK (Windows 10;AMD64) Python/3.14.6 Core/2.0.14 python-requests/2.34.2",
+    "x-webull-client-source": "sdk"
+  },
+  "_body_params": null,
+  "_uri_pattern": null,
+  "_uri_params": null,
+  "_content": null,
+  "_extra_user_agent": {},
+  "string_to_sign": "",
+  "_request_connect_timeout": null,
+  "_request_read_timeout": null,
+  "endpoint": "api.webull.com",
+  "_signer_spec": "<module 'webull.core.auth.algorithm.sha_hmac1' from 'C:\\\\Users\\\\Hulk\\\\Desktop\\\\asdas\\\\.venv\\\\Lib\\\\site-packages\\\\webull\\\\core\\\\auth\\\\algorithm\\\\sha_hmac1.py'>"
+} Response:{'error_code': 'INVALID_SYMBOL', 'message': 'Invalid Symbol:[SPX260723C07410000].', 'status': 417} ServerException:HTTP Status: 417, Code: INVALID_SYMBOL, Msg: Invalid Symbol:[SPX260723C07410000]., RequestID: 5edd7e35-5915-4a7b-8a0f-81c6f140a012
+17136 2026-07-23 20:06:42,223 webull.core.client ERROR ServerException occurred. Host:api.webull.com SDK-Version:2.0.14 Request:{
+  "_version": "v2",
+  "_action_name": "/openapi/market-data/option/snapshot",
+  "_protocol_type": "https",
+  "_accept_format": "JSON",
+  "_params": {
+    "symbols": "SPX260723C07410000",
+    "category": "US_OPTION"
+  },
+  "_method": "GET",
+  "_header": {
+    "x-version": "v2",
+    "Accept-Encoding": "gzip",
+    "x-app-key": "53a77ca9e6c56a74be896b66272e4859",
+    "x-timestamp": "2026-07-24T00:06:42Z",
+    "x-signature-version": "1.0",
+    "x-signature-algorithm": "HMAC-SHA256",
+    "x-signature-nonce": "06964068-c2fe-597f-9580-52c4ac84d6f9",
+    "x-signature": "JnyL10SBmkgUv706zaMxQ9gNtLGHU7dbqdmuPlxNbw4=",
+    "User-Agent": "WebullApiSDK (Windows 10;AMD64) Python/3.14.6 Core/2.0.14 python-requests/2.34.2",
+    "x-webull-client-source": "sdk"
+  },
+  "_body_params": null,
+  "_uri_pattern": null,
+  "_uri_params": null,
+  "_content": null,
+  "_extra_user_agent": {},
+  "string_to_sign": "",
+  "_request_connect_timeout": null,
+  "_request_read_timeout": null,
+  "endpoint": "api.webull.com",
+  "_signer_spec": "<module 'webull.core.auth.algorithm.sha_hmac1' from 'C:\\\\Users\\\\Hulk\\\\Desktop\\\\asdas\\\\.venv\\\\Lib\\\\site-packages\\\\webull\\\\core\\\\auth\\\\algorithm\\\\sha_hmac1.py'>"
+} Response:{'error_code': 'INVALID_SYMBOL', 'message': 'Invalid Symbol:[SPX260723C07410000].', 'status': 417} ServerException:HTTP Status: 417, Code: INVALID_SYMBOL, Msg: Invalid Symbol:[SPX260723C07410000]., RequestID: 5edd7e35-5915-4a7b-8a0f-81c6f140a012
+17136 2026-07-23 20:06:42,227 webull.core.client ERROR get_response exception. {
+  "error_code": "INVALID_SYMBOL",
+  "error_msg": "Invalid Symbol:[SPX260723C07410000].",
+  "http_status": 417,
+  "request_id": "5edd7e35-5915-4a7b-8a0f-81c6f140a012"
+}
+17136 2026-07-23 20:06:42,227 webull.core.client ERROR get_response exception. {
+  "error_code": "INVALID_SYMBOL",
+  "error_msg": "Invalid Symbol:[SPX260723C07410000].",
+  "http_status": 417,
+  "request_id": "5edd7e35-5915-4a7b-8a0f-81c6f140a012"
+}
+17136 2026-07-23 20:06:42,375 webull.core.client ERROR ServerException occurred. Host:api.webull.com SDK-Version:2.0.14 Request:{
+  "_version": "v2",
+  "_action_name": "/openapi/market-data/option/snapshot",
+  "_protocol_type": "https",
+  "_accept_format": "JSON",
+  "_params": {
+    "symbols": "SPX260723C07410000",
+    "category": "US_OPTION"
+  },
+  "_method": "GET",
+  "_header": {
+    "x-version": "v2",
+    "Accept-Encoding": "gzip",
+    "x-app-key": "53a77ca9e6c56a74be896b66272e4859",
+    "x-timestamp": "2026-07-24T00:06:42Z",
+    "x-signature-version": "1.0",
+    "x-signature-algorithm": "HMAC-SHA256",
+    "x-signature-nonce": "ad99f52f-f0d8-553c-b183-630d335b0798",
+    "x-signature": "XrRLwGxE03+lTohVIaGwxkGCujFy7hNdvw9WAHF5yZU=",
+    "User-Agent": "WebullApiSDK (Windows 10;AMD64) Python/3.14.6 Core/2.0.14 python-requests/2.34.2",
+    "x-webull-client-source": "sdk"
+  },
+  "_body_params": null,
+  "_uri_pattern": null,
+  "_uri_params": null,
+  "_content": null,
+  "_extra_user_agent": {},
+  "string_to_sign": "",
+  "_request_connect_timeout": null,
+  "_request_read_timeout": null,
+  "endpoint": "api.webull.com",
+  "_signer_spec": "<module 'webull.core.auth.algorithm.sha_hmac1' from 'C:\\\\Users\\\\Hulk\\\\Desktop\\\\asdas\\\\.venv\\\\Lib\\\\site-packages\\\\webull\\\\core\\\\auth\\\\algorithm\\\\sha_hmac1.py'>"
+} Response:{'error_code': 'INVALID_SYMBOL', 'message': 'Invalid Symbol:[SPX260723C07410000].', 'status': 417} ServerException:HTTP Status: 417, Code: INVALID_SYMBOL, Msg: Invalid Symbol:[SPX260723C07410000]., RequestID: ee22c559-97ad-4071-9bf8-6d2c86a3f8f2
+17136 2026-07-23 20:06:42,375 webull.core.client ERROR ServerException occurred. Host:api.webull.com SDK-Version:2.0.14 Request:{
+  "_version": "v2",
+  "_action_name": "/openapi/market-data/option/snapshot",
+  "_protocol_type": "https",
+  "_accept_format": "JSON",
+  "_params": {
+    "symbols": "SPX260723C07410000",
+    "category": "US_OPTION"
+  },
+  "_method": "GET",
+  "_header": {
+    "x-version": "v2",
+    "Accept-Encoding": "gzip",
+    "x-app-key": "53a77ca9e6c56a74be896b66272e4859",
+    "x-timestamp": "2026-07-24T00:06:42Z",
+    "x-signature-version": "1.0",
+    "x-signature-algorithm": "HMAC-SHA256",
+    "x-signature-nonce": "ad99f52f-f0d8-553c-b183-630d335b0798",
+    "x-signature": "XrRLwGxE03+lTohVIaGwxkGCujFy7hNdvw9WAHF5yZU=",
+    "User-Agent": "WebullApiSDK (Windows 10;AMD64) Python/3.14.6 Core/2.0.14 python-requests/2.34.2",
+    "x-webull-client-source": "sdk"
+  },
+  "_body_params": null,
+  "_uri_pattern": null,
+  "_uri_params": null,
+  "_content": null,
+  "_extra_user_agent": {},
+  "string_to_sign": "",
+  "_request_connect_timeout": null,
+  "_request_read_timeout": null,
+  "endpoint": "api.webull.com",
+  "_signer_spec": "<module 'webull.core.auth.algorithm.sha_hmac1' from 'C:\\\\Users\\\\Hulk\\\\Desktop\\\\asdas\\\\.venv\\\\Lib\\\\site-packages\\\\webull\\\\core\\\\auth\\\\algorithm\\\\sha_hmac1.py'>"
+} Response:{'error_code': 'INVALID_SYMBOL', 'message': 'Invalid Symbol:[SPX260723C07410000].', 'status': 417} ServerException:HTTP Status: 417, Code: INVALID_SYMBOL, Msg: Invalid Symbol:[SPX260723C07410000]., RequestID: ee22c559-97ad-4071-9bf8-6d2c86a3f8f2
+17136 2026-07-23 20:06:42,376 webull.core.client ERROR get_response exception. {
+  "error_code": "INVALID_SYMBOL",
+  "error_msg": "Invalid Symbol:[SPX260723C07410000].",
+  "http_status": 417,
+  "request_id": "ee22c559-97ad-4071-9bf8-6d2c86a3f8f2"
+}
+17136 2026-07-23 20:06:42,376 webull.core.client ERROR get_response exception. {
+  "error_code": "INVALID_SYMBOL",
+  "error_msg": "Invalid Symbol:[SPX260723C07410000].",
+  "http_status": 417,
+  "request_id": "ee22c559-97ad-4071-9bf8-6d2c86a3f8f2"
+}
+17416 2026-07-23 20:06:47,109 webull.core.client ERROR ServerException occurred. Host:api.webull.com SDK-Version:2.0.14 Request:{
+  "_version": "v2",
+  "_action_name": "/openapi/market-data/option/snapshot",
+  "_protocol_type": "https",
+  "_accept_format": "JSON",
+  "_params": {
+    "symbols": "SPX260723C07410000",
+    "category": "US_OPTION"
+  },
+  "_method": "GET",
+  "_header": {
+    "x-version": "v2",
+    "Accept-Encoding": "gzip",
+    "x-app-key": "53a77ca9e6c56a74be896b66272e4859",
+    "x-timestamp": "2026-07-24T00:06:46Z",
+    "x-signature-version": "1.0",
+    "x-signature-algorithm": "HMAC-SHA256",
+    "x-signature-nonce": "b5b0bb93-3dc8-5b43-a848-400a870e7585",
+    "x-signature": "8MQxirYciAbGqiv5wHm1r/U0OIH6eYN0PLOkBovp+vQ=",
+    "User-Agent": "WebullApiSDK (Windows 10;AMD64) Python/3.14.6 Core/2.0.14 python-requests/2.34.2",
+    "x-webull-client-source": "sdk"
+  },
+  "_body_params": null,
+  "_uri_pattern": null,
+  "_uri_params": null,
+  "_content": null,
+  "_extra_user_agent": {},
+  "string_to_sign": "",
+  "_request_connect_timeout": null,
+  "_request_read_timeout": null,
+  "endpoint": "api.webull.com",
+  "_signer_spec": "<module 'webull.core.auth.algorithm.sha_hmac1' from 'C:\\\\Users\\\\Hulk\\\\Desktop\\\\asdas\\\\.venv\\\\Lib\\\\site-packages\\\\webull\\\\core\\\\auth\\\\algorithm\\\\sha_hmac1.py'>"
+} Response:{'error_code': 'INVALID_SYMBOL', 'message': 'Invalid Symbol:[SPX260723C07410000].', 'status': 417} ServerException:HTTP Status: 417, Code: INVALID_SYMBOL, Msg: Invalid Symbol:[SPX260723C07410000]., RequestID: 028b5b1b-c971-4276-ace8-656286928153
+17416 2026-07-23 20:06:47,109 webull.core.client ERROR ServerException occurred. Host:api.webull.com SDK-Version:2.0.14 Request:{
+  "_version": "v2",
+  "_action_name": "/openapi/market-data/option/snapshot",
+  "_protocol_type": "https",
+  "_accept_format": "JSON",
+  "_params": {
+    "symbols": "SPX260723C07410000",
+    "category": "US_OPTION"
+  },
+  "_method": "GET",
+  "_header": {
+    "x-version": "v2",
+    "Accept-Encoding": "gzip",
+    "x-app-key": "53a77ca9e6c56a74be896b66272e4859",
+    "x-timestamp": "2026-07-24T00:06:46Z",
+    "x-signature-version": "1.0",
+    "x-signature-algorithm": "HMAC-SHA256",
+    "x-signature-nonce": "b5b0bb93-3dc8-5b43-a848-400a870e7585",
+    "x-signature": "8MQxirYciAbGqiv5wHm1r/U0OIH6eYN0PLOkBovp+vQ=",
+    "User-Agent": "WebullApiSDK (Windows 10;AMD64) Python/3.14.6 Core/2.0.14 python-requests/2.34.2",
+    "x-webull-client-source": "sdk"
+  },
+  "_body_params": null,
+  "_uri_pattern": null,
+  "_uri_params": null,
+  "_content": null,
+  "_extra_user_agent": {},
+  "string_to_sign": "",
+  "_request_connect_timeout": null,
+  "_request_read_timeout": null,
+  "endpoint": "api.webull.com",
+  "_signer_spec": "<module 'webull.core.auth.algorithm.sha_hmac1' from 'C:\\\\Users\\\\Hulk\\\\Desktop\\\\asdas\\\\.venv\\\\Lib\\\\site-packages\\\\webull\\\\core\\\\auth\\\\algorithm\\\\sha_hmac1.py'>"
+} Response:{'error_code': 'INVALID_SYMBOL', 'message': 'Invalid Symbol:[SPX260723C07410000].', 'status': 417} ServerException:HTTP Status: 417, Code: INVALID_SYMBOL, Msg: Invalid Symbol:[SPX260723C07410000]., RequestID: 028b5b1b-c971-4276-ace8-656286928153
+17416 2026-07-23 20:06:47,110 webull.core.client ERROR get_response exception. {
+  "error_code": "INVALID_SYMBOL",
+  "error_msg": "Invalid Symbol:[SPX260723C07410000].",
+  "http_status": 417,
+  "request_id": "028b5b1b-c971-4276-ace8-656286928153"
+}
+17416 2026-07-23 20:06:47,110 webull.core.client ERROR get_response exception. {
+  "error_code": "INVALID_SYMBOL",
+  "error_msg": "Invalid Symbol:[SPX260723C07410000].",
+  "http_status": 417,
+  "request_id": "028b5b1b-c971-4276-ace8-656286928153"
+}
+17416 2026-07-23 20:06:47,265 webull.core.client ERROR ServerException occurred. Host:api.webull.com SDK-Version:2.0.14 Request:{
+  "_version": "v2",
+  "_action_name": "/openapi/market-data/option/snapshot",
+  "_protocol_type": "https",
+  "_accept_format": "JSON",
+  "_params": {
+    "symbols": "SPX260723C07410000",
+    "category": "US_OPTION"
+  },
+  "_method": "GET",
+  "_header": {
+    "x-version": "v2",
+    "Accept-Encoding": "gzip",
+    "x-app-key": "53a77ca9e6c56a74be896b66272e4859",
+    "x-timestamp": "2026-07-24T00:06:47Z",
+    "x-signature-version": "1.0",
+    "x-signature-algorithm": "HMAC-SHA256",
+    "x-signature-nonce": "206bfdf9-9564-5356-95c8-9162c2191668",
+    "x-signature": "7v4hTRx1nXNXcAM4m6TIeo853ZnrjYdjnVVyjbYLr2k=",
+    "User-Agent": "WebullApiSDK (Windows 10;AMD64) Python/3.14.6 Core/2.0.14 python-requests/2.34.2",
+    "x-webull-client-source": "sdk"
+  },
+  "_body_params": null,
+  "_uri_pattern": null,
+  "_uri_params": null,
+  "_content": null,
+  "_extra_user_agent": {},
+  "string_to_sign": "",
+  "_request_connect_timeout": null,
+  "_request_read_timeout": null,
+  "endpoint": "api.webull.com",
+  "_signer_spec": "<module 'webull.core.auth.algorithm.sha_hmac1' from 'C:\\\\Users\\\\Hulk\\\\Desktop\\\\asdas\\\\.venv\\\\Lib\\\\site-packages\\\\webull\\\\core\\\\auth\\\\algorithm\\\\sha_hmac1.py'>"
+} Response:{'error_code': 'INVALID_SYMBOL', 'message': 'Invalid Symbol:[SPX260723C07410000].', 'status': 417} ServerException:HTTP Status: 417, Code: INVALID_SYMBOL, Msg: Invalid Symbol:[SPX260723C07410000]., RequestID: 90d74f7b-a419-45bc-a669-b66fd47396cd
+17416 2026-07-23 20:06:47,265 webull.core.client ERROR ServerException occurred. Host:api.webull.com SDK-Version:2.0.14 Request:{
+  "_version": "v2",
+  "_action_name": "/openapi/market-data/option/snapshot",
+  "_protocol_type": "https",
+  "_accept_format": "JSON",
+  "_params": {
+    "symbols": "SPX260723C07410000",
+    "category": "US_OPTION"
+  },
+  "_method": "GET",
+  "_header": {
+    "x-version": "v2",
+    "Accept-Encoding": "gzip",
+    "x-app-key": "53a77ca9e6c56a74be896b66272e4859",
+    "x-timestamp": "2026-07-24T00:06:47Z",
+    "x-signature-version": "1.0",
+    "x-signature-algorithm": "HMAC-SHA256",
+    "x-signature-nonce": "206bfdf9-9564-5356-95c8-9162c2191668",
+    "x-signature": "7v4hTRx1nXNXcAM4m6TIeo853ZnrjYdjnVVyjbYLr2k=",
+    "User-Agent": "WebullApiSDK (Windows 10;AMD64) Python/3.14.6 Core/2.0.14 python-requests/2.34.2",
+    "x-webull-client-source": "sdk"
+  },
+  "_body_params": null,
+  "_uri_pattern": null,
+  "_uri_params": null,
+  "_content": null,
+  "_extra_user_agent": {},
+  "string_to_sign": "",
+  "_request_connect_timeout": null,
+  "_request_read_timeout": null,
+  "endpoint": "api.webull.com",
+  "_signer_spec": "<module 'webull.core.auth.algorithm.sha_hmac1' from 'C:\\\\Users\\\\Hulk\\\\Desktop\\\\asdas\\\\.venv\\\\Lib\\\\site-packages\\\\webull\\\\core\\\\auth\\\\algorithm\\\\sha_hmac1.py'>"
+} Response:{'error_code': 'INVALID_SYMBOL', 'message': 'Invalid Symbol:[SPX260723C07410000].', 'status': 417} ServerException:HTTP Status: 417, Code: INVALID_SYMBOL, Msg: Invalid Symbol:[SPX260723C07410000]., RequestID: 90d74f7b-a419-45bc-a669-b66fd47396cd
+17416 2026-07-23 20:06:47,266 webull.core.client ERROR get_response exception. {
+  "error_code": "INVALID_SYMBOL",
+  "error_msg": "Invalid Symbol:[SPX260723C07410000].",
+  "http_status": 417,
+  "request_id": "90d74f7b-a419-45bc-a669-b66fd47396cd"
+}
+17416 2026-07-23 20:06:47,266 webull.core.client ERROR get_response exception. {
+  "error_code": "INVALID_SYMBOL",
+  "error_msg": "Invalid Symbol:[SPX260723C07410000].",
+  "http_status": 417,
+  "request_id": "90d74f7b-a419-45bc-a669-b66fd47396cd"
+}
+17416 2026-07-23 20:06:47,397 webull.core.client ERROR ServerException occurred. Host:api.webull.com SDK-Version:2.0.14 Request:{
+  "_version": "v2",
+  "_action_name": "/openapi/market-data/option/snapshot",
+  "_protocol_type": "https",
+  "_accept_format": "JSON",
+  "_params": {
+    "symbols": "SPX260723C07410000",
+    "category": "US_OPTION"
+  },
+  "_method": "GET",
+  "_header": {
+    "x-version": "v2",
+    "Accept-Encoding": "gzip",
+    "x-app-key": "53a77ca9e6c56a74be896b66272e4859",
+    "x-timestamp": "2026-07-24T00:06:47Z",
+    "x-signature-version": "1.0",
+    "x-signature-algorithm": "HMAC-SHA256",
+    "x-signature-nonce": "ba2ff161-79f9-59b6-bd19-b2cc47fcf100",
+    "x-signature": "RljF0VeY+F4LIBRZSapwg8y8aS+g6ppPXl9gov4Pe2M=",
+    "User-Agent": "WebullApiSDK (Windows 10;AMD64) Python/3.14.6 Core/2.0.14 python-requests/2.34.2",
+    "x-webull-client-source": "sdk"
+  },
+  "_body_params": null,
+  "_uri_pattern": null,
+  "_uri_params": null,
+  "_content": null,
+  "_extra_user_agent": {},
+  "string_to_sign": "",
+  "_request_connect_timeout": null,
+  "_request_read_timeout": null,
+  "endpoint": "api.webull.com",
+  "_signer_spec": "<module 'webull.core.auth.algorithm.sha_hmac1' from 'C:\\\\Users\\\\Hulk\\\\Desktop\\\\asdas\\\\.venv\\\\Lib\\\\site-packages\\\\webull\\\\core\\\\auth\\\\algorithm\\\\sha_hmac1.py'>"
+} Response:{'error_code': 'INVALID_SYMBOL', 'message': 'Invalid Symbol:[SPX260723C07410000].', 'status': 417} ServerException:HTTP Status: 417, Code: INVALID_SYMBOL, Msg: Invalid Symbol:[SPX260723C07410000]., RequestID: ba892981-9865-47c6-be2f-24e5e0872c2a
+17416 2026-07-23 20:06:47,397 webull.core.client ERROR ServerException occurred. Host:api.webull.com SDK-Version:2.0.14 Request:{
+  "_version": "v2",
+  "_action_name": "/openapi/market-data/option/snapshot",
+  "_protocol_type": "https",
+  "_accept_format": "JSON",
+  "_params": {
+    "symbols": "SPX260723C07410000",
+    "category": "US_OPTION"
+  },
+  "_method": "GET",
+  "_header": {
+    "x-version": "v2",
+    "Accept-Encoding": "gzip",
+    "x-app-key": "53a77ca9e6c56a74be896b66272e4859",
+    "x-timestamp": "2026-07-24T00:06:47Z",
+    "x-signature-version": "1.0",
+    "x-signature-algorithm": "HMAC-SHA256",
+    "x-signature-nonce": "ba2ff161-79f9-59b6-bd19-b2cc47fcf100",
+    "x-signature": "RljF0VeY+F4LIBRZSapwg8y8aS+g6ppPXl9gov4Pe2M=",
+    "User-Agent": "WebullApiSDK (Windows 10;AMD64) Python/3.14.6 Core/2.0.14 python-requests/2.34.2",
+    "x-webull-client-source": "sdk"
+  },
+  "_body_params": null,
+  "_uri_pattern": null,
+  "_uri_params": null,
+  "_content": null,
+  "_extra_user_agent": {},
+  "string_to_sign": "",
+  "_request_connect_timeout": null,
+  "_request_read_timeout": null,
+  "endpoint": "api.webull.com",
+  "_signer_spec": "<module 'webull.core.auth.algorithm.sha_hmac1' from 'C:\\\\Users\\\\Hulk\\\\Desktop\\\\asdas\\\\.venv\\\\Lib\\\\site-packages\\\\webull\\\\core\\\\auth\\\\algorithm\\\\sha_hmac1.py'>"
+} Response:{'error_code': 'INVALID_SYMBOL', 'message': 'Invalid Symbol:[SPX260723C07410000].', 'status': 417} ServerException:HTTP Status: 417, Code: INVALID_SYMBOL, Msg: Invalid Symbol:[SPX260723C07410000]., RequestID: ba892981-9865-47c6-be2f-24e5e0872c2a
+17416 2026-07-23 20:06:47,398 webull.core.client ERROR get_response exception. {
+  "error_code": "INVALID_SYMBOL",
+  "error_msg": "Invalid Symbol:[SPX260723C07410000].",
+  "http_status": 417,
+  "request_id": "ba892981-9865-47c6-be2f-24e5e0872c2a"
+}
+17416 2026-07-23 20:06:47,398 webull.core.client ERROR get_response exception. {
+  "error_code": "INVALID_SYMBOL",
+  "error_msg": "Invalid Symbol:[SPX260723C07410000].",
+  "http_status": 417,
+  "request_id": "ba892981-9865-47c6-be2f-24e5e0872c2a"
+}
+17416 2026-07-23 20:06:47,519 webull.core.client ERROR ServerException occurred. Host:api.webull.com SDK-Version:2.0.14 Request:{
+  "_version": "v2",
+  "_action_name": "/openapi/market-data/option/snapshot",
+  "_protocol_type": "https",
+  "_accept_format": "JSON",
+  "_params": {
+    "symbols": "SPX260723C07410000",
+    "category": "US_OPTION"
+  },
+  "_method": "GET",
+  "_header": {
+    "x-version": "v2",
+    "Accept-Encoding": "gzip",
+    "x-app-key": "53a77ca9e6c56a74be896b66272e4859",
+    "x-timestamp": "2026-07-24T00:06:47Z",
+    "x-signature-version": "1.0",
+    "x-signature-algorithm": "HMAC-SHA256",
+    "x-signature-nonce": "5eef1415-7460-5b6e-9aab-b470c87c0be8",
+    "x-signature": "woQeniRzvk+mVZJJi4BrCxla+p/tVBrDhuwX7JAw4Yc=",
+    "User-Agent": "WebullApiSDK (Windows 10;AMD64) Python/3.14.6 Core/2.0.14 python-requests/2.34.2",
+    "x-webull-client-source": "sdk"
+  },
+  "_body_params": null,
+  "_uri_pattern": null,
+  "_uri_params": null,
+  "_content": null,
+  "_extra_user_agent": {},
+  "string_to_sign": "",
+  "_request_connect_timeout": null,
+  "_request_read_timeout": null,
+  "endpoint": "api.webull.com",
+  "_signer_spec": "<module 'webull.core.auth.algorithm.sha_hmac1' from 'C:\\\\Users\\\\Hulk\\\\Desktop\\\\asdas\\\\.venv\\\\Lib\\\\site-packages\\\\webull\\\\core\\\\auth\\\\algorithm\\\\sha_hmac1.py'>"
+} Response:{'error_code': 'INVALID_SYMBOL', 'message': 'Invalid Symbol:[SPX260723C07410000].', 'status': 417} ServerException:HTTP Status: 417, Code: INVALID_SYMBOL, Msg: Invalid Symbol:[SPX260723C07410000]., RequestID: 252ab9ab-3327-4979-8f15-1b8b65faba75
+17416 2026-07-23 20:06:47,519 webull.core.client ERROR ServerException occurred. Host:api.webull.com SDK-Version:2.0.14 Request:{
+  "_version": "v2",
+  "_action_name": "/openapi/market-data/option/snapshot",
+  "_protocol_type": "https",
+  "_accept_format": "JSON",
+  "_params": {
+    "symbols": "SPX260723C07410000",
+    "category": "US_OPTION"
+  },
+  "_method": "GET",
+  "_header": {
+    "x-version": "v2",
+    "Accept-Encoding": "gzip",
+    "x-app-key": "53a77ca9e6c56a74be896b66272e4859",
+    "x-timestamp": "2026-07-24T00:06:47Z",
+    "x-signature-version": "1.0",
+    "x-signature-algorithm": "HMAC-SHA256",
+    "x-signature-nonce": "5eef1415-7460-5b6e-9aab-b470c87c0be8",
+    "x-signature": "woQeniRzvk+mVZJJi4BrCxla+p/tVBrDhuwX7JAw4Yc=",
+    "User-Agent": "WebullApiSDK (Windows 10;AMD64) Python/3.14.6 Core/2.0.14 python-requests/2.34.2",
+    "x-webull-client-source": "sdk"
+  },
+  "_body_params": null,
+  "_uri_pattern": null,
+  "_uri_params": null,
+  "_content": null,
+  "_extra_user_agent": {},
+  "string_to_sign": "",
+  "_request_connect_timeout": null,
+  "_request_read_timeout": null,
+  "endpoint": "api.webull.com",
+  "_signer_spec": "<module 'webull.core.auth.algorithm.sha_hmac1' from 'C:\\\\Users\\\\Hulk\\\\Desktop\\\\asdas\\\\.venv\\\\Lib\\\\site-packages\\\\webull\\\\core\\\\auth\\\\algorithm\\\\sha_hmac1.py'>"
+} Response:{'error_code': 'INVALID_SYMBOL', 'message': 'Invalid Symbol:[SPX260723C07410000].', 'status': 417} ServerException:HTTP Status: 417, Code: INVALID_SYMBOL, Msg: Invalid Symbol:[SPX260723C07410000]., RequestID: 252ab9ab-3327-4979-8f15-1b8b65faba75
+17416 2026-07-23 20:06:47,519 webull.core.client ERROR get_response exception. {
+  "error_code": "INVALID_SYMBOL",
+  "error_msg": "Invalid Symbol:[SPX260723C07410000].",
+  "http_status": 417,
+  "request_id": "252ab9ab-3327-4979-8f15-1b8b65faba75"
+}
+17416 2026-07-23 20:06:47,519 webull.core.client ERROR get_response exception. {
+  "error_code": "INVALID_SYMBOL",
+  "error_msg": "Invalid Symbol:[SPX260723C07410000].",
+  "http_status": 417,
+  "request_id": "252ab9ab-3327-4979-8f15-1b8b65faba75"
+}
+17136 2026-07-23 20:06:52,741 webull.core.client ERROR ServerException occurred. Host:api.webull.com SDK-Version:2.0.14 Request:{
+  "_version": "v2",
+  "_action_name": "/openapi/market-data/option/snapshot",
+  "_protocol_type": "https",
+  "_accept_format": "JSON",
+  "_params": {
+    "symbols": "SPX260723C07410000",
+    "category": "US_OPTION"
+  },
+  "_method": "GET",
+  "_header": {
+    "x-version": "v2",
+    "Accept-Encoding": "gzip",
+    "x-app-key": "53a77ca9e6c56a74be896b66272e4859",
+    "x-timestamp": "2026-07-24T00:06:52Z",
+    "x-signature-version": "1.0",
+    "x-signature-algorithm": "HMAC-SHA256",
+    "x-signature-nonce": "e1c9a56f-ea16-53c8-867e-0b1ab25c4827",
+    "x-signature": "woWRsIpr9lxy2+U5s0kLLwi9A7HrguThk3RW7ruU/hM=",
+    "User-Agent": "WebullApiSDK (Windows 10;AMD64) Python/3.14.6 Core/2.0.14 python-requests/2.34.2",
+    "x-webull-client-source": "sdk"
+  },
+  "_body_params": null,
+  "_uri_pattern": null,
+  "_uri_params": null,
+  "_content": null,
+  "_extra_user_agent": {},
+  "string_to_sign": "",
+  "_request_connect_timeout": null,
+  "_request_read_timeout": null,
+  "endpoint": "api.webull.com",
+  "_signer_spec": "<module 'webull.core.auth.algorithm.sha_hmac1' from 'C:\\\\Users\\\\Hulk\\\\Desktop\\\\asdas\\\\.venv\\\\Lib\\\\site-packages\\\\webull\\\\core\\\\auth\\\\algorithm\\\\sha_hmac1.py'>"
+} Response:{'error_code': 'INVALID_SYMBOL', 'message': 'Invalid Symbol:[SPX260723C07410000].', 'status': 417} ServerException:HTTP Status: 417, Code: INVALID_SYMBOL, Msg: Invalid Symbol:[SPX260723C07410000]., RequestID: 655faa63-eb27-49d6-9f12-9423a2712797
+17136 2026-07-23 20:06:52,741 webull.core.client ERROR ServerException occurred. Host:api.webull.com SDK-Version:2.0.14 Request:{
+  "_version": "v2",
+  "_action_name": "/openapi/market-data/option/snapshot",
+  "_protocol_type": "https",
+  "_accept_format": "JSON",
+  "_params": {
+    "symbols": "SPX260723C07410000",
+    "category": "US_OPTION"
+  },
+  "_method": "GET",
+  "_header": {
+    "x-version": "v2",
+    "Accept-Encoding": "gzip",
+    "x-app-key": "53a77ca9e6c56a74be896b66272e4859",
+    "x-timestamp": "2026-07-24T00:06:52Z",
+    "x-signature-version": "1.0",
+    "x-signature-algorithm": "HMAC-SHA256",
+    "x-signature-nonce": "e1c9a56f-ea16-53c8-867e-0b1ab25c4827",
+    "x-signature": "woWRsIpr9lxy2+U5s0kLLwi9A7HrguThk3RW7ruU/hM=",
+    "User-Agent": "WebullApiSDK (Windows 10;AMD64) Python/3.14.6 Core/2.0.14 python-requests/2.34.2",
+    "x-webull-client-source": "sdk"
+  },
+  "_body_params": null,
+  "_uri_pattern": null,
+  "_uri_params": null,
+  "_content": null,
+  "_extra_user_agent": {},
+  "string_to_sign": "",
+  "_request_connect_timeout": null,
+  "_request_read_timeout": null,
+  "endpoint": "api.webull.com",
+  "_signer_spec": "<module 'webull.core.auth.algorithm.sha_hmac1' from 'C:\\\\Users\\\\Hulk\\\\Desktop\\\\asdas\\\\.venv\\\\Lib\\\\site-packages\\\\webull\\\\core\\\\auth\\\\algorithm\\\\sha_hmac1.py'>"
+} Response:{'error_code': 'INVALID_SYMBOL', 'message': 'Invalid Symbol:[SPX260723C07410000].', 'status': 417} ServerException:HTTP Status: 417, Code: INVALID_SYMBOL, Msg: Invalid Symbol:[SPX260723C07410000]., RequestID: 655faa63-eb27-49d6-9f12-9423a2712797
+17136 2026-07-23 20:06:52,742 webull.core.client ERROR get_response exception. {
+  "error_code": "INVALID_SYMBOL",
+  "error_msg": "Invalid Symbol:[SPX260723C07410000].",
+  "http_status": 417,
+  "request_id": "655faa63-eb27-49d6-9f12-9423a2712797"
+}
+17136 2026-07-23 20:06:52,742 webull.core.client ERROR get_response exception. {
+  "error_code": "INVALID_SYMBOL",
+  "error_msg": "Invalid Symbol:[SPX260723C07410000].",
+  "http_status": 417,
+  "request_id": "655faa63-eb27-49d6-9f12-9423a2712797"
+}
+17136 2026-07-23 20:06:52,878 webull.core.client ERROR ServerException occurred. Host:api.webull.com SDK-Version:2.0.14 Request:{
+  "_version": "v2",
+  "_action_name": "/openapi/market-data/option/snapshot",
+  "_protocol_type": "https",
+  "_accept_format": "JSON",
+  "_params": {
+    "symbols": "SPX260723C07410000",
+    "category": "US_OPTION"
+  },
+  "_method": "GET",
+  "_header": {
+    "x-version": "v2",
+    "Accept-Encoding": "gzip",
+    "x-app-key": "53a77ca9e6c56a74be896b66272e4859",
+    "x-timestamp": "2026-07-24T00:06:52Z",
+    "x-signature-version": "1.0",
+    "x-signature-algorithm": "HMAC-SHA256",
+    "x-signature-nonce": "8241ad96-1e92-5f6c-8383-8b9158dea379",
+    "x-signature": "/CIesfzkYoJxJjbMNYpuUT9/S32+dtUwH9ei/K/d0yU=",
+    "User-Agent": "WebullApiSDK (Windows 10;AMD64) Python/3.14.6 Core/2.0.14 python-requests/2.34.2",
+    "x-webull-client-source": "sdk"
+  },
+  "_body_params": null,
+  "_uri_pattern": null,
+  "_uri_params": null,
+  "_content": null,
+  "_extra_user_agent": {},
+  "string_to_sign": "",
+  "_request_connect_timeout": null,
+  "_request_read_timeout": null,
+  "endpoint": "api.webull.com",
+  "_signer_spec": "<module 'webull.core.auth.algorithm.sha_hmac1' from 'C:\\\\Users\\\\Hulk\\\\Desktop\\\\asdas\\\\.venv\\\\Lib\\\\site-packages\\\\webull\\\\core\\\\auth\\\\algorithm\\\\sha_hmac1.py'>"
+} Response:{'error_code': 'INVALID_SYMBOL', 'message': 'Invalid Symbol:[SPX260723C07410000].', 'status': 417} ServerException:HTTP Status: 417, Code: INVALID_SYMBOL, Msg: Invalid Symbol:[SPX260723C07410000]., RequestID: 8c55cd00-63b0-48cb-a101-41e0d63ff7fe
+17136 2026-07-23 20:06:52,878 webull.core.client ERROR ServerException occurred. Host:api.webull.com SDK-Version:2.0.14 Request:{
+  "_version": "v2",
+  "_action_name": "/openapi/market-data/option/snapshot",
+  "_protocol_type": "https",
+  "_accept_format": "JSON",
+  "_params": {
+    "symbols": "SPX260723C07410000",
+    "category": "US_OPTION"
+  },
+  "_method": "GET",
+  "_header": {
+    "x-version": "v2",
+    "Accept-Encoding": "gzip",
+    "x-app-key": "53a77ca9e6c56a74be896b66272e4859",
+    "x-timestamp": "2026-07-24T00:06:52Z",
+    "x-signature-version": "1.0",
+    "x-signature-algorithm": "HMAC-SHA256",
+    "x-signature-nonce": "8241ad96-1e92-5f6c-8383-8b9158dea379",
+    "x-signature": "/CIesfzkYoJxJjbMNYpuUT9/S32+dtUwH9ei/K/d0yU=",
+    "User-Agent": "WebullApiSDK (Windows 10;AMD64) Python/3.14.6 Core/2.0.14 python-requests/2.34.2",
+    "x-webull-client-source": "sdk"
+  },
+  "_body_params": null,
+  "_uri_pattern": null,
+  "_uri_params": null,
+  "_content": null,
+  "_extra_user_agent": {},
+  "string_to_sign": "",
+  "_request_connect_timeout": null,
+  "_request_read_timeout": null,
+  "endpoint": "api.webull.com",
+  "_signer_spec": "<module 'webull.core.auth.algorithm.sha_hmac1' from 'C:\\\\Users\\\\Hulk\\\\Desktop\\\\asdas\\\\.venv\\\\Lib\\\\site-packages\\\\webull\\\\core\\\\auth\\\\algorithm\\\\sha_hmac1.py'>"
+} Response:{'error_code': 'INVALID_SYMBOL', 'message': 'Invalid Symbol:[SPX260723C07410000].', 'status': 417} ServerException:HTTP Status: 417, Code: INVALID_SYMBOL, Msg: Invalid Symbol:[SPX260723C07410000]., RequestID: 8c55cd00-63b0-48cb-a101-41e0d63ff7fe
+17136 2026-07-23 20:06:52,880 webull.core.client ERROR get_response exception. {
+  "error_code": "INVALID_SYMBOL",
+  "error_msg": "Invalid Symbol:[SPX260723C07410000].",
+  "http_status": 417,
+  "request_id": "8c55cd00-63b0-48cb-a101-41e0d63ff7fe"
+}
+17136 2026-07-23 20:06:52,880 webull.core.client ERROR get_response exception. {
+  "error_code": "INVALID_SYMBOL",
+  "error_msg": "Invalid Symbol:[SPX260723C07410000].",
+  "http_status": 417,
+  "request_id": "8c55cd00-63b0-48cb-a101-41e0d63ff7fe"
+}
+17136 2026-07-23 20:06:52,999 webull.core.client ERROR ServerException occurred. Host:api.webull.com SDK-Version:2.0.14 Request:{
+  "_version": "v2",
+  "_action_name": "/openapi/market-data/option/snapshot",
+  "_protocol_type": "https",
+  "_accept_format": "JSON",
+  "_params": {
+    "symbols": "SPX260723C07410000",
+    "category": "US_OPTION"
+  },
+  "_method": "GET",
+  "_header": {
+    "x-version": "v2",
+    "Accept-Encoding": "gzip",
+    "x-app-key": "53a77ca9e6c56a74be896b66272e4859",
+    "x-timestamp": "2026-07-24T00:06:52Z",
+    "x-signature-version": "1.0",
+    "x-signature-algorithm": "HMAC-SHA256",
+    "x-signature-nonce": "55f3d898-e7ac-5c66-95bd-66011cdd3f77",
+    "x-signature": "6NRftcBlFI9r6svNndVoRU2q3V2jVQjrxjX7NXsK4Cw=",
+    "User-Agent": "WebullApiSDK (Windows 10;AMD64) Python/3.14.6 Core/2.0.14 python-requests/2.34.2",
+    "x-webull-client-source": "sdk"
+  },
+  "_body_params": null,
+  "_uri_pattern": null,
+  "_uri_params": null,
+  "_content": null,
+  "_extra_user_agent": {},
+  "string_to_sign": "",
+  "_request_connect_timeout": null,
+  "_request_read_timeout": null,
+  "endpoint": "api.webull.com",
+  "_signer_spec": "<module 'webull.core.auth.algorithm.sha_hmac1' from 'C:\\\\Users\\\\Hulk\\\\Desktop\\\\asdas\\\\.venv\\\\Lib\\\\site-packages\\\\webull\\\\core\\\\auth\\\\algorithm\\\\sha_hmac1.py'>"
+} Response:{'error_code': 'INVALID_SYMBOL', 'message': 'Invalid Symbol:[SPX260723C07410000].', 'status': 417} ServerException:HTTP Status: 417, Code: INVALID_SYMBOL, Msg: Invalid Symbol:[SPX260723C07410000]., RequestID: 1c2340c5-7e64-4623-a19a-42cc7741a01b
+17136 2026-07-23 20:06:52,999 webull.core.client ERROR ServerException occurred. Host:api.webull.com SDK-Version:2.0.14 Request:{
+  "_version": "v2",
+  "_action_name": "/openapi/market-data/option/snapshot",
+  "_protocol_type": "https",
+  "_accept_format": "JSON",
+  "_params": {
+    "symbols": "SPX260723C07410000",
+    "category": "US_OPTION"
+  },
+  "_method": "GET",
+  "_header": {
+    "x-version": "v2",
+    "Accept-Encoding": "gzip",
+    "x-app-key": "53a77ca9e6c56a74be896b66272e4859",
+    "x-timestamp": "2026-07-24T00:06:52Z",
+    "x-signature-version": "1.0",
+    "x-signature-algorithm": "HMAC-SHA256",
+    "x-signature-nonce": "55f3d898-e7ac-5c66-95bd-66011cdd3f77",
+    "x-signature": "6NRftcBlFI9r6svNndVoRU2q3V2jVQjrxjX7NXsK4Cw=",
+    "User-Agent": "WebullApiSDK (Windows 10;AMD64) Python/3.14.6 Core/2.0.14 python-requests/2.34.2",
+    "x-webull-client-source": "sdk"
+  },
+  "_body_params": null,
+  "_uri_pattern": null,
+  "_uri_params": null,
+  "_content": null,
+  "_extra_user_agent": {},
+  "string_to_sign": "",
+  "_request_connect_timeout": null,
+  "_request_read_timeout": null,
+  "endpoint": "api.webull.com",
+  "_signer_spec": "<module 'webull.core.auth.algorithm.sha_hmac1' from 'C:\\\\Users\\\\Hulk\\\\Desktop\\\\asdas\\\\.venv\\\\Lib\\\\site-packages\\\\webull\\\\core\\\\auth\\\\algorithm\\\\sha_hmac1.py'>"
+} Response:{'error_code': 'INVALID_SYMBOL', 'message': 'Invalid Symbol:[SPX260723C07410000].', 'status': 417} ServerException:HTTP Status: 417, Code: INVALID_SYMBOL, Msg: Invalid Symbol:[SPX260723C07410000]., RequestID: 1c2340c5-7e64-4623-a19a-42cc7741a01b
+17136 2026-07-23 20:06:53,000 webull.core.client ERROR get_response exception. {
+  "error_code": "INVALID_SYMBOL",
+  "error_msg": "Invalid Symbol:[SPX260723C07410000].",
+  "http_status": 417,
+  "request_id": "1c2340c5-7e64-4623-a19a-42cc7741a01b"
+}
+17136 2026-07-23 20:06:53,000 webull.core.client ERROR get_response exception. {
+  "error_code": "INVALID_SYMBOL",
+  "error_msg": "Invalid Symbol:[SPX260723C07410000].",
+  "http_status": 417,
+  "request_id": "1c2340c5-7e64-4623-a19a-42cc7741a01b"
+}
+17136 2026-07-23 20:06:53,132 webull.core.client ERROR ServerException occurred. Host:api.webull.com SDK-Version:2.0.14 Request:{
+  "_version": "v2",
+  "_action_name": "/openapi/market-data/option/snapshot",
+  "_protocol_type": "https",
+  "_accept_format": "JSON",
+  "_params": {
+    "symbols": "SPX260723C07410000",
+    "category": "US_OPTION"
+  },
+  "_method": "GET",
+  "_header": {
+    "x-version": "v2",
+    "Accept-Encoding": "gzip",
+    "x-app-key": "53a77ca9e6c56a74be896b66272e4859",
+    "x-timestamp": "2026-07-24T00:06:53Z",
+    "x-signature-version": "1.0",
+    "x-signature-algorithm": "HMAC-SHA256",
+    "x-signature-nonce": "8316d886-e7a7-5551-9b29-aaa06cca6c3f",
+    "x-signature": "kUVCjSeCNGucBsnmnA97VnTZwAhqw6rZAywcHdoDPv8=",
+    "User-Agent": "WebullApiSDK (Windows 10;AMD64) Python/3.14.6 Core/2.0.14 python-requests/2.34.2",
+    "x-webull-client-source": "sdk"
+  },
+  "_body_params": null,
+  "_uri_pattern": null,
+  "_uri_params": null,
+  "_content": null,
+  "_extra_user_agent": {},
+  "string_to_sign": "",
+  "_request_connect_timeout": null,
+  "_request_read_timeout": null,
+  "endpoint": "api.webull.com",
+  "_signer_spec": "<module 'webull.core.auth.algorithm.sha_hmac1' from 'C:\\\\Users\\\\Hulk\\\\Desktop\\\\asdas\\\\.venv\\\\Lib\\\\site-packages\\\\webull\\\\core\\\\auth\\\\algorithm\\\\sha_hmac1.py'>"
+} Response:{'error_code': 'INVALID_SYMBOL', 'message': 'Invalid Symbol:[SPX260723C07410000].', 'status': 417} ServerException:HTTP Status: 417, Code: INVALID_SYMBOL, Msg: Invalid Symbol:[SPX260723C07410000]., RequestID: 9e357a19-3e2e-4f88-a76d-d17fc51e20ad
+17136 2026-07-23 20:06:53,132 webull.core.client ERROR ServerException occurred. Host:api.webull.com SDK-Version:2.0.14 Request:{
+  "_version": "v2",
+  "_action_name": "/openapi/market-data/option/snapshot",
+  "_protocol_type": "https",
+  "_accept_format": "JSON",
+  "_params": {
+    "symbols": "SPX260723C07410000",
+    "category": "US_OPTION"
+  },
+  "_method": "GET",
+  "_header": {
+    "x-version": "v2",
+    "Accept-Encoding": "gzip",
+    "x-app-key": "53a77ca9e6c56a74be896b66272e4859",
+    "x-timestamp": "2026-07-24T00:06:53Z",
+    "x-signature-version": "1.0",
+    "x-signature-algorithm": "HMAC-SHA256",
+    "x-signature-nonce": "8316d886-e7a7-5551-9b29-aaa06cca6c3f",
+    "x-signature": "kUVCjSeCNGucBsnmnA97VnTZwAhqw6rZAywcHdoDPv8=",
+    "User-Agent": "WebullApiSDK (Windows 10;AMD64) Python/3.14.6 Core/2.0.14 python-requests/2.34.2",
+    "x-webull-client-source": "sdk"
+  },
+  "_body_params": null,
+  "_uri_pattern": null,
+  "_uri_params": null,
+  "_content": null,
+  "_extra_user_agent": {},
+  "string_to_sign": "",
+  "_request_connect_timeout": null,
+  "_request_read_timeout": null,
+  "endpoint": "api.webull.com",
+  "_signer_spec": "<module 'webull.core.auth.algorithm.sha_hmac1' from 'C:\\\\Users\\\\Hulk\\\\Desktop\\\\asdas\\\\.venv\\\\Lib\\\\site-packages\\\\webull\\\\core\\\\auth\\\\algorithm\\\\sha_hmac1.py'>"
+} Response:{'error_code': 'INVALID_SYMBOL', 'message': 'Invalid Symbol:[SPX260723C07410000].', 'status': 417} ServerException:HTTP Status: 417, Code: INVALID_SYMBOL, Msg: Invalid Symbol:[SPX260723C07410000]., RequestID: 9e357a19-3e2e-4f88-a76d-d17fc51e20ad
+17136 2026-07-23 20:06:53,132 webull.core.client ERROR get_response exception. {
+  "error_code": "INVALID_SYMBOL",
+  "error_msg": "Invalid Symbol:[SPX260723C07410000].",
+  "http_status": 417,
+  "request_id": "9e357a19-3e2e-4f88-a76d-d17fc51e20ad"
+}
+17136 2026-07-23 20:06:53,132 webull.core.client ERROR get_response exception. {
+  "error_code": "INVALID_SYMBOL",
+  "error_msg": "Invalid Symbol:[SPX260723C07410000].",
+  "http_status": 417,
+  "request_id": "9e357a19-3e2e-4f88-a76d-d17fc51e20ad"
+}
+3312 2026-07-23 20:07:06,227 webull.core.http.initializer.client_initializer INFO _check_token_enable result is False
+3312 2026-07-23 20:07:06,227 webull.core.http.initializer.client_initializer INFO _check_token_enable result is False
+3312 2026-07-23 20:07:06,227 webull.core.http.initializer.client_initializer INFO _check_token_enable result is False
+3312 2026-07-23 20:07:06,855 webull.core.client ERROR ServerException occurred. Host:api.webull.com SDK-Version:2.0.14 Request:{
+  "_version": "v2",
+  "_action_name": "/openapi/assets/balance",
+  "_protocol_type": "https",
+  "_accept_format": "JSON",
+  "_params": {
+    "account_id": "R8IECPMDTO73FABD0UH7UT3T0B"
+  },
+  "_method": "GET",
+  "_header": {
+    "x-version": "v2",
+    "Accept-Encoding": "gzip",
+    "x-app-key": "53a77ca9e6c56a74be896b66272e4859",
+    "x-timestamp": "2026-07-24T00:07:06Z",
+    "x-signature-version": "1.0",
+    "x-signature-algorithm": "HMAC-SHA256",
+    "x-signature-nonce": "6d01cf7b-ccca-53eb-8594-fac6147901e1",
+    "x-signature": "jmFynX6dGV5oHgnQ/ZvPFGclxnxOFKIUJwsPbZwG1BE=",
+    "User-Agent": "WebullApiSDK (Windows 10;AMD64) Python/3.14.6 Core/2.0.14 python-requests/2.34.2",
+    "x-webull-client-source": "sdk"
+  },
+  "_body_params": null,
+  "_uri_pattern": null,
+  "_uri_params": null,
+  "_content": null,
+  "_extra_user_agent": {},
+  "string_to_sign": "",
+  "_request_connect_timeout": null,
+  "_request_read_timeout": null,
+  "endpoint": "api.webull.com",
+  "_signer_spec": "<module 'webull.core.auth.algorithm.sha_hmac1' from 'C:\\\\Users\\\\Hulk\\\\Desktop\\\\asdas\\\\.venv\\\\Lib\\\\site-packages\\\\webull\\\\core\\\\auth\\\\algorithm\\\\sha_hmac1.py'>"
+} Response:{'message': 'Too many requests', 'error_code': 'TOO_MANY_REQUESTS'} ServerException:HTTP Status: 429, Code: TOO_MANY_REQUESTS, Msg: Too many requests, RequestID: 790ba934-1ae9-4fc1-9f0d-80dc4f7e7bcc
+3312 2026-07-23 20:07:06,855 webull.core.client ERROR ServerException occurred. Host:api.webull.com SDK-Version:2.0.14 Request:{
+  "_version": "v2",
+  "_action_name": "/openapi/assets/balance",
+  "_protocol_type": "https",
+  "_accept_format": "JSON",
+  "_params": {
+    "account_id": "R8IECPMDTO73FABD0UH7UT3T0B"
+  },
+  "_method": "GET",
+  "_header": {
+    "x-version": "v2",
+    "Accept-Encoding": "gzip",
+    "x-app-key": "53a77ca9e6c56a74be896b66272e4859",
+    "x-timestamp": "2026-07-24T00:07:06Z",
+    "x-signature-version": "1.0",
+    "x-signature-algorithm": "HMAC-SHA256",
+    "x-signature-nonce": "6d01cf7b-ccca-53eb-8594-fac6147901e1",
+    "x-signature": "jmFynX6dGV5oHgnQ/ZvPFGclxnxOFKIUJwsPbZwG1BE=",
+    "User-Agent": "WebullApiSDK (Windows 10;AMD64) Python/3.14.6 Core/2.0.14 python-requests/2.34.2",
+    "x-webull-client-source": "sdk"
+  },
+  "_body_params": null,
+  "_uri_pattern": null,
+  "_uri_params": null,
+  "_content": null,
+  "_extra_user_agent": {},
+  "string_to_sign": "",
+  "_request_connect_timeout": null,
+  "_request_read_timeout": null,
+  "endpoint": "api.webull.com",
+  "_signer_spec": "<module 'webull.core.auth.algorithm.sha_hmac1' from 'C:\\\\Users\\\\Hulk\\\\Desktop\\\\asdas\\\\.venv\\\\Lib\\\\site-packages\\\\webull\\\\core\\\\auth\\\\algorithm\\\\sha_hmac1.py'>"
+} Response:{'message': 'Too many requests', 'error_code': 'TOO_MANY_REQUESTS'} ServerException:HTTP Status: 429, Code: TOO_MANY_REQUESTS, Msg: Too many requests, RequestID: 790ba934-1ae9-4fc1-9f0d-80dc4f7e7bcc
+3312 2026-07-23 20:07:06,855 webull.core.client ERROR ServerException occurred. Host:api.webull.com SDK-Version:2.0.14 Request:{
+  "_version": "v2",
+  "_action_name": "/openapi/assets/balance",
+  "_protocol_type": "https",
+  "_accept_format": "JSON",
+  "_params": {
+    "account_id": "R8IECPMDTO73FABD0UH7UT3T0B"
+  },
+  "_method": "GET",
+  "_header": {
+    "x-version": "v2",
+    "Accept-Encoding": "gzip",
+    "x-app-key": "53a77ca9e6c56a74be896b66272e4859",
+    "x-timestamp": "2026-07-24T00:07:06Z",
+    "x-signature-version": "1.0",
+    "x-signature-algorithm": "HMAC-SHA256",
+    "x-signature-nonce": "6d01cf7b-ccca-53eb-8594-fac6147901e1",
+    "x-signature": "jmFynX6dGV5oHgnQ/ZvPFGclxnxOFKIUJwsPbZwG1BE=",
+    "User-Agent": "WebullApiSDK (Windows 10;AMD64) Python/3.14.6 Core/2.0.14 python-requests/2.34.2",
+    "x-webull-client-source": "sdk"
+  },
+  "_body_params": null,
+  "_uri_pattern": null,
+  "_uri_params": null,
+  "_content": null,
+  "_extra_user_agent": {},
+  "string_to_sign": "",
+  "_request_connect_timeout": null,
+  "_request_read_timeout": null,
+  "endpoint": "api.webull.com",
+  "_signer_spec": "<module 'webull.core.auth.algorithm.sha_hmac1' from 'C:\\\\Users\\\\Hulk\\\\Desktop\\\\asdas\\\\.venv\\\\Lib\\\\site-packages\\\\webull\\\\core\\\\auth\\\\algorithm\\\\sha_hmac1.py'>"
+} Response:{'message': 'Too many requests', 'error_code': 'TOO_MANY_REQUESTS'} ServerException:HTTP Status: 429, Code: TOO_MANY_REQUESTS, Msg: Too many requests, RequestID: 790ba934-1ae9-4fc1-9f0d-80dc4f7e7bcc
+3312 2026-07-23 20:07:06,856 webull.core.client ERROR get_response exception. {
+  "error_code": "TOO_MANY_REQUESTS",
+  "error_msg": "Too many requests",
+  "http_status": 429,
+  "request_id": "790ba934-1ae9-4fc1-9f0d-80dc4f7e7bcc"
+}
+3312 2026-07-23 20:07:06,856 webull.core.client ERROR get_response exception. {
+  "error_code": "TOO_MANY_REQUESTS",
+  "error_msg": "Too many requests",
+  "http_status": 429,
+  "request_id": "790ba934-1ae9-4fc1-9f0d-80dc4f7e7bcc"
+}
+3312 2026-07-23 20:07:06,856 webull.core.client ERROR get_response exception. {
+  "error_code": "TOO_MANY_REQUESTS",
+  "error_msg": "Too many requests",
+  "http_status": 429,
+  "request_id": "790ba934-1ae9-4fc1-9f0d-80dc4f7e7bcc"
+}
+3312 2026-07-23 20:09:57,826 webull.core.http.initializer.client_initializer INFO _check_token_enable result is False
+3312 2026-07-23 20:09:57,826 webull.core.http.initializer.client_initializer INFO _check_token_enable result is False
+3312 2026-07-23 20:09:57,826 webull.core.http.initializer.client_initializer INFO _check_token_enable result is False
+3312 2026-07-23 20:09:57,826 webull.core.http.initializer.client_initializer INFO _check_token_enable result is False
+17136 2026-07-23 20:09:58,546 webull.core.http.initializer.client_initializer INFO _check_token_enable result is False
+17136 2026-07-23 20:09:58,546 webull.core.http.initializer.client_initializer INFO _check_token_enable result is False
+17136 2026-07-23 20:09:58,546 webull.core.http.initializer.client_initializer INFO _check_token_enable result is False
+17136 2026-07-23 20:09:58,546 webull.core.http.initializer.client_initializer INFO _check_token_enable result is False
