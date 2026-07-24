@@ -1,3 +1,5 @@
 __pycache__/
 *.pyc
 data/
+webull_trade_sdk.log
+*.log

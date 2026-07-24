@@ -2,6 +2,10 @@
 title MARKET SNIPER
 cd /d "%~dp0"
 
+echo [0/3] Checking GitHub for updates...
+git stash >nul 2>&1
+git pull origin main
+
 echo [1/3] Unblocking files...
 powershell -NoProfile -ExecutionPolicy Bypass -Command "Get-ChildItem -Path '%~dp0' -Recurse | Unblock-File" >nul 2>&1
 

@@ -1,6 +1,9 @@
 @echo off
 title FUTURES (MNQ/MES)
 cd /d "%~dp0"
+echo Checking GitHub for updates...
+git stash >nul 2>&1
+git pull origin main
 echo Unblocking any newly copied files...
 powershell -NoProfile -ExecutionPolicy Bypass -Command "Get-ChildItem -Path '%~dp0' -Recurse | Unblock-File" >nul 2>&1
 echo Stopping any old copy on port 8010...
