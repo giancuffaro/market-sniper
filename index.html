@@ -4,6 +4,9 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>MARKET SNIPER</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
 <style>
   :root{
     --bg:#0c0e0d;--panel:#111413;--panel2:#161a18;--line:#242a27;
@@ -11,6 +14,7 @@
     --green:#3ad07e;--green-deep:#0f2a1c;--green-btn:#57d98a;
     --red:#e0574f;--red-deep:#2a1211;--amber:#e0b64a;
     --mono:'SFMono-Regular',ui-monospace,'DejaVu Sans Mono',Menlo,Consolas,monospace;
+    --ui:'Inter',-apple-system,BlinkMacSystemFont,'SF Pro Text','Segoe UI',Roboto,Helvetica,Arial,sans-serif;
   }
   body[data-theme="light"]{
     --bg:#f2f4f2;--panel:#ffffff;--panel2:#e9ede9;--line:#c9d2cb;
@@ -19,141 +23,155 @@
     --red:#b3261e;--red-deep:#f7dedc;--amber:#8a6410;
   }
   body[data-theme="light"]{background:#dfe3df}
+  body[data-theme="gray"]{
+    --bg:#2b2f2d;--panel:#343937;--panel2:#3d423f;--line:#4c534f;
+    --txt:#eef2f0;--dim:#b4bdb8;--dimmer:#8d958f;
+    --green:#4ada86;--green-deep:#1c4030;--green-btn:#5fe093;
+    --red:#f0736b;--red-deep:#3a1f1d;--amber:#e6c15c;
+  }
+  body[data-theme="gray"]{background:#1f2321}
+  .theme-dots{display:inline-flex;align-items:center;gap:9px;vertical-align:middle}
+  .tdot{width:19px;height:19px;border-radius:50%;border:1px solid var(--line);cursor:pointer;padding:0;-webkit-appearance:none;appearance:none;transition:transform .12s ease,box-shadow .12s ease}
+  .tdot-white{background:#ffffff}
+  .tdot-gray{background:#8a908c}
+  .tdot-black{background:#0b0d0c}
+  .tdot:hover{transform:scale(1.12)}
+  .tdot.active{box-shadow:0 0 0 2px var(--bg),0 0 0 4px var(--green);transform:scale(1.08)}
   *{box-sizing:border-box}
-  html,body{margin:0;background:#000;color:var(--txt);font-family:var(--mono);-webkit-font-smoothing:antialiased}
+  html,body{margin:0;background:#000;color:var(--txt);font-family:var(--ui);font-variant-numeric:tabular-nums;-webkit-font-smoothing:antialiased;-moz-osx-font-smoothing:grayscale}
   .wrap{max-width:430px;margin:0 auto;min-height:100vh;background:var(--bg);position:relative;overflow:hidden}
   .app{padding:0 16px 24px}
   .hidden{display:none!important}
   .connect{padding:36px 22px}
-  .connect h1{font-size:22px;letter-spacing:.18em;font-weight:800;margin:0 0 4px}
-  .connect .sub{color:var(--dim);font-size:11px;letter-spacing:.16em;margin-bottom:20px}
+  .connect h1{font-size:25.5px;letter-spacing:.18em;font-weight:800;margin:0 0 4px}
+  .connect .sub{color:var(--dim);font-size:12.5px;letter-spacing:.16em;margin-bottom:20px}
   .field{margin-bottom:14px}
-  .field label{display:block;color:var(--dim);font-size:10px;letter-spacing:.18em;margin-bottom:6px}
+  .field label{display:block;color:var(--dim);font-size:11.5px;letter-spacing:.18em;margin-bottom:6px}
   .field input{width:100%;background:var(--panel);border:1px solid var(--line);border-radius:10px;color:var(--txt);
-    font-family:var(--mono);font-size:14px;padding:14px;outline:none}
+    font-family:var(--ui);font-size:16px;padding:14px;outline:none}
   .modes{display:flex;gap:10px;margin-bottom:16px}
   .modes button{flex:1;border:1px solid var(--line);background:var(--panel);color:var(--dim);border-radius:10px;
-    padding:14px 0;font-family:var(--mono);font-size:12px;letter-spacing:.12em;font-weight:700;cursor:pointer}
+    padding:14px 0;font-family:var(--ui);font-size:14px;letter-spacing:.12em;font-weight:700;cursor:pointer}
   .modes button.on[data-m="PAPER"]{border-color:var(--green);background:var(--green-deep);color:var(--green)}
   .modes button.on[data-m="LIVE"]{border-color:var(--amber);background:var(--panel2);color:var(--amber)}
-  .remember{display:flex;align-items:center;gap:9px;margin:4px 2px 16px;color:var(--dim);font-size:11px;cursor:pointer}
+  .remember{display:flex;align-items:center;gap:9px;margin:4px 2px 16px;color:var(--dim);font-size:12.5px;cursor:pointer}
   .remember input{width:16px;height:16px;accent-color:var(--green)}
   .connect .go{width:100%;border:0;border-radius:12px;padding:18px 0;background:var(--green-btn);color:#fff;
-    font-family:var(--mono);font-weight:800;font-size:16px;letter-spacing:.08em;cursor:pointer;margin-top:2px}
+    font-family:var(--ui);font-weight:800;font-size:18.5px;letter-spacing:.08em;cursor:pointer;margin-top:2px}
   body:not([data-theme="light"]) .connect .go{color:#08130c}
-  .note{color:var(--dimmer);font-size:10px;line-height:1.6;margin-top:16px}
-  .err{color:var(--red);font-size:12px;margin-top:12px;min-height:16px}
-  .themebtn{border:1px solid var(--line);border-radius:6px;padding:3px 9px;color:var(--dim);font-size:9px;cursor:pointer;background:var(--panel)}
+  .note{color:var(--dimmer);font-size:11.5px;line-height:1.6;margin-top:16px}
+  .err{color:var(--red);font-size:14px;margin-top:12px;min-height:16px}
+  .themebtn{border:1px solid var(--line);border-radius:6px;padding:3px 9px;color:var(--dim);font-size:11px;cursor:pointer;background:var(--panel)}
   .profbox{border:1px solid var(--line);border-radius:12px;padding:14px;margin-bottom:16px}
-  .profbox .plbl{color:var(--dim);font-size:10px;letter-spacing:.18em;margin-bottom:10px}
+  .profbox .plbl{color:var(--dim);font-size:11.5px;letter-spacing:.18em;margin-bottom:10px}
   .proflist{display:flex;flex-wrap:wrap;gap:8px;margin-bottom:10px}
   .proflist:empty{margin-bottom:0}
   .prof{display:flex;align-items:center;gap:8px;border:1px solid var(--line);background:var(--panel2);
-        border-radius:20px;padding:7px 12px;color:var(--dim);font-size:12px;cursor:pointer}
+        border-radius:20px;padding:7px 12px;color:var(--dim);font-size:14px;cursor:pointer}
   .prof.on{border-color:var(--green);background:var(--green-deep);color:var(--green)}
-  .prof .del{color:var(--dimmer);font-size:11px;padding:0 2px}
+  .prof .del{color:var(--dimmer);font-size:12.5px;padding:0 2px}
   .prof .del:hover{color:var(--red)}
   .profadd{display:flex;gap:8px}
   .profadd input{flex:1;background:var(--panel2);border:1px solid var(--line);border-radius:8px;color:var(--txt);
-        font-family:var(--mono);font-size:12px;padding:10px;outline:none;min-width:0}
+        font-family:var(--ui);font-size:14px;padding:10px;outline:none;min-width:0}
   .profadd button{border:1px solid var(--green);background:var(--green-deep);color:var(--green);border-radius:8px;
-        padding:10px 12px;font-family:var(--mono);font-size:10px;font-weight:700;cursor:pointer;white-space:nowrap}
-  .profhint{color:var(--dimmer);font-size:9.5px;line-height:1.5;margin-top:8px}
+        padding:10px 12px;font-family:var(--ui);font-size:11.5px;font-weight:700;cursor:pointer;white-space:nowrap}
+  .profhint{color:var(--dimmer);font-size:11px;line-height:1.5;margin-top:8px}
   /* stacked account rows (multi-account picker) */
   .acctrow{border:1px solid var(--line);background:var(--panel2);border-radius:12px;padding:14px;
            margin-bottom:10px;cursor:pointer;display:block}
   .acctrow:hover{border-color:var(--green)}
-  .acctrow .t1{display:flex;justify-content:space-between;font-size:13px;font-weight:700;color:var(--txt)}
+  .acctrow .t1{display:flex;justify-content:space-between;font-size:15px;font-weight:700;color:var(--txt)}
   .acctrow .t1 .typ{letter-spacing:.1em}
   .acctrow .t1 .bp{color:var(--green)}
-  .acctrow .t2{color:var(--dim);font-size:11px;margin-top:5px}
+  .acctrow .t2{color:var(--dim);font-size:12.5px;margin-top:5px}
   .acctrow.fut{opacity:.75}
   .acctrow.fut .typ{color:var(--amber)}
-  .top{display:flex;align-items:center;justify-content:space-between;padding:16px 6px 12px;font-size:11px;letter-spacing:.12em}
+  .top{display:flex;align-items:center;justify-content:space-between;padding:16px 6px 12px;font-size:12.5px;letter-spacing:.12em}
   .brand{display:flex;align-items:center;gap:8px;font-weight:700;letter-spacing:.12em}
   .backbtn{border:1px solid var(--line);background:var(--panel);color:var(--dim);border-radius:8px;width:30px;height:30px;
-    font-size:16px;cursor:pointer;display:flex;align-items:center;justify-content:center}
+    font-size:18.5px;cursor:pointer;display:flex;align-items:center;justify-content:center}
   .backbtn:hover{color:var(--txt)}
   .dot{width:8px;height:8px;border-radius:50%;background:var(--green);box-shadow:0 0 8px var(--green)}
   .top .meta{color:var(--dim);display:flex;gap:8px;align-items:center;flex-wrap:wrap;justify-content:flex-end}
-  .modepill{border:1px solid var(--line);border-radius:6px;padding:3px 8px;font-size:9px;letter-spacing:.12em}
+  .modepill{border:1px solid var(--line);border-radius:6px;padding:3px 8px;font-size:11px;letter-spacing:.12em}
   .modepill.PAPER{color:var(--green);border-color:var(--green)}
   .modepill.LIVE{color:var(--amber);border-color:var(--amber)}
-  .setbtn{border:1px solid var(--line);border-radius:6px;padding:3px 9px;color:var(--dim);font-size:9px;cursor:pointer}
+  .setbtn{border:1px solid var(--line);border-radius:6px;padding:3px 9px;color:var(--dim);font-size:11px;cursor:pointer}
   .setbtn:hover{color:var(--txt)}
   .prices{display:flex;gap:8px;margin-bottom:12px}
   .pchip{flex:1;border:1px solid var(--line);border-radius:10px;background:var(--panel);padding:9px 8px;text-align:center}
-  .pchip .s{font-size:10px;letter-spacing:.16em;color:var(--dim)}
-  .pchip .p{font-size:15px;font-weight:700;margin-top:2px}
-  .pchip .c{font-size:10px;margin-top:1px;color:var(--dim)}
+  .pchip .s{font-size:11.5px;letter-spacing:.16em;color:var(--dim)}
+  .pchip .p{font-size:17px;font-weight:700;margin-top:2px}
+  .pchip .c{font-size:11.5px;margin-top:1px;color:var(--dim)}
   .pchip.up .c{color:var(--green)} .pchip.dn .c{color:var(--red)}
   .hero{border:1px solid var(--line);border-radius:14px;background:var(--panel);padding:22px 18px;text-align:center;margin-bottom:14px}
-  .hero .big{font-size:42px;font-weight:800;letter-spacing:.10em;line-height:1;color:var(--dim)}
-  .hero .sub{color:var(--dim);font-size:11px;letter-spacing:.2em;margin-top:10px;text-transform:uppercase}
+  .hero .big{font-size:48.5px;font-weight:800;letter-spacing:.10em;line-height:1;color:var(--dim)}
+  .hero .sub{color:var(--dim);font-size:12.5px;letter-spacing:.2em;margin-top:10px;text-transform:uppercase}
   .hero.in .big{color:var(--green)}
   .hero.in{background:var(--green-deep);border-color:var(--green)}
   .hero.loss .big{color:var(--red)} .hero.loss{background:var(--red-deep);border-color:var(--red)}
   .pnl{text-align:center;margin:2px 0 12px}
-  .pnl .n{font-size:40px;font-weight:800;color:var(--green)} .pnl .n.neg{color:var(--red)}
-  .pnl .pct{font-size:13px;margin-left:8px}
-  .pnl .spot{color:var(--dim);font-size:11px;letter-spacing:.12em;margin-top:6px}
-  .ticker{text-align:center;color:var(--dim);font-size:11px;letter-spacing:.12em;margin:2px 0 12px}
+  .pnl .n{font-size:46px;font-weight:800;color:var(--green)} .pnl .n.neg{color:var(--red)}
+  .pnl .pct{font-size:15px;margin-left:8px}
+  .pnl .spot{color:var(--dim);font-size:12.5px;letter-spacing:.12em;margin-top:6px}
+  .ticker{text-align:center;color:var(--dim);font-size:12.5px;letter-spacing:.12em;margin:2px 0 12px}
   .ticker b{color:var(--txt)}
   .reject{display:none;border:1px solid var(--red);background:var(--red-deep);border-radius:10px;padding:12px 14px;margin-bottom:12px;position:relative}
   .reject.show{display:block}
-  .reject .h{color:var(--red);font-size:11px;font-weight:700}
-  .reject .b{color:var(--txt);font-size:12px;margin-top:4px}
+  .reject .h{color:var(--red);font-size:12.5px;font-weight:700}
+  .reject .b{color:var(--txt);font-size:14px;margin-top:4px}
   .reject .x{position:absolute;top:9px;right:12px;color:var(--dim);cursor:pointer}
   .event{display:none;border:1px solid var(--green);background:var(--green-deep);border-radius:10px;padding:12px 14px;margin-bottom:12px;position:relative}
   .event.show{display:block}
   .event.sl{border-color:var(--red);background:var(--red-deep)}
-  .event .h{color:var(--green);font-size:11px;font-weight:700}
+  .event .h{color:var(--green);font-size:12.5px;font-weight:700}
   .event.sl .h{color:var(--red)}
   .event .x{position:absolute;top:9px;right:12px;color:var(--dim);cursor:pointer}
   .seg{display:flex;border:1px solid var(--line);border-radius:12px;overflow:hidden;margin-bottom:12px}
-  .seg button{flex:1;background:transparent;color:var(--dim);border:0;padding:15px 0;font-family:var(--mono);font-size:14px;letter-spacing:.14em;font-weight:700;cursor:pointer}
+  .seg button{flex:1;background:transparent;color:var(--dim);border:0;padding:15px 0;font-family:var(--ui);font-size:16px;letter-spacing:.14em;font-weight:700;cursor:pointer}
   .seg button.on{background:var(--panel2);color:var(--txt);box-shadow:inset 0 0 0 1px var(--line)}
   .seg button:disabled{opacity:.35;cursor:not-allowed}
   .row{display:flex;align-items:center;justify-content:space-between;border:1px solid var(--line);border-radius:12px;padding:15px 18px;margin-bottom:12px}
-  .row .lbl{color:var(--dim);font-size:11px;letter-spacing:.18em}
+  .row .lbl{color:var(--dim);font-size:12.5px;letter-spacing:.18em}
   .stepper{display:flex;align-items:center;gap:16px}
-  .stepper button{width:26px;height:26px;border-radius:6px;border:1px solid var(--line);background:transparent;color:var(--txt);font-size:16px;cursor:pointer}
-  .stepper .v{font-size:20px;font-weight:700;min-width:22px;text-align:center}
+  .stepper button{width:26px;height:26px;border-radius:6px;border:1px solid var(--line);background:transparent;color:var(--txt);font-size:18.5px;cursor:pointer}
+  .stepper .v{font-size:23px;font-weight:700;min-width:22px;text-align:center}
   .duo{display:flex;gap:12px;margin-bottom:16px}
-  .duo button{flex:1;border-radius:12px;padding:15px 0;font-family:var(--mono);font-weight:800;font-size:16px;cursor:pointer;border:1px solid}
+  .duo button{flex:1;border-radius:12px;padding:15px 0;font-family:var(--ui);font-weight:800;font-size:18.5px;cursor:pointer;border:1px solid}
   .buy-c{background:var(--green-deep);border-color:var(--green);color:var(--green)}
   .buy-p{background:var(--red-deep);border-color:var(--red);color:var(--red)}
-  .duo small{display:block;font-weight:600;font-size:11px;letter-spacing:.06em;color:var(--dim);margin-top:6px}
-  .close-btn{width:100%;border:0;border-radius:12px;padding:21px 0;background:var(--green-btn);color:#fff;font-family:var(--mono);font-weight:800;font-size:18px;cursor:pointer;margin-bottom:16px}
+  .duo small{display:block;font-weight:600;font-size:12.5px;letter-spacing:.06em;color:var(--dim);margin-top:6px}
+  .close-btn{width:100%;border:0;border-radius:12px;padding:21px 0;background:var(--green-btn);color:#fff;font-family:var(--ui);font-weight:800;font-size:20.5px;cursor:pointer;margin-bottom:16px}
   body:not([data-theme="light"]) .close-btn{color:#08130c}
-  .close-btn small{display:block;font-weight:600;font-size:10px;margin-top:5px;opacity:.85}
+  .close-btn small{display:block;font-weight:600;font-size:11.5px;margin-top:5px;opacity:.85}
   .blotter{border-top:1px solid var(--line);padding-top:12px;margin-top:4px}
-  .blotter .hd{display:flex;justify-content:space-between;color:var(--dim);font-size:11px;margin-bottom:8px}
+  .blotter .hd{display:flex;justify-content:space-between;color:var(--dim);font-size:12.5px;margin-bottom:8px}
   .blotter .net{color:var(--green)} .blotter .net.neg{color:var(--red)}
-  .trow{display:flex;justify-content:space-between;font-size:12px;color:var(--dim);padding:4px 0}
+  .trow{display:flex;justify-content:space-between;font-size:14px;color:var(--dim);padding:4px 0}
   .trow .t{color:var(--dimmer);width:44px}.trow .s{flex:1;color:var(--txt)}.trow .mv{text-align:right;width:96px}
   .trow .pl{width:78px;text-align:right}.pl.up{color:var(--green)}.pl.dn{color:var(--red)}
-  .footer{color:var(--dimmer);font-size:9px;letter-spacing:.14em;text-align:center;padding:14px 0 2px}
+  .footer{color:var(--dimmer);font-size:11px;letter-spacing:.14em;text-align:center;padding:14px 0 2px}
   .footer a{color:var(--dim);cursor:pointer;text-decoration:underline}
   .scrim{position:absolute;inset:0;background:rgba(0,0,0,.6);display:none;align-items:center;justify-content:center;padding:22px;z-index:5}
   .scrim.show{display:flex}
   .smodal{width:100%;max-width:380px;border:1px solid var(--line);border-radius:16px;background:var(--panel);padding:24px 20px;max-height:90vh;overflow-y:auto}
-  .smodal h2{margin:0 0 16px;font-size:13px;letter-spacing:.2em;color:var(--txt);text-align:center}
+  .smodal h2{margin:0 0 16px;font-size:15px;letter-spacing:.2em;color:var(--txt);text-align:center}
   .sgroup{border:1px solid var(--line);border-radius:12px;padding:14px;margin-bottom:12px}
-  .sgroup .glbl{color:var(--dim);font-size:10px;letter-spacing:.16em;margin-bottom:10px}
+  .sgroup .glbl{color:var(--dim);font-size:11.5px;letter-spacing:.16em;margin-bottom:10px}
   .srow{display:flex;align-items:center;gap:10px;margin-top:8px}
-  .srow input[type=number]{flex:1;background:var(--panel2);border:1px solid var(--line);border-radius:8px;color:var(--txt);font-family:var(--mono);font-size:14px;padding:10px;outline:none;min-width:0}
-  .srow select{background:var(--panel2);border:1px solid var(--line);border-radius:8px;color:var(--txt);font-family:var(--mono);font-size:12px;padding:10px;max-width:170px;flex:1}
-  .srow label.tog{display:flex;align-items:center;gap:8px;color:var(--dim);font-size:11px;cursor:pointer}
+  .srow input[type=number]{flex:1;background:var(--panel2);border:1px solid var(--line);border-radius:8px;color:var(--txt);font-family:var(--ui);font-size:16px;padding:10px;outline:none;min-width:0}
+  .srow select{background:var(--panel2);border:1px solid var(--line);border-radius:8px;color:var(--txt);font-family:var(--ui);font-size:14px;padding:10px;max-width:170px;flex:1}
+  .srow label.tog{display:flex;align-items:center;gap:8px;color:var(--dim);font-size:12.5px;cursor:pointer}
   .srow input[type=checkbox]{width:16px;height:16px;accent-color:var(--green)}
-  .srow .mini{border:1px solid var(--green);background:var(--green-deep);color:var(--green);border-radius:8px;padding:10px 12px;font-family:var(--mono);font-size:10px;font-weight:700;cursor:pointer;white-space:nowrap}
+  .srow .mini{border:1px solid var(--green);background:var(--green-deep);color:var(--green);border-radius:8px;padding:10px 12px;font-family:var(--ui);font-size:11.5px;font-weight:700;cursor:pointer;white-space:nowrap}
   .srow .mini.off{border-color:var(--red);background:var(--red-deep);color:var(--red)}
   .strikeopts{display:flex;gap:8px}
-  .strikeopts button{flex:1;border:1px solid var(--line);background:var(--panel2);color:var(--dim);border-radius:9px;padding:11px 4px;font-family:var(--mono);font-size:10px;font-weight:700;cursor:pointer;line-height:1.4}
+  .strikeopts button{flex:1;border:1px solid var(--line);background:var(--panel2);color:var(--dim);border-radius:9px;padding:11px 4px;font-family:var(--ui);font-size:11.5px;font-weight:700;cursor:pointer;line-height:1.4}
   .strikeopts button.on{border-color:var(--green);background:var(--green-deep);color:var(--green)}
-  .shint{color:var(--dimmer);font-size:9.5px;line-height:1.5;margin-top:8px}
+  .shint{color:var(--dimmer);font-size:11px;line-height:1.5;margin-top:8px}
   .sactions{display:flex;gap:10px;margin-top:6px}
-  .sactions button{flex:1;border-radius:10px;padding:14px 0;font-family:var(--mono);font-weight:800;font-size:13px;cursor:pointer}
+  .sactions button{flex:1;border-radius:10px;padding:14px 0;font-family:var(--ui);font-weight:800;font-size:15px;cursor:pointer}
   .ssave{border:0;background:var(--green-btn);color:#fff}
   body:not([data-theme="light"]) .ssave{color:#08130c}
   .scancel{border:1px solid var(--line);background:transparent;color:var(--dim)}
@@ -169,7 +187,7 @@
         <h1>MARKET SNIPER</h1>
         <div class="sub">CONNECT · <span id="appVer">v?</span></div>
       </div>
-      <button class="themebtn" onclick="EZ.toggleTheme()">☀/☾ THEME</button>
+      <div class="theme-dots" role="group" aria-label="Theme color"><button class="tdot tdot-white" data-set="light" onclick="EZ.setTheme('light')" aria-label="White theme"></button><button class="tdot tdot-gray" data-set="gray" onclick="EZ.setTheme('gray')" aria-label="Gray theme"></button><button class="tdot tdot-black" data-set="dark" onclick="EZ.setTheme('dark')" aria-label="Black theme"></button></div>
     </div>
 
     <div class="modes" id="modes">
@@ -223,7 +241,7 @@
         <span class="modepill" id="acctType" style="display:none"></span>
         <span>BP <b id="bp">$0.00</b></span>
         <span class="setbtn" onclick="EZ.openSettings()">CONFIGURATION</span>
-        <span class="setbtn" onclick="EZ.toggleTheme()">☀/☾</span>
+        <div class="theme-dots" role="group" aria-label="Theme color"><button class="tdot tdot-white" data-set="light" onclick="EZ.setTheme('light')" aria-label="White theme"></button><button class="tdot tdot-gray" data-set="gray" onclick="EZ.setTheme('gray')" aria-label="Gray theme"></button><button class="tdot tdot-black" data-set="dark" onclick="EZ.setTheme('dark')" aria-label="Black theme"></button></div>
         <span class="setbtn" title="lock now" onclick="EZ.lockNow()">LOCK</span>
       </div>
     </div>
@@ -383,9 +401,10 @@ const EZ = (function(){
   try{ const sv=JSON.parse(localStorage.getItem(LSS)||"null"); if(sv) settings={...settings,...sv}; }catch(e){}
   try{ const av=JSON.parse(localStorage.getItem(LSA)||"null"); if(av) autolock={...autolock,...av}; }catch(e){}
 
-  function applyTheme(t){ document.body.dataset.theme=t; localStorage.setItem(LST,t); }
+  function applyTheme(t){ if(t==="white")t="light"; if(t==="black")t="dark"; document.body.dataset.theme=t; localStorage.setItem(LST,t); document.querySelectorAll(".tdot").forEach(function(d){d.classList.toggle("active",d.dataset.set===t);}); }
+  function setTheme(t){ applyTheme(t); }
   applyTheme(localStorage.getItem(LST)||"dark");
-  function toggleTheme(){ applyTheme(document.body.dataset.theme==="light"?"dark":"light"); }
+  function toggleTheme(){ var o=["light","gray","dark"]; var i=o.indexOf(document.body.dataset.theme); applyTheme(o[(i+1)%o.length]); }
 
   fetch('/api/health').then(r=>r.json())
     .then(h=>{$('appVer').textContent='v'+(h.version||'old');})
@@ -687,7 +706,7 @@ const EZ = (function(){
     await api('/api/disconnect',{}); clearInterval(poll); clearInterval(priceTimer); location.reload();
   }
 
-  return {step,buy,close,hideReject,disconnect,switchAccount,toggleTheme,lockNow,
+  return {step,buy,close,hideReject,disconnect,switchAccount,toggleTheme,setTheme,lockNow,
           openSettings,closeSettings,saveSettings,setStrikeMode,hideEvent,tpUnitChanged,
           mirrorToggle,selectProfile,saveProfile,deleteProfile,pickAccount};
 })();
