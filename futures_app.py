@@ -14,6 +14,18 @@ from pydantic import BaseModel
 
 import futures_client as fc
 
+# CSV upload needs python-multipart. If it's missing, the app must still boot —
+# so we only register the multipart upload route when it's available.
+try:
+    import multipart  # noqa: F401  (python-multipart)
+    HAS_MULTIPART = True
+except Exception:
+    try:
+        import python_multipart  # noqa: F401
+        HAS_MULTIPART = True
+    except Exception:
+        HAS_MULTIPART = False
+
 app = FastAPI(title="MARKET SNIPER FUTURES")
 SESSION = {"s": None}
 HERE = pathlib.Path(__file__).parent
@@ -116,13 +128,19 @@ def backtest(req: BacktestReq):
 def data_status():
     return fc.data_status()
 
-@app.post("/api/upload_data")
-async def upload_data(symbol: str = Form(...), file: UploadFile = File(...)):
-    raw = await file.read()
-    try:
-        return {"ok": True, **fc.save_uploaded(symbol, raw)}
-    except fc.OrderRejected as e:
-        raise HTTPException(400, str(e))
+if HAS_MULTIPART:
+    @app.post("/api/upload_data")
+    async def upload_data(symbol: str = Form(...), file: UploadFile = File(...)):
+        raw = await file.read()
+        try:
+            return {"ok": True, **fc.save_uploaded(symbol, raw)}
+        except fc.OrderRejected as e:
+            raise HTTPException(400, str(e))
+else:
+    @app.post("/api/upload_data")
+    async def upload_data_unavailable():
+        raise HTTPException(400, "CSV upload needs the python-multipart package. "
+                                 "Close the app and run:  pip install python-multipart")
 
 @app.get("/api/trend")
 def trend(symbol: str = "MNQ"):
