@@ -207,6 +207,134 @@ def _coerce_fstrategy(st):
     return base
 
 
+# ---- Backtesting (free Yahoo data) --------------------------------------
+def _ohlcv(sym, interval, rng):
+    res = _chart(sym, interval, rng)
+    ts = res.get("timestamp") or []
+    q = (res.get("indicators", {}).get("quote") or [{}])[0]
+    O, H, L, C, V = (q.get("open") or [], q.get("high") or [], q.get("low") or [],
+                     q.get("close") or [], q.get("volume") or [])
+    bars = []
+    for i, t in enumerate(ts):
+        if i >= len(C) or C[i] is None or H[i] is None or L[i] is None:
+            continue
+        bars.append({"t": int(t),
+                     "o": float(O[i]) if i < len(O) and O[i] is not None else float(C[i]),
+                     "h": float(H[i]), "l": float(L[i]), "c": float(C[i]),
+                     "v": float(V[i]) if i < len(V) and V[i] is not None else 0.0})
+    return bars
+
+
+def _ema_series(vals, period):
+    k = 2.0 / (period + 1)
+    out = [vals[0]]
+    for v in vals[1:]:
+        out.append(v * k + out[-1] * (1 - k))
+    return out
+
+
+def _sim_ema(bars, fast, slow):
+    """Always-in MA system: reverse on the opposite cross. Returns pnl per trade in points."""
+    closes = [b["c"] for b in bars]
+    if len(closes) < slow + 2:
+        return []
+    ef, es = _ema_series(closes, fast), _ema_series(closes, slow)
+    trades, pos, entry = [], None, 0.0
+    for i in range(slow + 1, len(bars)):
+        up = ef[i - 1] <= es[i - 1] and ef[i] > es[i]
+        dn = ef[i - 1] >= es[i - 1] and ef[i] < es[i]
+        if pos is None:
+            if up: pos, entry = "LONG", closes[i]
+            elif dn: pos, entry = "SHORT", closes[i]
+        elif pos == "LONG" and dn:
+            trades.append(closes[i] - entry); pos, entry = "SHORT", closes[i]
+        elif pos == "SHORT" and up:
+            trades.append(entry - closes[i]); pos, entry = "LONG", closes[i]
+    return trades
+
+
+def _sim_vwap(bars, band):
+    """Session-VWAP pullback: enter on pullback to VWAP, exit when close crosses back."""
+    trades, pos, entry = [], None, 0.0
+    day = None; num = den = 0.0; vwap = None
+    for b in bars:
+        d = dt.datetime.utcfromtimestamp(b["t"]).date()
+        if d != day:
+            if pos is not None:
+                trades.append((b["c"] - entry) if pos == "LONG" else (entry - b["c"]))
+                pos = None
+            day = d; num = den = 0.0
+        vol = b["v"] or 1.0
+        tp = (b["h"] + b["l"] + b["c"]) / 3.0
+        num += tp * vol; den += vol; vwap = num / den
+        if pos is None:
+            if b["c"] > vwap and b["l"] <= vwap + band: pos, entry = "LONG", b["c"]
+            elif b["c"] < vwap and b["h"] >= vwap - band: pos, entry = "SHORT", b["c"]
+        elif pos == "LONG" and b["c"] < vwap:
+            trades.append(b["c"] - entry); pos = None
+        elif pos == "SHORT" and b["c"] > vwap:
+            trades.append(entry - b["c"]); pos = None
+    return trades
+
+
+def _bt_stats(trades, sym):
+    pv = FUT[sym]["point_value"]
+    wins = [p for p in trades if p > 0]
+    losses = [p for p in trades if p < 0]
+    gp, gl = sum(wins) * pv, abs(sum(losses)) * pv
+    eq = peak = mdd = 0.0
+    for p in trades:
+        eq += p * pv; peak = max(peak, eq); mdd = min(mdd, eq - peak)
+    n = len(trades)
+    return {
+        "trades": n, "wins": len(wins), "losses": len(losses),
+        "win_rate": round(len(wins) / n * 100, 1) if n else 0.0,
+        "net": round(sum(trades) * pv, 2),
+        "gross_profit": round(gp, 2), "gross_loss": round(gl, 2),
+        "avg_win": round(sum(wins) / len(wins) * pv, 2) if wins else 0.0,
+        "avg_loss": round(sum(losses) / len(losses) * pv, 2) if losses else 0.0,
+        "largest_win": round(max(wins) * pv, 2) if wins else 0.0,
+        "largest_loss": round(min(losses) * pv, 2) if losses else 0.0,
+        "profit_factor": round(gp / gl, 2) if gl > 0 else None,
+        "max_drawdown": round(mdd, 2), "point_value": pv,
+    }
+
+
+# duration -> (Yahoo range, interval). Finest interval that free data allows.
+_BT_MAP = {"1mo": ("1mo", "5m"), "3mo": ("3mo", "60m"), "6mo": ("6mo", "60m"),
+           "1y": ("1y", "60m"), "2y": ("2y", "60m"), "5y": ("5y", "1d")}
+
+def backtest(strategy, duration):
+    sym = strategy.get("symbol", "MNQ")
+    if sym not in FUT:
+        sym = "MNQ"
+    trig = strategy.get("trigger", {})
+    stype = trig.get("type")
+    note = ""
+    if stype == "vwap_pullback":
+        rng, interval = "1mo", "5m"      # VWAP needs intraday; free 5m caps ~60 days
+        if duration != "1mo":
+            note = "VWAP needs intraday bars — free data limits this to ~1 month at 5-min."
+    else:
+        rng, interval = _BT_MAP.get(duration, ("6mo", "60m"))
+    try:
+        bars = _ohlcv(sym, interval, rng)
+    except Exception as e:
+        return {"error": f"could not load free data ({type(e).__name__})"}
+    if len(bars) < 30:
+        return {"error": "not enough historical data returned for this range"}
+    if stype == "vwap_pullback":
+        trades = _sim_vwap(bars, float(trig.get("band", 2.0)))
+    else:
+        trades = _sim_ema(bars, int(trig.get("fast", 9)), int(trig.get("slow", 21)))
+    out = _bt_stats(trades, sym)
+    out.update({"symbol": sym, "interval": interval, "duration": duration,
+                "from": dt.datetime.utcfromtimestamp(bars[0]["t"]).strftime("%Y-%m-%d"),
+                "to": dt.datetime.utcfromtimestamp(bars[-1]["t"]).strftime("%Y-%m-%d"),
+                "bars": len(bars), "note": note, "name": strategy.get("name", "")})
+    return out
+
+
 class OrderRejected(Exception):
     pass
 

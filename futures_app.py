@@ -101,6 +101,14 @@ def get_settings():
 def set_settings(req: SettingsReq):
     return _sess().update_settings({k: v for k, v in req.model_dump().items() if v is not None})
 
+class BacktestReq(BaseModel):
+    strategy: dict
+    duration: str = "6mo"
+
+@app.post("/api/backtest")
+def backtest(req: BacktestReq):
+    return fc.backtest(req.strategy, req.duration)
+
 @app.get("/api/trend")
 def trend(symbol: str = "MNQ"):
     if symbol not in fc.FUT:

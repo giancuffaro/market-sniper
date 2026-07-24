@@ -138,6 +138,21 @@
   .srow2 label{color:var(--dim);font-size:10.5px;letter-spacing:.06em;min-width:70px}
   .srow2 select,.srow2 input{flex:1;background:var(--panel2);border:1px solid var(--line);border-radius:8px;color:var(--txt);font-family:var(--ui);font-size:12px;padding:8px;min-width:0}
   .stag{color:var(--amber);font-size:10px;letter-spacing:.04em;display:block;margin-top:8px}
+  .btbtn{border:1px solid var(--blue);background:transparent;color:var(--blue);border-radius:8px;
+         padding:8px 12px;font-family:var(--ui);font-size:11px;font-weight:700;cursor:pointer;white-space:nowrap}
+  .btrow{display:flex;gap:8px;align-items:center;margin-top:8px}
+  .btrow select{flex:1;background:var(--panel2);border:1px solid var(--line);border-radius:8px;color:var(--txt);font-family:var(--ui);font-size:12px;padding:8px;min-width:0}
+  .btwait{color:var(--dim);font-size:12px;text-align:center;padding:20px 0}
+  .bthead{color:var(--dim);font-size:11px;line-height:1.5;margin-bottom:12px;text-align:center}
+  .btnet{font-size:26px;font-weight:800;text-align:center;margin:4px 0 2px}
+  .btnet.pos{color:var(--green)} .btnet.neg{color:var(--red)}
+  .btgrid{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:10px}
+  .btstat{border:1px solid var(--line);border-radius:9px;padding:9px 10px;background:var(--panel2)}
+  .btstat .k{color:var(--dim);font-size:9.5px;letter-spacing:.06em}
+  .btstat .v{font-size:15px;font-weight:700;margin-top:2px}
+  .btstat .v.pos{color:var(--green)} .btstat .v.neg{color:var(--red)}
+  .btnote{color:var(--amber);font-size:10.5px;line-height:1.4;margin-top:12px}
+  .btfoot{color:var(--dimmer);font-size:10px;line-height:1.4;margin-top:10px}
   .srow{display:flex;align-items:center;gap:10px;margin-top:6px}
   .srow input[type=number]{flex:1;background:var(--panel2);border:1px solid var(--line);border-radius:8px;color:var(--txt);font-family:var(--ui);font-size:16px;padding:10px;min-width:0}
   .srow label{display:flex;align-items:center;gap:8px;color:var(--dim);font-size:12.5px}
@@ -288,6 +303,17 @@
       <div class="sactions">
         <button class="scancel" onclick="FZ.closeSettings()">CANCEL</button>
         <button class="ssave" onclick="FZ.saveSettings()">SAVE</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- BACKTEST RESULTS -->
+  <div id="btScrim" class="scrim">
+    <div class="smodal" style="max-width:360px">
+      <h2>BACKTEST</h2>
+      <div id="btBody"></div>
+      <div class="sactions" style="margin-top:14px">
+        <button class="scancel" onclick="FZ.closeBacktest()">CLOSE</button>
       </div>
     </div>
   </div>
@@ -461,6 +487,17 @@ const FZ = (function(){
         <div class="srow2" style="margin-top:8px"><label>CONTRACTS</label>
           <input type="number" min="1" value="${s.qty}" onchange="FZ.setStrategyField('${s.id}','qty',this.value)"></div>
         <span class="stag">${trigTag(s)} · ×${s.qty}</span>
+        <div class="btrow">
+          <select id="btdur_${s.id}">
+            <option value="1mo">1 Month</option>
+            <option value="3mo">3 Months</option>
+            <option value="6mo" selected>6 Months</option>
+            <option value="1y">1 Year</option>
+            <option value="2y">2 Years</option>
+            <option value="5y">5 Years</option>
+          </select>
+          <button class="btbtn" onclick="FZ.backtestStrategy('${s.id}')">BACKTEST</button>
+        </div>
       </div>`).join('');
   }
   function showTab(t){
@@ -480,6 +517,46 @@ const FZ = (function(){
     persistStrategies(); renderStrategies();
   }
   loadStrategies();
+
+  // ---- Backtest ---------------------------------------------------------
+  function showBacktest(html){ $('btBody').innerHTML=html; $('btScrim').classList.add('show'); }
+  function closeBacktest(){ $('btScrim').classList.remove('show'); }
+  const DUR_LABEL={'1mo':'1 month','3mo':'3 months','6mo':'6 months','1y':'1 year','2y':'2 years','5y':'5 years'};
+  async function backtestStrategy(id){
+    const s=strategies.find(x=>x.id===id); if(!s) return;
+    const dur=$('btdur_'+id).value;
+    showBacktest('<div class="btwait">Running backtest on free historical data…<br>('+(DUR_LABEL[dur]||dur)+', '+s.symbol+')</div>');
+    try{
+      const r=await api('/api/backtest',{strategy:s,duration:dur});
+      renderBacktest(s,r);
+    }catch(e){ showBacktest('<div class="btwait">Backtest failed — try again.</div>'); }
+  }
+  const money=n=>(n<0?'−$':'$')+Math.abs(Number(n||0)).toLocaleString(undefined,{minimumFractionDigits:2,maximumFractionDigits:2});
+  function renderBacktest(s,r){
+    if(!r || r.error){ showBacktest('<div class="btwait">Couldn’t run it: '+((r&&r.error)||'no data')+'</div>'); return; }
+    const netCls=r.net>=0?'pos':'neg';
+    const pf=r.profit_factor==null?'∞':r.profit_factor;
+    const st=(k,v,cls)=>`<div class="btstat"><div class="k">${k}</div><div class="v ${cls||''}">${v}</div></div>`;
+    const html=`
+      <div class="bthead"><b>${s.name}</b> · ${s.symbol}<br>${r.interval} bars · ${r.from} → ${r.to} · ${r.bars} bars</div>
+      <div class="btnet ${netCls}">${money(r.net)}</div>
+      <div style="text-align:center;color:var(--dim);font-size:11px">net P&L · 1 contract</div>
+      <div class="btgrid">
+        ${st('TRADES', r.trades)}
+        ${st('WIN RATE', r.win_rate+'%')}
+        ${st('WINS', r.wins,'pos')}
+        ${st('LOSSES', r.losses,'neg')}
+        ${st('MONEY WON', money(r.gross_profit),'pos')}
+        ${st('MONEY LOST', money(r.gross_loss),'neg')}
+        ${st('AVG WIN', money(r.avg_win),'pos')}
+        ${st('AVG LOSS', money(r.avg_loss),'neg')}
+        ${st('PROFIT FACTOR', pf)}
+        ${st('MAX DRAWDOWN', money(r.max_drawdown),'neg')}
+      </div>
+      ${r.note?`<div class="btnote">⚠ ${r.note}</div>`:''}
+      <div class="btfoot">Free Yahoo data at the finest resolution the period allows (1-min history is limited, so longer tests use hourly/daily). Assumes 1 contract, no commissions/slippage — treat as a directional gut-check, not a promise.</div>`;
+    showBacktest(html);
+  }
   function closeSettings(){ $('setScrim').classList.remove('show'); }
   async function saveSettings(){
     settings={tp_enabled:$('tpE').checked, tp_points:parseFloat($('tpV').value)||settings.tp_points,
@@ -508,7 +585,7 @@ const FZ = (function(){
   }
 
   return {step,open,close,back,toggleTheme,setTheme,openSettings,closeSettings,saveSettings,hideEvent,hideReject,
-          showTab,toggleStrategy,setStrategyField};
+          showTab,toggleStrategy,setStrategyField,backtestStrategy,closeBacktest};
 })();
 </script>
 </body>
