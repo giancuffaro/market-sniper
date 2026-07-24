@@ -9,6 +9,7 @@ COMPLETELY SEPARATE from the options app. Nothing here imports the options code.
   LiveFuturesSession  — not wired yet (needs futures approval + CME data $228/mo).
 """
 
+import os
 import json
 import time
 import math
@@ -207,6 +208,114 @@ def _coerce_fstrategy(st):
     return base
 
 
+# ---- Uploaded historical data (NinjaTrader CSV export) ------------------
+_DATA_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), "data")
+_META_PATH = os.path.join(_DATA_DIR, "meta.json")
+_CSV_CACHE = {}   # symbol -> {"mtime":.., "bars":[...]}
+
+_DT_FORMATS = ("%Y%m%d %H%M%S", "%Y-%m-%d %H:%M:%S", "%Y-%m-%d %H:%M",
+               "%m/%d/%Y %H:%M:%S", "%m/%d/%Y %H:%M", "%Y%m%d")
+
+def _parse_dt(s):
+    s = s.strip()
+    for f in _DT_FORMATS:
+        try:
+            return dt.datetime.strptime(s, f)
+        except ValueError:
+            continue
+    return None
+
+def _parse_csv_bars(path):
+    """Flexible parser for NinjaTrader / generic OHLCV exports.
+    Accepts ';' , ',' or tab delimiters; datetime as one field or date+time."""
+    bars = []
+    with open(path, "r", errors="ignore") as fh:
+        for ln, line in enumerate(fh):
+            line = line.strip()
+            if not line:
+                continue
+            low = line.lower()
+            if ln == 0 and any(h in low for h in ("open", "close", "date", "time")) \
+                    and not any(ch.isdigit() for ch in line.split((";" if ";" in line else ","))[0][:4] or ""):
+                continue  # header row
+            delim = ";" if ";" in line else ("," if "," in line else ("\t" if "\t" in line else None))
+            if not delim:
+                continue
+            parts = [p.strip() for p in line.split(delim)]
+            if len(parts) < 5:
+                continue
+            dtobj = _parse_dt(parts[0]); idx = 1
+            if dtobj is None and len(parts) >= 2:
+                dtobj = _parse_dt(parts[0] + " " + parts[1]); idx = 2
+            if dtobj is None:
+                continue
+            nums = parts[idx:]
+            try:
+                o, h, l, c = float(nums[0]), float(nums[1]), float(nums[2]), float(nums[3])
+                v = float(nums[4]) if len(nums) > 4 else 0.0
+            except (ValueError, IndexError):
+                continue
+            bars.append({"t": int(dtobj.replace(tzinfo=dt.timezone.utc).timestamp()),
+                         "o": o, "h": h, "l": l, "c": c, "v": v})
+    bars.sort(key=lambda b: b["t"])
+    return bars
+
+def csv_bars(symbol):
+    path = os.path.join(_DATA_DIR, f"{symbol}.csv")
+    if not os.path.exists(path):
+        return None
+    mt = os.path.getmtime(path)
+    c = _CSV_CACHE.get(symbol)
+    if c and c["mtime"] == mt:
+        return c["bars"]
+    bars = _parse_csv_bars(path)
+    _CSV_CACHE[symbol] = {"mtime": mt, "bars": bars}
+    return bars
+
+def _load_meta():
+    try:
+        with open(_META_PATH) as fh:
+            return json.load(fh)
+    except Exception:
+        return {}
+
+def data_status():
+    meta = _load_meta()
+    out = {}
+    for sym in FUT:
+        if os.path.exists(os.path.join(_DATA_DIR, f"{sym}.csv")):
+            out[sym] = meta.get(sym) or {"uploaded_at": None, "bars": None}
+        else:
+            out[sym] = None
+    return out
+
+def save_uploaded(symbol, raw):
+    if symbol not in FUT:
+        raise OrderRejected("unknown symbol")
+    os.makedirs(_DATA_DIR, exist_ok=True)
+    path = os.path.join(_DATA_DIR, f"{symbol}.csv")
+    with open(path, "wb") as fh:
+        fh.write(raw)
+    _CSV_CACHE.pop(symbol, None)
+    bars = _parse_csv_bars(path)
+    if len(bars) < 30:
+        try:
+            os.remove(path)
+        except OSError:
+            pass
+        raise OrderRejected("couldn't read enough bars — expected a NinjaTrader OHLCV "
+                            "export (datetime, open, high, low, close, volume)")
+    meta = _load_meta()
+    meta[symbol] = {"uploaded_at": dt.datetime.now().strftime("%Y-%m-%d %H:%M"),
+                    "bars": len(bars),
+                    "from": dt.datetime.utcfromtimestamp(bars[0]["t"]).strftime("%Y-%m-%d"),
+                    "to": dt.datetime.utcfromtimestamp(bars[-1]["t"]).strftime("%Y-%m-%d")}
+    with open(_META_PATH, "w") as fh:
+        json.dump(meta, fh)
+    _CSV_CACHE[symbol] = {"mtime": os.path.getmtime(path), "bars": bars}
+    return {"symbol": symbol, **meta[symbol]}
+
+
 # ---- Backtesting (free Yahoo data) --------------------------------------
 def _ohlcv(sym, interval, rng):
     res = _chart(sym, interval, rng)
@@ -311,24 +420,35 @@ def backtest(strategy, duration):
     trig = strategy.get("trigger", {})
     stype = trig.get("type")
     note = ""
-    if stype == "vwap_pullback":
-        rng, interval = "1mo", "5m"      # VWAP needs intraday; free 5m caps ~60 days
-        if duration != "1mo":
-            note = "VWAP needs intraday bars — free data limits this to ~1 month at 5-min."
+    months = {"1mo": 1, "3mo": 3, "6mo": 6, "1y": 12, "2y": 24, "5y": 60}.get(duration, 6)
+    uploaded = csv_bars(sym)
+    if uploaded and len(uploaded) >= 30:
+        # Use the trader's own NinjaTrader export, sliced to the chosen window.
+        source, interval = "Your NinjaTrader data", "your bars"
+        cutoff = uploaded[-1]["t"] - months * 30 * 86400
+        bars = [b for b in uploaded if b["t"] >= cutoff]
+        if len(bars) < 30:
+            bars = uploaded
     else:
-        rng, interval = _BT_MAP.get(duration, ("6mo", "60m"))
-    try:
-        bars = _ohlcv(sym, interval, rng)
-    except Exception as e:
-        return {"error": f"could not load free data ({type(e).__name__})"}
+        source = "Yahoo (free)"
+        if stype == "vwap_pullback":
+            rng, interval = "1mo", "5m"      # VWAP needs intraday; free 5m caps ~60 days
+            if duration != "1mo":
+                note = "VWAP needs intraday bars — free data limits this to ~1 month at 5-min. Upload NinjaTrader data for the full range."
+        else:
+            rng, interval = _BT_MAP.get(duration, ("6mo", "60m"))
+        try:
+            bars = _ohlcv(sym, interval, rng)
+        except Exception as e:
+            return {"error": f"could not load free data ({type(e).__name__})"}
     if len(bars) < 30:
-        return {"error": "not enough historical data returned for this range"}
+        return {"error": "not enough historical data for this range"}
     if stype == "vwap_pullback":
         trades = _sim_vwap(bars, float(trig.get("band", 2.0)))
     else:
         trades = _sim_ema(bars, int(trig.get("fast", 9)), int(trig.get("slow", 21)))
     out = _bt_stats(trades, sym)
-    out.update({"symbol": sym, "interval": interval, "duration": duration,
+    out.update({"symbol": sym, "interval": interval, "duration": duration, "source": source,
                 "from": dt.datetime.utcfromtimestamp(bars[0]["t"]).strftime("%Y-%m-%d"),
                 "to": dt.datetime.utcfromtimestamp(bars[-1]["t"]).strftime("%Y-%m-%d"),
                 "bars": len(bars), "note": note, "name": strategy.get("name", "")})

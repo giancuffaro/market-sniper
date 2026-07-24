@@ -295,6 +295,21 @@
 
       <div id="paneStrat" class="pane" hidden>
         <div id="stratList"></div>
+
+        <div class="sgroup">
+          <div class="glbl">HISTORICAL DATA — for deep backtests (optional)</div>
+          <div id="dataStatus" class="btfoot" style="margin-top:2px"></div>
+          <div class="srow2" style="margin-top:10px"><label>SYMBOL</label>
+            <select id="dataSym"><option>MNQ</option><option>MES</option></select></div>
+          <div class="srow2" style="margin-top:8px">
+            <input type="file" id="dataFile" accept=".csv,.txt" style="flex:1;min-width:0;color:var(--dim);font-size:11px">
+            <button class="btbtn" onclick="FZ.uploadData()">UPLOAD</button>
+          </div>
+          <div class="shint">Export bars in NinjaTrader (Tools → Historical Data → Export) and upload here.
+          Backtests then use YOUR data — real deep 1-minute history. Without a file, they fall back to
+          free Yahoo data (limited to ~1 month of 1-min).</div>
+        </div>
+
         <div class="shint">Enable any of these and they run automatically while the futures app is
         open — each opens ONE trade per signal and manages it with your Take-Profit / Stop /
         Trailing stop above. You can run more than one at a time. Test in PAPER first.</div>
@@ -504,7 +519,7 @@ const FZ = (function(){
     const cfg=(t==='config');
     $('tabConfig').classList.toggle('on',cfg); $('tabStrat').classList.toggle('on',!cfg);
     $('paneConfig').hidden=!cfg; $('paneStrat').hidden=cfg;
-    if(!cfg) renderStrategies();
+    if(!cfg){ renderStrategies(); refreshDataStatus(); }
   }
   function toggleStrategy(id){
     const s=strategies.find(x=>x.id===id); if(!s) return;
@@ -517,6 +532,32 @@ const FZ = (function(){
     persistStrategies(); renderStrategies();
   }
   loadStrategies();
+
+  // ---- Historical data upload ------------------------------------------
+  async function refreshDataStatus(){
+    const el=$('dataStatus'); if(!el) return;
+    try{
+      const d=await api('/api/data_status');
+      el.innerHTML=['MNQ','MES'].map(s=>{
+        const m=d[s];
+        if(!m||!m.uploaded_at) return `<b style="color:var(--dim)">${s}</b>: no file — using free Yahoo data`;
+        return `<b style="color:var(--green)">${s}</b>: uploaded ${m.uploaded_at} · ${Number(m.bars).toLocaleString()} bars · ${m.from}→${m.to}`;
+      }).join('<br>');
+    }catch(e){}
+  }
+  async function uploadData(){
+    const f=$('dataFile').files[0];
+    if(!f){ showEvent('pick a CSV file first'); return; }
+    const sym=$('dataSym').value;
+    const fd=new FormData(); fd.append('symbol',sym); fd.append('file',f);
+    $('dataStatus').innerHTML='<span style="color:var(--dim)">uploading & parsing '+sym+'…</span>';
+    try{
+      const r=await fetch('/api/upload_data',{method:'POST',body:fd}).then(x=>x.json());
+      if(r.detail){ showEvent('upload failed: '+r.detail); }
+      else showEvent(sym+' data loaded — '+Number(r.bars).toLocaleString()+' bars ('+r.from+'→'+r.to+')');
+    }catch(e){ showEvent('upload failed'); }
+    refreshDataStatus();
+  }
 
   // ---- Backtest ---------------------------------------------------------
   function showBacktest(html){ $('btBody').innerHTML=html; $('btScrim').classList.add('show'); }
@@ -538,7 +579,7 @@ const FZ = (function(){
     const pf=r.profit_factor==null?'∞':r.profit_factor;
     const st=(k,v,cls)=>`<div class="btstat"><div class="k">${k}</div><div class="v ${cls||''}">${v}</div></div>`;
     const html=`
-      <div class="bthead"><b>${s.name}</b> · ${s.symbol}<br>${r.interval} bars · ${r.from} → ${r.to} · ${r.bars} bars</div>
+      <div class="bthead"><b>${s.name}</b> · ${s.symbol}<br><b style="color:${r.source&&r.source.indexOf('NinjaTrader')>=0?'var(--green)':'var(--dim)'}">${r.source||'data'}</b> · ${r.interval} · ${r.from} → ${r.to} · ${Number(r.bars).toLocaleString()} bars</div>
       <div class="btnet ${netCls}">${money(r.net)}</div>
       <div style="text-align:center;color:var(--dim);font-size:11px">net P&L · 1 contract</div>
       <div class="btgrid">
@@ -554,7 +595,9 @@ const FZ = (function(){
         ${st('MAX DRAWDOWN', money(r.max_drawdown),'neg')}
       </div>
       ${r.note?`<div class="btnote">⚠ ${r.note}</div>`:''}
-      <div class="btfoot">Free Yahoo data at the finest resolution the period allows (1-min history is limited, so longer tests use hourly/daily). Assumes 1 contract, no commissions/slippage — treat as a directional gut-check, not a promise.</div>`;
+      <div class="btfoot">${r.source&&r.source.indexOf('NinjaTrader')>=0
+        ? 'Your uploaded NinjaTrader bars.'
+        : 'Free Yahoo data at the finest resolution the period allows (1-min history is limited, so longer tests use hourly/daily). Upload NinjaTrader data for deep 1-min history.'} Assumes 1 contract, no commissions/slippage — treat as a directional gut-check, not a promise.</div>`;
     showBacktest(html);
   }
   function closeSettings(){ $('setScrim').classList.remove('show'); }
@@ -585,7 +628,7 @@ const FZ = (function(){
   }
 
   return {step,open,close,back,toggleTheme,setTheme,openSettings,closeSettings,saveSettings,hideEvent,hideReject,
-          showTab,toggleStrategy,setStrategyField,backtestStrategy,closeBacktest};
+          showTab,toggleStrategy,setStrategyField,backtestStrategy,closeBacktest,uploadData};
 })();
 </script>
 </body>

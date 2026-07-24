@@ -8,7 +8,7 @@ import os
 import pathlib
 from typing import Optional
 
-from fastapi import FastAPI, HTTPException
+from fastapi import FastAPI, HTTPException, UploadFile, File, Form
 from fastapi.responses import HTMLResponse, JSONResponse
 from pydantic import BaseModel
 
@@ -108,6 +108,18 @@ class BacktestReq(BaseModel):
 @app.post("/api/backtest")
 def backtest(req: BacktestReq):
     return fc.backtest(req.strategy, req.duration)
+
+@app.get("/api/data_status")
+def data_status():
+    return fc.data_status()
+
+@app.post("/api/upload_data")
+async def upload_data(symbol: str = Form(...), file: UploadFile = File(...)):
+    raw = await file.read()
+    try:
+        return {"ok": True, **fc.save_uploaded(symbol, raw)}
+    except fc.OrderRejected as e:
+        raise HTTPException(400, str(e))
 
 @app.get("/api/trend")
 def trend(symbol: str = "MNQ"):
