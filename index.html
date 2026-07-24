@@ -183,6 +183,21 @@
   .risk{display:inline-block;margin-top:7px;font-size:9.5px;letter-spacing:.1em;padding:2px 7px;border-radius:6px;font-weight:700}
   .risk.hi{color:var(--red);border:1px solid var(--red)}
   .risk.lo{color:var(--green);border:1px solid var(--green)}
+  /* Strategies tab */
+  .tabs{display:flex;gap:6px;margin-bottom:14px}
+  .tab{flex:1;border:1px solid var(--line);background:var(--panel2);color:var(--dim);border-radius:10px;padding:11px 0;font-family:var(--ui);font-size:11.5px;letter-spacing:.14em;font-weight:700;cursor:pointer}
+  .tab.on{border-color:var(--green);background:var(--green-deep);color:var(--green)}
+  .scard{border:1px solid var(--line);border-radius:12px;padding:13px;margin-bottom:10px}
+  .scard.act{border-color:var(--green);background:var(--green-deep)}
+  .scard .stitle{display:flex;align-items:center;gap:9px;font-size:13px;font-weight:700;color:var(--txt);cursor:pointer}
+  .sdesc{color:var(--dim);font-size:11.5px;line-height:1.5;margin:8px 0 4px}
+  .scardft{display:flex;align-items:center;justify-content:space-between;gap:8px}
+  .stag{color:var(--amber);font-size:10px;letter-spacing:.05em}
+  .scardft button{border:1px solid var(--line);background:var(--panel2);color:var(--txt);border-radius:8px;padding:6px 13px;font-family:var(--ui);font-size:10.5px;font-weight:700;cursor:pointer}
+  .steditrow{display:flex;gap:8px;margin-bottom:8px;align-items:center}
+  .steditrow[hidden]{display:none}
+  .steditrow>label{color:var(--dim);font-size:10.5px;letter-spacing:.08em;min-width:74px}
+  .steditrow input,.steditrow select{flex:1;background:var(--panel2);border:1px solid var(--line);border-radius:8px;color:var(--txt);font-family:var(--ui);font-size:12px;padding:9px;min-width:0}
   .shint{color:var(--dimmer);font-size:11px;line-height:1.5;margin-top:8px}
   .sactions{display:flex;gap:10px;margin-top:6px}
   .sactions button{flex:1;border-radius:10px;padding:14px 0;font-family:var(--ui);font-weight:800;font-size:15px;cursor:pointer}
@@ -333,8 +348,13 @@
   <!-- CONFIGURATION MODAL -->
   <div id="setScrim" class="scrim">
     <div class="smodal">
-      <h2>CONFIGURATION</h2>
+      <h2>SETTINGS</h2>
+      <div class="tabs">
+        <button id="tabConfig" class="tab on" onclick="EZ.showTab('config')">CONFIGURATION</button>
+        <button id="tabStrat" class="tab" onclick="EZ.showTab('strat')">STRATEGIES</button>
+      </div>
 
+      <div id="paneConfig" class="pane">
       <div class="sgroup mine myfont">
         <div class="glbl">★ MY CONFIG — round-number entry</div>
         <div class="srow">
@@ -407,6 +427,42 @@
         The LOCK button locks instantly.</div>
       </div>
 
+      </div><!-- /paneConfig -->
+
+      <div id="paneStrat" class="pane" hidden>
+        <div id="stratList"></div>
+        <button class="mini" style="width:100%;margin-top:2px" onclick="EZ.newStrategy()">+ NEW STRATEGY</button>
+
+        <div id="stratEditor" class="sgroup" hidden style="margin-top:12px">
+          <div class="glbl" id="stratEditTitle">NEW STRATEGY</div>
+          <div class="steditrow"><label>NAME</label><input id="stName" placeholder="My strategy"></div>
+          <div class="steditrow"><label>SYMBOL</label>
+            <select id="stSymbol"><option>SPY</option><option>QQQ</option><option>TSLA</option></select></div>
+          <div class="steditrow"><label>WHEN</label>
+            <select id="stType" onchange="EZ.stTypeChanged()">
+              <option value="orb">Opening Range Breakout</option>
+              <option value="cross">Price crosses a level</option>
+            </select></div>
+          <div class="steditrow" id="stOrbRow"><label>MINUTES</label><input id="stMinutes" type="number" value="15" min="1"></div>
+          <div class="steditrow" id="stCrossRow" hidden><label>LEVEL</label><input id="stLevel" type="number" step="0.01" placeholder="500">
+            <select id="stDir"><option value="up">↑ → CALLS</option><option value="down">↓ → PUTS</option></select></div>
+          <div class="steditrow"><label>CONTRACTS</label><input id="stQty" type="number" value="1" min="1"></div>
+          <div class="steditrow"><label>TAKE PROFIT</label><input id="stTpVal" type="number" step="0.01" value="1">
+            <select id="stTpUnit"><option value="whole">next whole (spot)</option><option value="cents">¢ premium</option><option value="usd">$ profit</option></select></div>
+          <div class="steditrow"><label>STOP</label><input id="stSlVal" type="number" step="0.01" value="20">
+            <select id="stSlUnit"><option value="pct">% premium</option><option value="cents">¢ premium</option></select></div>
+          <div class="steditrow"><label>NOTE</label><input id="stDesc" placeholder="what it does (optional)"></div>
+          <div class="srow" style="margin-top:2px">
+            <button class="mini" onclick="EZ.saveStrategy()">SAVE STRATEGY</button>
+            <button class="mini off" onclick="EZ.cancelStrategyEdit()">CANCEL</button>
+            <button class="mini off" id="stDelete" style="display:none" onclick="EZ.deleteStrategy()">DELETE</button>
+          </div>
+        </div>
+        <div class="shint">Enabled strategies run automatically while the app is open and connected.
+        Each places ONE entry per day when its condition is met, then manages it with the
+        take-profit and stop you set. You can enable several at once. Test in PAPER first.</div>
+      </div>
+
       <div class="sactions">
         <button class="scancel" onclick="EZ.closeSettings()">CANCEL</button>
         <button class="ssave" onclick="EZ.saveSettings()">SAVE</button>
@@ -417,7 +473,7 @@
 
 <script>
 const EZ = (function(){
-  const LSK="ezexec_creds", LSS="ezexec_settings", LSP="ezexec_profiles", LSPA="ezexec_active_profile", LST="ezexec_theme", LSA="ezexec_autolock";
+  const LSK="ezexec_creds", LSS="ezexec_settings", LSP="ezexec_profiles", LSPA="ezexec_active_profile", LST="ezexec_theme", LSA="ezexec_autolock", LSST="ezexec_strategies";
   let mode="LIVE", sym="QQQ", side="CALLS", qty=1, inTrade=false, poll=null, priceTimer=null;
   let profiles=[], activeProf=null, mirrorOn=false;
   let settings={strike_mode:"OTM1",tp_enabled:false,tp_value:30,tp_unit:"cents",
@@ -535,6 +591,7 @@ const EZ = (function(){
     $('footProf').textContent = mode==='LIVE' ? (activeProf||'unsaved keys') : 'sim account';
     render(state); refreshQuote(); refreshPrices();
     api('/api/settings',settings);
+    syncStrategies();
     poll=setInterval(tick,1000);
     priceTimer=setInterval(()=>{ refreshPrices(); if(!inTrade) refreshQuote(); },5000);
   }
@@ -554,6 +611,7 @@ const EZ = (function(){
   }
 
   function openSettings(){
+    showTab('config'); cancelStrategyEdit(); renderStrategies();
     $('smOTM').classList.toggle('on',settings.strike_mode==='OTM1');
     $('smITM').classList.toggle('on',settings.strike_mode==='ITM1');
     $('myEnabled').checked=!!settings.my_enabled;
@@ -691,6 +749,98 @@ const EZ = (function(){
 
   async function tick(){ render(await api('/api/state')); }
 
+  // ---- Strategies -------------------------------------------------------
+  let strategies=[], editingStrat=null;
+  function defaultStrategies(){
+    return [
+      {id:"orb15",name:"ORB 15-min",builtin:true,enabled:false,symbol:"QQQ",qty:1,
+       desc:"Opening Range Breakout. Marks the HIGH and LOW of the first 15 minutes after the 9:30 ET open. If price breaks ABOVE that high it buys CALLS; if it breaks BELOW the low it buys PUTS. One entry per day.",
+       trigger:{type:"orb",minutes:15},tp_unit:"whole",tp_value:1,sl_unit:"pct",sl_value:20},
+      {id:"lvlbreak",name:"Level Break (example)",builtin:true,enabled:false,symbol:"QQQ",qty:1,
+       desc:"Watches one price level you choose. Cross UP through it → CALLS; cross DOWN through it → PUTS.",
+       trigger:{type:"cross",level:500,dir:"up"},tp_unit:"whole",tp_value:1,sl_unit:"pct",sl_value:20},
+    ];
+  }
+  function loadStrategies(){
+    try{ strategies=JSON.parse(localStorage.getItem(LSST)||"null")||defaultStrategies(); }
+    catch(e){ strategies=defaultStrategies(); }
+  }
+  async function syncStrategies(){ try{ await api('/api/strategies',{strategies}); }catch(e){} }
+  function persistStrategies(){ localStorage.setItem(LSST,JSON.stringify(strategies)); syncStrategies(); }
+  function trigSummary(s){
+    return s.trigger.type==='orb' ? `ORB ${s.trigger.minutes}m`
+      : `cross ${s.trigger.level} ${s.trigger.dir==='up'?'↑':'↓'}`;
+  }
+  function renderStrategies(){
+    const el=$('stratList'); if(!el) return;
+    el.innerHTML = strategies.map(s=>`
+      <div class="scard ${s.enabled?'act':''}">
+        <label class="stitle"><input type="checkbox" ${s.enabled?'checked':''} onchange="EZ.toggleStrategy('${s.id}')"> ${s.name}</label>
+        <div class="sdesc">${s.desc||''}</div>
+        <div class="scardft"><span class="stag">${s.symbol} · ${trigSummary(s)} · ×${s.qty} · TP ${s.tp_value}${s.tp_unit==='whole'?'w':s.tp_unit==='pct'?'%':'¢'} · SL ${s.sl_value}${s.sl_unit==='pct'?'%':'¢'}</span>
+          <button onclick="EZ.editStrategy('${s.id}')">EDIT</button></div>
+      </div>`).join('') || '<div class="shint">No strategies yet — tap NEW STRATEGY.</div>';
+  }
+  function showTab(t){
+    const cfg=(t==='config');
+    $('tabConfig').classList.toggle('on',cfg); $('tabStrat').classList.toggle('on',!cfg);
+    $('paneConfig').hidden=!cfg; $('paneStrat').hidden=cfg;
+    if(!cfg) renderStrategies();
+  }
+  function toggleStrategy(id){
+    const s=strategies.find(x=>x.id===id); if(!s) return;
+    s.enabled=!s.enabled; persistStrategies(); renderStrategies();
+    showEvent(s.enabled?`Strategy "${s.name}" is ON — runs while connected`:`Strategy "${s.name}" turned off`);
+  }
+  function stTypeChanged(){
+    const t=$('stType').value;
+    $('stOrbRow').hidden=(t!=='orb'); $('stCrossRow').hidden=(t!=='cross');
+  }
+  function newStrategy(){
+    editingStrat=null;
+    $('stratEditTitle').textContent='NEW STRATEGY';
+    $('stName').value=''; $('stSymbol').value='QQQ'; $('stType').value='orb';
+    $('stMinutes').value=15; $('stLevel').value=''; $('stDir').value='up';
+    $('stQty').value=1; $('stTpVal').value=1; $('stTpUnit').value='whole';
+    $('stSlVal').value=20; $('stSlUnit').value='pct'; $('stDesc').value='';
+    $('stDelete').style.display='none'; stTypeChanged(); $('stratEditor').hidden=false;
+  }
+  function editStrategy(id){
+    const s=strategies.find(x=>x.id===id); if(!s) return;
+    editingStrat=id;
+    $('stratEditTitle').textContent='EDIT STRATEGY';
+    $('stName').value=s.name; $('stSymbol').value=s.symbol; $('stType').value=s.trigger.type;
+    $('stMinutes').value=s.trigger.minutes||15; $('stLevel').value=s.trigger.level||''; $('stDir').value=s.trigger.dir||'up';
+    $('stQty').value=s.qty; $('stTpVal').value=s.tp_value; $('stTpUnit').value=s.tp_unit;
+    $('stSlVal').value=s.sl_value; $('stSlUnit').value=s.sl_unit; $('stDesc').value=s.desc||'';
+    $('stDelete').style.display=s.builtin?'none':''; stTypeChanged(); $('stratEditor').hidden=false;
+  }
+  function cancelStrategyEdit(){ $('stratEditor').hidden=true; editingStrat=null; }
+  function saveStrategy(){
+    const type=$('stType').value;
+    const trigger = type==='orb'
+      ? {type:'orb',minutes:Math.max(1,parseInt($('stMinutes').value)||15)}
+      : {type:'cross',level:parseFloat($('stLevel').value)||0,dir:$('stDir').value};
+    const sym=$('stSymbol').value;
+    let desc=$('stDesc').value.trim();
+    if(!desc){ desc = type==='orb'
+      ? `Opening range breakout over ${trigger.minutes} min on ${sym}: break above the range high buys CALLS, below the low buys PUTS.`
+      : `On ${sym}, when price crosses ${trigger.dir==='up'?'up through':'down through'} ${trigger.level} it buys ${trigger.dir==='up'?'CALLS':'PUTS'}.`; }
+    const data={name:($('stName').value||'Strategy').slice(0,60),desc,symbol:sym,
+      qty:Math.max(1,parseInt($('stQty').value)||1),trigger,
+      tp_unit:$('stTpUnit').value,tp_value:parseFloat($('stTpVal').value)||1,
+      sl_unit:$('stSlUnit').value,sl_value:parseFloat($('stSlVal').value)||20};
+    if(editingStrat){ Object.assign(strategies.find(x=>x.id===editingStrat),data); }
+    else{ data.id='s'+Date.now(); data.enabled=false; data.builtin=false; strategies.push(data); }
+    persistStrategies(); renderStrategies(); cancelStrategyEdit();
+  }
+  function deleteStrategy(){
+    if(!editingStrat) return;
+    strategies=strategies.filter(x=>x.id!==editingStrat);
+    persistStrategies(); renderStrategies(); cancelStrategyEdit();
+  }
+  loadStrategies();
+
   function render(st){
     if(!st) return;
     if(st.event) showEvent(st.event);
@@ -773,7 +923,8 @@ const EZ = (function(){
 
   return {step,buy,close,disarm,hideReject,disconnect,switchAccount,toggleTheme,setTheme,lockNow,
           openSettings,closeSettings,saveSettings,setStrikeMode,hideEvent,tpUnitChanged,
-          mirrorToggle,selectProfile,saveProfile,deleteProfile,pickAccount};
+          mirrorToggle,selectProfile,saveProfile,deleteProfile,pickAccount,
+          showTab,toggleStrategy,newStrategy,editStrategy,saveStrategy,deleteStrategy,cancelStrategyEdit,stTypeChanged};
 })();
 </script>
 </body>

@@ -69,6 +69,52 @@ def pick_strike(spot, side, step, mode="OTM1"):
 def next_whole(spot, side):
     return math.floor(spot) + 1 if side == "CALLS" else math.ceil(spot) - 1
 
+
+def default_strategies():
+    """Built-in example strategies. Conditions that auto-execute when met."""
+    return [
+        {"id": "orb15", "name": "ORB 15-min", "builtin": True, "enabled": False,
+         "symbol": "QQQ", "qty": 1,
+         "desc": ("Opening Range Breakout. Marks the HIGH and LOW of the first 15 "
+                  "minutes after the 9:30 ET open. If price breaks ABOVE that high it "
+                  "buys CALLS; if it breaks BELOW the low it buys PUTS. One entry per day."),
+         "trigger": {"type": "orb", "minutes": 15},
+         "tp_unit": "whole", "tp_value": 1, "sl_unit": "pct", "sl_value": 20},
+        {"id": "lvlbreak", "name": "Level Break (example)", "builtin": True, "enabled": False,
+         "symbol": "QQQ", "qty": 1,
+         "desc": ("Watches one price level you choose. Cross UP through it → CALLS; "
+                  "cross DOWN through it → PUTS."),
+         "trigger": {"type": "cross", "level": 500.0, "dir": "up"},
+         "tp_unit": "whole", "tp_value": 1, "sl_unit": "pct", "sl_value": 20},
+    ]
+
+
+def _coerce_strategy(st):
+    """Sanitize a strategy dict coming from the client."""
+    if not isinstance(st, dict):
+        return None
+    trig = st.get("trigger") or {}
+    ttype = trig.get("type") if trig.get("type") in ("orb", "cross") else "orb"
+    out = {
+        "id": str(st.get("id") or "s")[:40],
+        "name": str(st.get("name") or "Strategy")[:60],
+        "desc": str(st.get("desc") or "")[:400],
+        "enabled": bool(st.get("enabled")),
+        "builtin": bool(st.get("builtin")),
+        "symbol": st.get("symbol") if st.get("symbol") in config.SYMBOLS else "QQQ",
+        "qty": max(1, min(int(st.get("qty") or 1), config.MAX_CONTRACTS)),
+        "tp_unit": st.get("tp_unit") if st.get("tp_unit") in ("whole", "cents", "usd") else "whole",
+        "tp_value": float(st.get("tp_value") or 1),
+        "sl_unit": st.get("sl_unit") if st.get("sl_unit") in ("pct", "cents") else "pct",
+        "sl_value": float(st.get("sl_value") or 20),
+    }
+    if ttype == "orb":
+        out["trigger"] = {"type": "orb", "minutes": max(1, min(int(trig.get("minutes") or 15), 60))}
+    else:
+        out["trigger"] = {"type": "cross", "level": float(trig.get("level") or 0),
+                          "dir": "down" if trig.get("dir") == "down" else "up"}
+    return out
+
 def buy_limit(ask):
     return round(ask + max(config.MARKETABLE_BUFFER_MIN, ask * config.MARKETABLE_BUFFER_PCT), 2)
 
@@ -246,6 +292,8 @@ class BaseSession:
         self.settings = dict(config.DEFAULT_SETTINGS)
         self.last_event = None
         self.armed = None   # MY CONFIG pending round-number entry
+        self.strategies = default_strategies()
+        self._fired = set()   # (strategy_id, date) that already entered today
 
     def update_settings(self, new):
         s = self.settings
@@ -369,6 +417,69 @@ class BaseSession:
         except OrderRejected as e:
             self.last_event = f"MY CONFIG entry blocked at {a['target']:.0f}: {e}"
 
+    # ---- Strategy engine: conditions that auto-execute --------------------
+    def update_strategies(self, strategies):
+        if not isinstance(strategies, list):
+            raise OrderRejected("strategies must be a list")
+        cleaned = [c for c in (_coerce_strategy(s) for s in strategies) if c]
+        self.strategies = cleaned
+        return self.strategies
+
+    def _strategy_side(self, st, sym):
+        """Return 'CALLS' / 'PUTS' if the strategy's condition is met, else None."""
+        trig = st.get("trigger", {})
+        price = self._underlying(sym)
+        if price is None:
+            return None
+        if trig.get("type") == "orb":
+            try:
+                import quotes
+                rng = quotes.opening_range(sym, int(trig.get("minutes", 15)))
+            except Exception:
+                rng = {}
+            if not rng or not rng.get("complete"):
+                return None
+            if price > rng["high"]:
+                return "CALLS"
+            if price < rng["low"]:
+                return "PUTS"
+            return None
+        if trig.get("type") == "cross":
+            level = float(trig.get("level", 0))
+            if trig.get("dir") == "down":
+                return "PUTS" if price <= level else None
+            return "CALLS" if price >= level else None
+        return None
+
+    def _eval_strategies(self):
+        if self.position is not None or self.armed is not None:
+            return
+        today = dt.date.today().isoformat()
+        for st in self.strategies:
+            if not st.get("enabled"):
+                continue
+            sym = st.get("symbol") or "QQQ"
+            if config.SYMBOLS.get(sym, {}).get("enabled") is not True:
+                continue
+            if (st.get("id"), today) in self._fired:
+                continue
+            side = self._strategy_side(st, sym)
+            if not side:
+                continue
+            self._fired.add((st.get("id"), today))     # one entry per strategy per day
+            s = self.settings
+            s["tp_enabled"] = True; s["tp_unit"] = st.get("tp_unit", "whole")
+            s["tp_value"] = float(st.get("tp_value", 1))
+            s["sl_enabled"] = True; s["sl_unit"] = st.get("sl_unit", "pct")
+            s["sl_value"] = float(st.get("sl_value", 20))
+            try:
+                self.place(sym, side, int(st.get("qty", 1)))
+                self.last_event = (f"STRATEGY «{st.get('name')}» FIRED — "
+                                   f"bought {side} {sym} at the ask")
+            except OrderRejected as e:
+                self.last_event = f"strategy «{st.get('name')}» blocked: {e}"
+            return                                       # one position at a time
+
     def _decorate_position(self, q):
         p = self.position
         p["entry_spot"] = q["spot"]
@@ -398,13 +509,15 @@ class BaseSession:
 
     def state(self):
         self._maybe_trigger_entry()   # fire armed MY CONFIG entry if price reached
+        self._eval_strategies()       # fire any enabled strategy whose condition is met
         ev, self.last_event = self.last_event, None
         return {"mode": self.mode, "account_id": self.account_id,
                 "account_type": self.account_type,
                 "buying_power": round(self.buying_power, 2),
                 "position": self.position, "armed": self.armed,
                 "day_realized": round(self.day_realized, 2),
-                "blotter": self.blotter[-20:], "settings": self.settings, "event": ev}
+                "blotter": self.blotter[-20:], "settings": self.settings,
+                "strategies": self.strategies, "event": ev}
 
 
 class PaperSession(BaseSession):

@@ -230,6 +230,24 @@ def set_settings(req: SettingsReq):
         MIRROR["s"].update_settings(new)
     return out
 
+@app.get("/api/strategies")
+def get_strategies():
+    return {"strategies": _sess().strategies}
+
+@app.post("/api/strategies")
+def set_strategies(req: dict):
+    s = _sess()
+    try:
+        strategies = s.update_strategies(req.get("strategies", []))
+    except wb.OrderRejected as e:
+        raise HTTPException(400, str(e))
+    if MIRROR["s"] is not None:
+        try:
+            MIRROR["s"].update_strategies(req.get("strategies", []))
+        except Exception:
+            pass
+    return {"ok": True, "strategies": strategies}
+
 @app.post("/api/disconnect")
 def disconnect():
     SESSION["s"] = None
