@@ -101,6 +101,17 @@ def get_settings():
 def set_settings(req: SettingsReq):
     return _sess().update_settings({k: v for k, v in req.model_dump().items() if v is not None})
 
+@app.get("/api/strategies")
+def get_strategies():
+    return {"strategies": _sess().strategies}
+
+@app.post("/api/strategies")
+def set_strategies(req: dict):
+    try:
+        return {"ok": True, "strategies": _sess().update_strategies(req.get("strategies", []))}
+    except fc.OrderRejected as e:
+        raise HTTPException(400, str(e))
+
 @app.post("/api/disconnect")
 def disconnect():
     SESSION["s"] = None

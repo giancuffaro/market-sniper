@@ -56,6 +56,58 @@ def get_price(sym):
     return v
 
 
+def _closes(sym, count=80):
+    """Recent 1-minute closes as [(ts, close), ...] (oldest→newest)."""
+    url = ("https://query1.finance.yahoo.com/v8/finance/chart/"
+           f"{urllib.request.quote(FUT[sym]['yahoo'])}?range=1d&interval=1m")
+    with urllib.request.urlopen(urllib.request.Request(url, headers=_UA), timeout=6) as r:
+        res = json.load(r)["chart"]["result"][0]
+    ts = res.get("timestamp") or []
+    closes = (res.get("indicators", {}).get("quote") or [{}])[0].get("close") or []
+    out = [(int(ts[i]), float(closes[i])) for i in range(min(len(ts), len(closes)))
+           if closes[i] is not None]
+    return out[-count:]
+
+
+def _ema(vals, period):
+    k = 2.0 / (period + 1)
+    e = vals[0]
+    for v in vals[1:]:
+        e = v * k + e * (1 - k)
+    return e
+
+
+def default_futures_strategies():
+    """One popular, followable built-in: 9/21 EMA crossover (trend)."""
+    return [
+        {"id": "ema921", "name": "9/21 EMA Crossover", "builtin": True, "enabled": False,
+         "symbol": "MNQ", "qty": 1,
+         "desc": ("Classic trend strategy. On the 1-minute chart, when the 9 EMA crosses "
+                  "ABOVE the 21 EMA it goes LONG; when the 9 EMA crosses BELOW the 21 EMA "
+                  "it goes SHORT. Manage the trade with the Take-Profit / Stop / Trailing "
+                  "stop you set in Configuration."),
+         "trigger": {"type": "ema_cross", "fast": 9, "slow": 21}},
+    ]
+
+
+def _coerce_fstrategy(st):
+    if not isinstance(st, dict):
+        return None
+    trig = st.get("trigger") or {}
+    fast = max(2, min(int(trig.get("fast") or 9), 50))
+    slow = max(fast + 1, min(int(trig.get("slow") or 21), 100))
+    return {
+        "id": str(st.get("id") or "s")[:40],
+        "name": str(st.get("name") or "Strategy")[:60],
+        "desc": str(st.get("desc") or "")[:400],
+        "enabled": bool(st.get("enabled")),
+        "builtin": bool(st.get("builtin")),
+        "symbol": st.get("symbol") if st.get("symbol") in FUT else "MNQ",
+        "qty": max(1, min(int(st.get("qty") or 1), MAX_CONTRACTS)),
+        "trigger": {"type": "ema_cross", "fast": fast, "slow": slow},
+    }
+
+
 class OrderRejected(Exception):
     pass
 
@@ -70,6 +122,56 @@ class BaseFuturesSession:
         self.blotter = []
         self.settings = dict(DEFAULT_SETTINGS)
         self.last_event = None
+        self.strategies = default_futures_strategies()
+        self._fired = set()   # (strategy_id, bar_ts) already entered on that bar
+
+    def update_strategies(self, strategies):
+        if not isinstance(strategies, list):
+            raise OrderRejected("strategies must be a list")
+        self.strategies = [c for c in (_coerce_fstrategy(s) for s in strategies) if c]
+        return self.strategies
+
+    def _strategy_side(self, st, sym):
+        """Return ('LONG'/'SHORT', bar_ts) on an EMA cross, else (None, bar_ts)."""
+        trig = st.get("trigger", {})
+        fast, slow = int(trig.get("fast", 9)), int(trig.get("slow", 21))
+        try:
+            bars = _closes(sym, slow * 3 + 5)
+        except Exception:
+            return (None, None)
+        if len(bars) < slow + 5:
+            return (None, None)
+        closes = [c for _, c in bars]
+        bar_ts = bars[-1][0]
+        f_cur, s_cur = _ema(closes, fast), _ema(closes, slow)
+        f_prev, s_prev = _ema(closes[:-1], fast), _ema(closes[:-1], slow)
+        if f_prev <= s_prev and f_cur > s_cur:
+            return ("LONG", bar_ts)
+        if f_prev >= s_prev and f_cur < s_cur:
+            return ("SHORT", bar_ts)
+        return (None, bar_ts)
+
+    def _eval_strategies(self):
+        if self.position is not None:
+            return
+        for st in self.strategies:
+            if not st.get("enabled"):
+                continue
+            sym = st.get("symbol") or "MNQ"
+            if sym not in FUT:
+                continue
+            side, bar_ts = self._strategy_side(st, sym)
+            if not side:
+                continue
+            if (st.get("id"), bar_ts) in self._fired:
+                continue
+            self._fired.add((st.get("id"), bar_ts))   # one entry per bar per strategy
+            try:
+                self.place(sym, side, int(st.get("qty", 1)))
+                self.last_event = f"STRATEGY «{st.get('name')}» — {side} {sym} on EMA cross"
+            except OrderRejected as e:
+                self.last_event = f"strategy «{st.get('name')}» blocked: {e}"
+            return
 
     def update_settings(self, new):
         s = self.settings
@@ -143,11 +245,13 @@ class BaseFuturesSession:
             raise OrderRejected("a position is already open — close it first")
 
     def state(self):
+        self._eval_strategies()   # fire any enabled strategy on an EMA cross
         ev, self.last_event = self.last_event, None
         return {"mode": self.mode, "account_id": self.account_id,
                 "buying_power": round(self.buying_power, 2),
                 "position": self.position, "day_realized": round(self.day_realized, 2),
-                "blotter": self.blotter[-20:], "settings": self.settings, "event": ev}
+                "blotter": self.blotter[-20:], "settings": self.settings,
+                "strategies": self.strategies, "event": ev}
 
 
 class PaperFuturesSession(BaseFuturesSession):
