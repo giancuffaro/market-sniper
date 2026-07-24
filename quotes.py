@@ -1,5 +1,5 @@
 """
-Live price feed for SPY / QQQ / SPX.
+Live price feed for SPY / QQQ / TSLA.
 
 Uses the public Yahoo Finance chart endpoint (keyless) via the standard
 library only — no extra dependencies. Results are cached for a few seconds
@@ -7,8 +7,8 @@ so rapid polling doesn't hammer the endpoint. If a fetch fails (offline,
 rate-limited, weekend), it falls back to the last known / seed value so the
 app never breaks.
 
-Note: SPX is the S&P 500 index, quoted here as ^GSPC. In LIVE trading, wire
-Webull's own market-data SDK instead for exchange-consistent option pricing.
+Note: TSLA replaced SPX here. In LIVE trading, wire Webull's own market-data
+SDK for exchange-consistent option pricing.
 """
 
 import json
@@ -16,10 +16,10 @@ import time
 import urllib.request
 
 # Webull symbol -> Yahoo symbol
-YSYM = {"SPY": "SPY", "QQQ": "QQQ", "SPX": "^GSPC"}
+YSYM = {"SPY": "SPY", "QQQ": "QQQ", "TSLA": "TSLA"}
 
 # seed fallbacks (only used if the very first fetch fails)
-_SEED = {"SPY": 626.40, "QQQ": 500.13, "SPX": 5601.20}
+_SEED = {"SPY": 626.40, "QQQ": 500.13, "TSLA": 330.00}
 
 _CACHE = {}            # sym -> {"price":..,"prev":..,"ts":..}
 _TTL = 5.0             # seconds

@@ -16,12 +16,13 @@ PREFERRED_ACCOUNT_TYPE = None   # "MARGIN"/"CASH" to skip the login picker
 # redirects to the futures app.
 FUTURES_ACCOUNT_SUFFIXES = ["3T0B"]
 
-# SPX stays disabled: it's an INDEX option and Webull's option-snapshot API
-# serves US stock/ETF options only (their docs). SPY/QQQ are the live pair.
+# SPY/QQQ are daily-0DTE ETFs. TSLA replaces SPX (an INDEX option Webull's
+# API can't serve): TSLA is a stock with tradable options, but its expirations
+# are WEEKLY (mostly Fridays), so the app targets the nearest Friday for it.
 SYMBOLS = {
-    "SPY": {"strike_step": 1.0, "style": "american", "settles": "shares", "enabled": True},
-    "QQQ": {"strike_step": 1.0, "style": "american", "settles": "shares", "enabled": True},
-    "SPX": {"strike_step": 5.0, "style": "european", "settles": "cash",   "enabled": False},
+    "SPY":  {"strike_step": 1.0, "style": "american", "settles": "shares", "enabled": True},
+    "QQQ":  {"strike_step": 1.0, "style": "american", "settles": "shares", "enabled": True},
+    "TSLA": {"strike_step": 2.5, "style": "american", "settles": "shares", "enabled": True},
 }
 
 def build_option_order(client_order_id, symbol, strike, expiration, option_type,

@@ -1,5 +1,5 @@
 """MARKET SNIPER — Webull session wrapper. v3.1
-(SPX now returns a clean explanation instead of raw API errors.)"""
+(Symbols: SPY/QQQ daily-0DTE, TSLA weekly via nearest-Friday expiry.)"""
 
 import os, uuid, math, random
 import datetime as dt
@@ -38,6 +38,16 @@ except Exception:
 
 def _today_expiry():
     return dt.date.today().isoformat()
+
+# SPY/QQQ have daily (0DTE) expirations; other symbols (e.g. TSLA) are weekly —
+# use the nearest Friday on/after today so live orders hit a real expiration.
+DAILY_EXPIRY = ("SPY", "QQQ")
+def _expiry_for(symbol):
+    today = dt.date.today()
+    if symbol in DAILY_EXPIRY:
+        return today.isoformat()
+    days = (4 - today.weekday()) % 7          # 4 = Friday
+    return (today + dt.timedelta(days=days)).isoformat()
 
 def occ_symbol(symbol, expiration, option_type, strike):
     d = expiration.replace("-", "")[2:]
@@ -398,7 +408,7 @@ class BaseSession:
 
 
 class PaperSession(BaseSession):
-    SPOTS = {"SPY": 626.40, "QQQ": 500.13, "SPX": 5601.20}
+    SPOTS = {"SPY": 626.40, "QQQ": 500.13, "TSLA": 330.00}
 
     def connect(self, app_key, app_secret, account_id=None):
         self.account_id = "PAPER-0000"
@@ -433,7 +443,7 @@ class PaperSession(BaseSession):
         if self._od is not None and config.SYMBOLS[symbol]["enabled"]:
             try:
                 a, b, m, _ = self._od.ask_bid_mark(
-                    occ_symbol(symbol, _today_expiry(), option_type, strike))
+                    occ_symbol(symbol, _expiry_for(symbol), option_type, strike))
                 ask = a or m
             except Exception:
                 ask = None
@@ -452,7 +462,7 @@ class PaperSession(BaseSession):
         self.buying_power -= cost
         self.position = {"symbol": symbol, "side": side, "qty": qty,
                          "strike": q["strike"], "option_type": q["option_type"],
-                         "expiration": _today_expiry(), "entry": q["ask"], "mark": q["ask"],
+                         "expiration": _expiry_for(symbol), "entry": q["ask"], "mark": q["ask"],
                          "opened_at": dt.datetime.now().strftime("%H:%M")}
         self._decorate_position(q)
         return self.position
@@ -661,8 +671,7 @@ class LiveSession(BaseSession):
     def quote(self, symbol, side):
         if not config.SYMBOLS.get(symbol, {}).get("enabled", False):
             raise OrderRejected(
-                f"{symbol} isn't tradable here — it's an INDEX option, and "
-                "Webull's API serves stock/ETF options only. Use SPY or QQQ.")
+                f"{symbol} isn't enabled for trading here. Use SPY, QQQ or TSLA.")
         if quotes is None:
             raise OrderRejected("price feed unavailable (quotes.py failed to load)")
         spot = quotes.get_price(symbol)["price"]
@@ -670,7 +679,7 @@ class LiveSession(BaseSession):
         strike = pick_strike(spot, side, step, self.settings["strike_mode"])
         option_type = "CALL" if side == "CALLS" else "PUT"
         a, b, m, row = self._od.ask_bid_mark(
-            occ_symbol(symbol, _today_expiry(), option_type, strike))
+            occ_symbol(symbol, _expiry_for(symbol), option_type, strike))
         if not a or a <= 0:
             raise OrderRejected(f"no ask in snapshot — response: {str(row)[:150]}")
         return {"symbol": symbol, "side": side, "spot": spot, "strike": strike,
@@ -682,7 +691,7 @@ class LiveSession(BaseSession):
         limit = buy_limit(q["ask"])
         orders = config.build_option_order(
             client_order_id=uuid.uuid4().hex[:32], symbol=symbol, strike=q["strike"],
-            expiration=_today_expiry(), option_type=q["option_type"], side="BUY",
+            expiration=_expiry_for(symbol), option_type=q["option_type"], side="BUY",
             quantity=qty, limit_price=limit)
         res = self.trade.order_v3.place_order(self.account_id, orders)
         body = {}
@@ -693,7 +702,7 @@ class LiveSession(BaseSession):
         if getattr(res, "status_code", None) != 200:
             raise OrderRejected(f"order rejected (HTTP {getattr(res,'status_code','?')}): {str(body)[:200]}")
         self.position = {"symbol": symbol, "side": side, "qty": qty, "strike": q["strike"],
-                         "option_type": q["option_type"], "expiration": _today_expiry(),
+                         "option_type": q["option_type"], "expiration": _expiry_for(symbol),
                          "entry": q["ask"], "mark": q["ask"],
                          "opened_at": dt.datetime.now().strftime("%H:%M"),
                          "client_order_id": orders[0]["client_order_id"],

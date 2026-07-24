@@ -180,6 +180,9 @@
   .strikeopts{display:flex;gap:8px}
   .strikeopts button{flex:1;border:1px solid var(--line);background:var(--panel2);color:var(--dim);border-radius:9px;padding:11px 4px;font-family:var(--ui);font-size:11.5px;font-weight:700;cursor:pointer;line-height:1.4}
   .strikeopts button.on{border-color:var(--green);background:var(--green-deep);color:var(--green)}
+  .risk{display:inline-block;margin-top:7px;font-size:9.5px;letter-spacing:.1em;padding:2px 7px;border-radius:6px;font-weight:700}
+  .risk.hi{color:var(--red);border:1px solid var(--red)}
+  .risk.lo{color:var(--green);border:1px solid var(--green)}
   .shint{color:var(--dimmer);font-size:11px;line-height:1.5;margin-top:8px}
   .sactions{display:flex;gap:10px;margin-top:6px}
   .sactions button{flex:1;border-radius:10px;padding:14px 0;font-family:var(--ui);font-weight:800;font-size:15px;cursor:pointer}
@@ -260,7 +263,7 @@
     <div class="prices" id="prices">
       <div class="pchip" data-s="SPY"><div class="s">SPY</div><div class="p">—</div><div class="c">—</div></div>
       <div class="pchip" data-s="QQQ"><div class="s">QQQ</div><div class="p">—</div><div class="c">—</div></div>
-      <div class="pchip" data-s="SPX"><div class="s">SPX</div><div class="p">—</div><div class="c">—</div></div>
+      <div class="pchip" data-s="TSLA"><div class="s">TSLA</div><div class="p">—</div><div class="c">—</div></div>
     </div>
 
     <div id="hero" class="hero">
@@ -291,7 +294,7 @@
     <div class="seg" id="seg">
       <button data-s="SPY">SPY</button>
       <button data-s="QQQ" class="on">QQQ</button>
-      <button data-s="SPX">SPX</button>
+      <button data-s="TSLA">TSLA</button>
     </div>
 
     <div class="row">
@@ -346,8 +349,8 @@
       <div class="sgroup">
         <div class="glbl">STRIKE SELECTION</div>
         <div class="strikeopts">
-          <button id="smOTM" onclick="EZ.setStrikeMode('OTM1')">1 STRIKE<br>OUT OF THE MONEY</button>
-          <button id="smITM" onclick="EZ.setStrikeMode('ITM1')">1 STRIKE<br>IN THE MONEY</button>
+          <button id="smOTM" onclick="EZ.setStrikeMode('OTM1')">1 STRIKE<br>OUT OF THE MONEY<br><span class="risk hi">MORE RISK</span></button>
+          <button id="smITM" onclick="EZ.setStrikeMode('ITM1')">1 STRIKE<br>IN THE MONEY<br><span class="risk lo">LESS RISK</span></button>
         </div>
         <div class="shint">QQQ at 755 buying a CALL: OTM picks the <b>756</b>; ITM picks the
         <b>754</b> (costs more, already has value). PUTS mirror this.</div>
@@ -619,7 +622,7 @@ const EZ = (function(){
   async function refreshPrices(){
     const d=await api('/api/prices');
     if(!d||d.error) return;
-    ['SPY','QQQ','SPX'].forEach(s=>{
+    ['SPY','QQQ','TSLA'].forEach(s=>{
       const q=d[s]; if(!q) return;
       const el=document.querySelector(`.pchip[data-s="${s}"]`); if(!el) return;
       const up=(q.change||0)>=0;
@@ -634,6 +637,17 @@ const EZ = (function(){
     if(inTrade) return;
     document.querySelectorAll('#seg button').forEach(x=>x.classList.remove('on'));
     b.classList.add('on'); sym=b.dataset.s; refreshQuote();
+  });
+  // Hotkeys: A=SPY  S=QQQ  D=TSLA  (ignored while typing or in a trade)
+  const HOTKEYS={a:'SPY',s:'QQQ',d:'TSLA'};
+  document.addEventListener('keydown',e=>{
+    const t=e.target;
+    if(t&&(t.tagName==='INPUT'||t.tagName==='TEXTAREA'||t.tagName==='SELECT'||t.isContentEditable)) return;
+    if(e.metaKey||e.ctrlKey||e.altKey) return;
+    const want=HOTKEYS[(e.key||'').toLowerCase()];
+    if(!want||inTrade) return;
+    const btn=[...document.querySelectorAll('#seg button')].find(b=>b.dataset.s===want);
+    if(btn){ e.preventDefault(); btn.click(); }
   });
   function step(d){ if(inTrade)return; qty=Math.max(1,qty+d); $('qty').textContent=qty; }
 
