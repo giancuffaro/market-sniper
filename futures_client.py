@@ -77,6 +77,76 @@ def _ema(vals, period):
     return e
 
 
+def _chart(sym, interval, rng):
+    """Raw Yahoo chart result dict for a symbol/interval/range."""
+    url = ("https://query1.finance.yahoo.com/v8/finance/chart/"
+           f"{urllib.request.quote(FUT[sym]['yahoo'])}?range={rng}&interval={interval}")
+    with urllib.request.urlopen(urllib.request.Request(url, headers=_UA), timeout=6) as r:
+        return json.load(r)["chart"]["result"][0]
+
+
+def _interval_closes(sym, interval, rng):
+    res = _chart(sym, interval, rng)
+    c = (res.get("indicators", {}).get("quote") or [{}])[0].get("close") or []
+    return [float(x) for x in c if x is not None]
+
+
+def session_vwap(sym):
+    """Session VWAP from 1-min bars, plus the latest bar (ts,high,low,close)."""
+    try:
+        res = _chart(sym, "1m", "1d")
+    except Exception:
+        return {}
+    ts = res.get("timestamp") or []
+    q = (res.get("indicators", {}).get("quote") or [{}])[0]
+    H, L, C, V = q.get("high") or [], q.get("low") or [], q.get("close") or [], q.get("volume") or []
+    try:
+        open_epoch = int(res["meta"]["currentTradingPeriod"]["regular"]["start"])
+    except Exception:
+        open_epoch = ts[0] if ts else 0
+    num = den = 0.0
+    last = None
+    for i, t in enumerate(ts):
+        if i >= len(V) or H[i] is None or L[i] is None or C[i] is None or V[i] is None:
+            continue
+        if t < open_epoch:
+            continue
+        tp = (H[i] + L[i] + C[i]) / 3.0
+        num += tp * V[i]; den += V[i]
+        last = (int(t), float(H[i]), float(L[i]), float(C[i]))
+    if den <= 0 or not last:
+        return {}
+    return {"vwap": round(num / den, 2), "bar": last}
+
+
+def _trend_from_closes(closes, fast=9, slow=21):
+    if len(closes) < slow + 1:
+        return "—"
+    f, s = _ema(closes, fast), _ema(closes, slow)
+    thr = closes[-1] * 0.0005    # ~0.05% dead-band = FLAT
+    if f - s > thr:
+        return "UP"
+    if f - s < -thr:
+        return "DOWN"
+    return "FLAT"
+
+
+# Timeframe -> (yahoo interval, range, group size to resample). 4h = four 60m bars.
+_TREND_TF = {"1m": ("1m", "1d", 1), "15m": ("15m", "5d", 1), "4h": ("60m", "1mo", 4)}
+
+def trend(sym):
+    out = {}
+    for tf, (interval, rng, group) in _TREND_TF.items():
+        try:
+            closes = _interval_closes(sym, interval, rng)
+            if group > 1 and closes:
+                closes = [closes[i] for i in range(len(closes) - 1, -1, -group)][::-1]
+            out[tf] = _trend_from_closes(closes)
+        except Exception:
+            out[tf] = "—"
+    return out
+
+
 def default_futures_strategies():
     """One popular, followable built-in: 9/21 EMA crossover (trend)."""
     return [
@@ -87,6 +157,13 @@ def default_futures_strategies():
                   "it goes SHORT. Manage the trade with the Take-Profit / Stop / Trailing "
                   "stop you set in Configuration."),
          "trigger": {"type": "ema_cross", "fast": 9, "slow": 21}},
+        {"id": "vwap_pb", "name": "VWAP Pullback", "builtin": True, "enabled": False,
+         "symbol": "MNQ", "qty": 1,
+         "desc": ("Trend + value entry. When price is ABOVE the session VWAP (uptrend) and "
+                  "pulls back to touch VWAP but closes back above it, goes LONG. When price is "
+                  "BELOW VWAP (downtrend) and rallies to touch it but closes back below, goes "
+                  "SHORT. VWAP is the volume-weighted average price from the session open."),
+         "trigger": {"type": "vwap_pullback", "band": 2.0}},
     ]
 
 
@@ -94,9 +171,8 @@ def _coerce_fstrategy(st):
     if not isinstance(st, dict):
         return None
     trig = st.get("trigger") or {}
-    fast = max(2, min(int(trig.get("fast") or 9), 50))
-    slow = max(fast + 1, min(int(trig.get("slow") or 21), 100))
-    return {
+    ttype = trig.get("type") if trig.get("type") in ("ema_cross", "vwap_pullback") else "ema_cross"
+    base = {
         "id": str(st.get("id") or "s")[:40],
         "name": str(st.get("name") or "Strategy")[:60],
         "desc": str(st.get("desc") or "")[:400],
@@ -104,8 +180,15 @@ def _coerce_fstrategy(st):
         "builtin": bool(st.get("builtin")),
         "symbol": st.get("symbol") if st.get("symbol") in FUT else "MNQ",
         "qty": max(1, min(int(st.get("qty") or 1), MAX_CONTRACTS)),
-        "trigger": {"type": "ema_cross", "fast": fast, "slow": slow},
     }
+    if ttype == "vwap_pullback":
+        band = float(trig.get("band") or 2.0)
+        base["trigger"] = {"type": "vwap_pullback", "band": max(0.25, min(band, 50.0))}
+    else:
+        fast = max(2, min(int(trig.get("fast") or 9), 50))
+        slow = max(fast + 1, min(int(trig.get("slow") or 21), 100))
+        base["trigger"] = {"type": "ema_cross", "fast": fast, "slow": slow}
+    return base
 
 
 class OrderRejected(Exception):
@@ -132,8 +215,19 @@ class BaseFuturesSession:
         return self.strategies
 
     def _strategy_side(self, st, sym):
-        """Return ('LONG'/'SHORT', bar_ts) on an EMA cross, else (None, bar_ts)."""
+        """Return ('LONG'/'SHORT', bar_ts) if the strategy fires, else (None, bar_ts)."""
         trig = st.get("trigger", {})
+        if trig.get("type") == "vwap_pullback":
+            data = session_vwap(sym)
+            if not data:
+                return (None, None)
+            vwap = data["vwap"]; ts, hi, lo, cl = data["bar"]
+            band = float(trig.get("band", 2.0))
+            if cl > vwap and lo <= vwap + band:      # uptrend, pulled back to VWAP, held above
+                return ("LONG", ts)
+            if cl < vwap and hi >= vwap - band:      # downtrend, rallied to VWAP, held below
+                return ("SHORT", ts)
+            return (None, ts)
         fast, slow = int(trig.get("fast", 9)), int(trig.get("slow", 21))
         try:
             bars = _closes(sym, slow * 3 + 5)
@@ -168,7 +262,9 @@ class BaseFuturesSession:
             self._fired.add((st.get("id"), bar_ts))   # one entry per bar per strategy
             try:
                 self.place(sym, side, int(st.get("qty", 1)))
-                self.last_event = f"STRATEGY «{st.get('name')}» — {side} {sym} on EMA cross"
+                reason = ("VWAP pullback" if st.get("trigger", {}).get("type") == "vwap_pullback"
+                          else "EMA cross")
+                self.last_event = f"STRATEGY «{st.get('name')}» — {side} {sym} ({reason})"
             except OrderRejected as e:
                 self.last_event = f"strategy «{st.get('name')}» blocked: {e}"
             return

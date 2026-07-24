@@ -67,6 +67,16 @@
   .pchip .p{font-size:18.5px;font-weight:700;margin-top:2px}
   .pchip .c{font-size:11.5px;color:var(--dim)}
   .pchip.up .c{color:var(--green)}.pchip.dn .c{color:var(--red)}
+  .trendbar{display:flex;align-items:center;gap:10px;border:1px solid var(--line);border-radius:10px;
+            background:var(--panel);padding:9px 12px;margin-top:10px;flex-wrap:wrap}
+  .trendbar .tlbl{color:var(--dim);font-size:11px;letter-spacing:.12em}
+  .trendbar .tlbl b{color:var(--blue)}
+  .tcell{display:inline-flex;align-items:center;gap:6px;margin-left:2px}
+  .tcell .ttf{color:var(--dim);font-size:10.5px;letter-spacing:.08em}
+  .tcell .tarr{font-size:14px;font-weight:800}
+  .tcell.up .tarr{color:var(--green)} .tcell.up .ttf{color:var(--green)}
+  .tcell.dn .tarr{color:var(--red)} .tcell.dn .ttf{color:var(--red)}
+  .tcell.flat .tarr{color:var(--amber)} .tcell.flat .ttf{color:var(--amber)}
   .hero{border:1px solid var(--line);border-radius:14px;background:var(--panel);padding:22px;text-align:center;margin-bottom:14px}
   .hero .big{font-size:46px;font-weight:800;letter-spacing:.08em;color:var(--dim)}
   .hero .sub{color:var(--dim);font-size:12.5px;letter-spacing:.16em;margin-top:10px;text-transform:uppercase}
@@ -178,6 +188,13 @@
       <div class="pchip" data-s="MES"><div class="s">MES</div><div class="p">—</div><div class="c">—</div></div>
     </div>
 
+    <div class="trendbar" id="trendBar">
+      <span class="tlbl">TREND <b id="trendSym">MNQ</b></span>
+      <span class="tcell" id="tf4h"><span class="ttf">4H</span><span class="tarr">·</span></span>
+      <span class="tcell" id="tf15m"><span class="ttf">15M</span><span class="tarr">·</span></span>
+      <span class="tcell" id="tf1m"><span class="ttf">1M</span><span class="tarr">·</span></span>
+    </div>
+
     <div id="hero" class="hero">
       <div id="heroBig" class="big">FLAT</div>
       <div id="heroSub" class="sub">No open position</div>
@@ -263,9 +280,9 @@
 
       <div id="paneStrat" class="pane" hidden>
         <div id="stratList"></div>
-        <div class="shint">Just one strategy for now. When enabled, it runs automatically while the
-        futures app is open, opening ONE trade per signal and managing it with your Take-Profit /
-        Stop / Trailing stop above. Test in PAPER first.</div>
+        <div class="shint">Enable any of these and they run automatically while the futures app is
+        open — each opens ONE trade per signal and manages it with your Take-Profit / Stop /
+        Trailing stop above. You can run more than one at a time. Test in PAPER first.</div>
       </div>
 
       <div class="sactions">
@@ -279,7 +296,7 @@
 <script>
 const FZ = (function(){
   const LSS="ezfut_settings", LST="ezexec_theme", LSST="ezfut_strategies";
-  let mode="PAPER", sym="MNQ", qty=1, inTrade=false, poll=null, priceTimer=null;
+  let mode="PAPER", sym="MNQ", qty=1, inTrade=false, poll=null, priceTimer=null, trendTimer=null;
   let settings={tp_enabled:false,tp_points:10,sl_enabled:false,sl_points:5,trail_enabled:false,trail_points:5};
   const $=id=>document.getElementById(id);
   const api=(p,b)=>fetch(p,{method:b?'POST':'GET',headers:{'Content-Type':'application/json'},
@@ -306,12 +323,26 @@ const FZ = (function(){
     $('connectScreen').classList.add('hidden'); $('dash').classList.remove('hidden');
     $('modePill').textContent=mode;
     $('footMode').textContent = mode==='PAPER' ? '◦ PAPER — SIMULATED FILLS · LIVE PRICES ◦' : '● LIVE ●';
-    render(r); refreshPrices();
+    render(r); refreshPrices(); refreshTrend();
     api('/api/settings',settings);
     syncStrategies();
     poll=setInterval(tick,1000);
     priceTimer=setInterval(refreshPrices,5000);
+    trendTimer=setInterval(refreshTrend,20000);
   };
+
+  function trendCell(id,val){
+    const el=$(id); if(!el) return;
+    el.className='tcell '+(val==='UP'?'up':val==='DOWN'?'dn':val==='FLAT'?'flat':'');
+    el.querySelector('.tarr').textContent = val==='UP'?'▲':val==='DOWN'?'▼':val==='FLAT'?'▬':'·';
+  }
+  async function refreshTrend(){
+    try{
+      const r=await api('/api/trend?symbol='+sym);
+      $('trendSym').textContent=sym;
+      trendCell('tf4h',r.trend['4h']); trendCell('tf15m',r.trend['15m']); trendCell('tf1m',r.trend['1m']);
+    }catch(e){}
+  }
 
   async function refreshPrices(){
     const d=await api('/api/prices');
@@ -330,7 +361,7 @@ const FZ = (function(){
   document.querySelectorAll('#seg button').forEach(b=>b.onclick=()=>{
     if(inTrade) return;
     document.querySelectorAll('#seg button').forEach(x=>x.classList.remove('on'));
-    b.classList.add('on'); sym=b.dataset.s; refreshPrices();
+    b.classList.add('on'); sym=b.dataset.s; refreshPrices(); refreshTrend();
   });
   function step(d){ if(inTrade)return; qty=Math.max(1,qty+d); $('qty').textContent=qty; }
 
@@ -393,9 +424,17 @@ const FZ = (function(){
   // ---- Strategies (futures) --------------------------------------------
   let strategies=[];
   function defaultStrategies(){
-    return [{id:"ema921",name:"9/21 EMA Crossover",builtin:true,enabled:false,symbol:"MNQ",qty:1,
-      desc:"Classic trend strategy. On the 1-minute chart, when the 9 EMA crosses ABOVE the 21 EMA it goes LONG; when the 9 EMA crosses BELOW the 21 EMA it goes SHORT. Managed by your Take-Profit / Stop / Trailing stop.",
-      trigger:{type:"ema_cross",fast:9,slow:21}}];
+    return [
+      {id:"ema921",name:"9/21 EMA Crossover",builtin:true,enabled:false,symbol:"MNQ",qty:1,
+       desc:"Classic trend strategy. On the 1-minute chart, when the 9 EMA crosses ABOVE the 21 EMA it goes LONG; when the 9 EMA crosses BELOW the 21 EMA it goes SHORT. Managed by your Take-Profit / Stop / Trailing stop.",
+       trigger:{type:"ema_cross",fast:9,slow:21}},
+      {id:"vwap_pb",name:"VWAP Pullback",builtin:true,enabled:false,symbol:"MNQ",qty:1,
+       desc:"Trend + value entry. When price is ABOVE the session VWAP and pulls back to touch it but closes back above, goes LONG. When price is BELOW VWAP and rallies to touch it but closes back below, goes SHORT. VWAP is the volume-weighted average price from the session open.",
+       trigger:{type:"vwap_pullback",band:2.0}},
+    ];
+  }
+  function trigTag(s){
+    return s.trigger.type==='vwap_pullback' ? 'session VWAP pullback' : '1-min · 9/21 EMA cross';
   }
   function loadStrategies(){
     try{ strategies=JSON.parse(localStorage.getItem(LSST)||"null")||defaultStrategies(); }
@@ -415,7 +454,7 @@ const FZ = (function(){
             <option ${s.symbol==='MES'?'selected':''}>MES</option></select></div>
         <div class="srow2" style="margin-top:8px"><label>CONTRACTS</label>
           <input type="number" min="1" value="${s.qty}" onchange="FZ.setStrategyField('${s.id}','qty',this.value)"></div>
-        <span class="stag">1-min · 9/21 EMA cross · ×${s.qty}</span>
+        <span class="stag">${trigTag(s)} · ×${s.qty}</span>
       </div>`).join('');
   }
   function showTab(t){
@@ -459,7 +498,7 @@ const FZ = (function(){
 
   async function back(){
     if(inTrade && !confirm('You have an OPEN position. Leave anyway?')) return;
-    await api('/api/disconnect',{}); clearInterval(poll); clearInterval(priceTimer); location.reload();
+    await api('/api/disconnect',{}); clearInterval(poll); clearInterval(priceTimer); clearInterval(trendTimer); location.reload();
   }
 
   return {step,open,close,back,toggleTheme,setTheme,openSettings,closeSettings,saveSettings,hideEvent,hideReject,
