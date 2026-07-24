@@ -55,6 +55,8 @@
   .err{color:var(--red);font-size:14px;margin-top:12px;min-height:16px}
   .note{color:var(--dimmer);font-size:11.5px;line-height:1.6;margin-top:16px}
   .themebtn,.setbtn{border:1px solid var(--line);border-radius:6px;padding:3px 9px;color:var(--dim);font-size:11px;cursor:pointer;background:var(--panel)}
+  .quitbtn{border:1px solid var(--red);color:var(--red);background:transparent;border-radius:7px;padding:2px 9px;font-size:14px;font-weight:800;cursor:pointer;line-height:1.3}
+  .quitbtn:hover{background:var(--red);color:#fff}
   .top{display:flex;align-items:center;justify-content:space-between;padding:16px 6px 12px;font-size:12.5px}
   .brand{display:flex;align-items:center;gap:8px;font-weight:700;letter-spacing:.12em}
   .backbtn{border:1px solid var(--line);background:var(--panel);color:var(--dim);border-radius:8px;width:30px;height:30px;font-size:18.5px;cursor:pointer}
@@ -208,6 +210,7 @@
         <span class="setbtn" onclick="FZ.openSettings()">CONFIGURATION</span>
         <div class="theme-dots" role="group" aria-label="Theme color"><button class="tdot tdot-white" data-set="light" onclick="FZ.setTheme('light')" aria-label="White theme"></button><button class="tdot tdot-gray" data-set="gray" onclick="FZ.setTheme('gray')" aria-label="Gray theme"></button><button class="tdot tdot-black" data-set="dark" onclick="FZ.setTheme('dark')" aria-label="Black theme"></button></div>
         <span class="setbtn" onclick="FZ.back()">🔒</span>
+        <span class="quitbtn" title="Shut down the app" onclick="FZ.quitApp()">✕</span>
       </div>
     </div>
 
@@ -547,6 +550,21 @@ const FZ = (function(){
   }
   loadStrategies();
 
+  // ---- Quit / shut down -------------------------------------------------
+  async function quitApp(){
+    if(inTrade && !confirm('You have an OPEN position. Shut the app down anyway?')) return;
+    if(!inTrade && !confirm('Shut the app down completely?')) return;
+    try{ clearInterval(poll); clearInterval(priceTimer); clearInterval(trendTimer); }catch(e){}
+    try{ await fetch('/api/shutdown',{method:'POST'}); }catch(e){}
+    // also stop the sibling app (options on 8000) so everything closes
+    try{ await fetch('http://127.0.0.1:8000/api/shutdown',{method:'POST'}); }catch(e){}
+    document.body.innerHTML='<div style="padding:60px 24px;text-align:center;font-family:var(--ui);color:var(--dim)">'
+      +'<div style="font-size:40px;color:var(--red)">✕</div><h2 style="letter-spacing:.1em">APP SHUT DOWN</h2>'
+      +'<p>Everything is closed. You can close this tab.</p></div>';
+    try{ window.close(); }catch(e){}
+    setTimeout(()=>{ try{ window.open('','_self'); window.close(); }catch(e){} }, 150);
+  }
+
   // ---- Historical data upload ------------------------------------------
   async function refreshDataStatus(){
     const el=$('dataStatus'); if(!el) return;
@@ -642,7 +660,7 @@ const FZ = (function(){
   }
 
   return {step,open,close,back,toggleTheme,setTheme,openSettings,closeSettings,saveSettings,hideEvent,hideReject,
-          showTab,toggleStrategy,setStrategyField,backtestStrategy,closeBacktest,uploadData};
+          showTab,toggleStrategy,setStrategyField,backtestStrategy,closeBacktest,uploadData,quitApp};
 })();
 </script>
 </body>

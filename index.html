@@ -98,6 +98,8 @@
   .modepill.PAPER{color:var(--green);border-color:var(--green)}
   .modepill.LIVE{color:var(--amber);border-color:var(--amber)}
   .setbtn{border:1px solid var(--line);border-radius:6px;padding:3px 9px;color:var(--dim);font-size:11px;cursor:pointer}
+  .quitbtn{border:1px solid var(--red);color:var(--red);background:transparent;border-radius:7px;padding:2px 9px;font-size:14px;font-weight:800;cursor:pointer;line-height:1.3}
+  .quitbtn:hover{background:var(--red);color:#fff}
   .setbtn:hover{color:var(--txt)}
   .prices{display:flex;gap:8px;margin-bottom:12px}
   .pchip{flex:1;border:1px solid var(--line);border-radius:10px;background:var(--panel);padding:9px 8px;text-align:center}
@@ -272,6 +274,7 @@
         <span class="setbtn" onclick="EZ.openSettings()">CONFIGURATION</span>
         <div class="theme-dots" role="group" aria-label="Theme color"><button class="tdot tdot-white" data-set="light" onclick="EZ.setTheme('light')" aria-label="White theme"></button><button class="tdot tdot-gray" data-set="gray" onclick="EZ.setTheme('gray')" aria-label="Gray theme"></button><button class="tdot tdot-black" data-set="dark" onclick="EZ.setTheme('dark')" aria-label="Black theme"></button></div>
         <span class="setbtn" title="lock now" onclick="EZ.lockNow()">LOCK</span>
+        <span class="quitbtn" title="Shut down the app" onclick="EZ.quitApp()">✕</span>
       </div>
     </div>
 
@@ -920,8 +923,21 @@ const EZ = (function(){
     localStorage.removeItem(LSP); localStorage.removeItem(LSPA); localStorage.removeItem(LSK);
     await api('/api/disconnect',{}); clearInterval(poll); clearInterval(priceTimer); location.reload();
   }
+  async function quitApp(){
+    if(inTrade && !confirm('You have an OPEN position. Shut the app down anyway?')) return;
+    if(!inTrade && !confirm('Shut the app down completely?')) return;
+    try{ clearInterval(poll); clearInterval(priceTimer); }catch(e){}
+    try{ await fetch('/api/shutdown',{method:'POST'}); }catch(e){}
+    // also stop the sibling futures app (8010) so everything closes
+    try{ await fetch('http://127.0.0.1:8010/api/shutdown',{method:'POST'}); }catch(e){}
+    document.body.innerHTML='<div style="padding:60px 24px;text-align:center;font-family:var(--ui);color:var(--dim)">'
+      +'<div style="font-size:40px;color:var(--red)">✕</div><h2 style="letter-spacing:.1em">APP SHUT DOWN</h2>'
+      +'<p>Everything is closed. You can close this tab.</p></div>';
+    try{ window.close(); }catch(e){}
+    setTimeout(()=>{ try{ window.open('','_self'); window.close(); }catch(e){} }, 150);
+  }
 
-  return {step,buy,close,disarm,hideReject,disconnect,switchAccount,toggleTheme,setTheme,lockNow,
+  return {step,buy,close,disarm,hideReject,disconnect,quitApp,switchAccount,toggleTheme,setTheme,lockNow,
           openSettings,closeSettings,saveSettings,setStrikeMode,hideEvent,tpUnitChanged,
           mirrorToggle,selectProfile,saveProfile,deleteProfile,pickAccount,
           showTab,toggleStrategy,newStrategy,editStrategy,saveStrategy,deleteStrategy,cancelStrategyEdit,stTypeChanged};

@@ -254,6 +254,15 @@ def disconnect():
     MIRROR["s"], MIRROR["name"] = None, None
     return {"ok": True}
 
+@app.post("/api/shutdown")
+def shutdown():
+    import threading, time
+    def _die():
+        time.sleep(0.4)
+        os._exit(0)
+    threading.Thread(target=_die, daemon=True).start()
+    return {"ok": True}
+
 
 if __name__ == "__main__":
     import uvicorn
