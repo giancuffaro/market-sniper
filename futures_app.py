@@ -24,6 +24,8 @@ class ConnectReq(BaseModel):
     app_key: str = ""
     app_secret: str = ""
     mode: str = "PAPER"
+    account: str = ""
+    incoming_folder: str = ""
 
 class OrderReq(BaseModel):
     symbol: str
@@ -64,7 +66,8 @@ def connect(req: ConnectReq):
         raise HTTPException(400, "mode must be PAPER or LIVE")
     s = fc.make_session(req.mode)
     try:
-        state = s.connect(req.app_key.strip(), req.app_secret.strip())
+        state = s.connect(req.app_key.strip(), req.app_secret.strip(),
+                          req.account.strip(), req.incoming_folder.strip())
     except fc.OrderRejected as e:
         raise HTTPException(400, str(e))
     SESSION["s"] = s

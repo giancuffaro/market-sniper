@@ -175,14 +175,25 @@
     </div>
     <div class="modes" id="modes">
       <button data-m="PAPER" class="on">PAPER</button>
-      <button data-m="LIVE">LIVE</button>
+      <button data-m="LIVE">NINJATRADER</button>
     </div>
+
+    <div id="ntConfig" style="display:none">
+      <div class="srow"><label style="min-width:78px">ACCOUNT</label>
+        <input id="ntAccount" type="text" value="Sim101" placeholder="Sim101" style="font-size:14px"></div>
+      <div class="srow" style="margin-top:8px"><label style="min-width:78px">INCOMING</label>
+        <input id="ntFolder" type="text" placeholder="leave blank = Documents\NinjaTrader 8\incoming" style="font-size:12px"></div>
+      <div class="note" style="color:var(--amber)">⚠ NinjaTrader mode sends REAL orders via its ATI. Start with
+      <b>Sim101</b> (NinjaTrader's built-in simulator) to test safely — switch to your live account name only
+      once you trust it. NinjaTrader must be running with the ATI enabled, and orders are fire-and-forget
+      (watch NinjaTrader to confirm fills).</div>
+    </div>
+
     <button class="go" id="connectBtn">START</button>
     <div class="err" id="connectErr"></div>
-    <div class="note">PAPER futures is fully working with live prices — no keys needed, just hit START.
-    LIVE futures needs futures approval + CME data on your Webull account and is not wired yet;
-    it will tell you exactly that if you try. This app is completely separate from the options app
-    (runs on its own port, 8010).</div>
+    <div class="note" id="ntNote">PAPER futures is fully working with live prices — no keys needed, just hit START.
+    NINJATRADER routes real orders to your NinjaTrader platform over its ATI (start on Sim101).
+    Separate from the options app (runs on its own port, 8010).</div>
   </div>
 
   <div id="dash" class="app hidden">
@@ -355,15 +366,18 @@ const FZ = (function(){
   document.querySelectorAll('#modes button').forEach(b=>b.onclick=()=>{
     mode=b.dataset.m;
     document.querySelectorAll('#modes button').forEach(x=>x.classList.toggle('on',x===b));
+    $('ntConfig').style.display = mode==='LIVE' ? 'block' : 'none';
   });
 
   $('connectBtn').onclick=async()=>{
     $('connectErr').textContent='';
-    const r=await api('/api/connect',{app_key:'',app_secret:'',mode});
+    const body={app_key:'',app_secret:'',mode};
+    if(mode==='LIVE'){ body.account=$('ntAccount').value.trim()||'Sim101'; body.incoming_folder=$('ntFolder').value.trim(); }
+    const r=await api('/api/connect',body);
     if(r.detail){ $('connectErr').textContent=r.detail; return; }
     $('connectScreen').classList.add('hidden'); $('dash').classList.remove('hidden');
-    $('modePill').textContent=mode;
-    $('footMode').textContent = mode==='PAPER' ? '◦ PAPER — SIMULATED FILLS · LIVE PRICES ◦' : '● LIVE ●';
+    $('modePill').textContent = mode==='PAPER' ? 'PAPER' : 'NINJA';
+    $('footMode').textContent = mode==='PAPER' ? '◦ PAPER — SIMULATED FILLS · LIVE PRICES ◦' : ('● NINJATRADER · '+(r.account_id||'')+' — REAL ORDERS ●');
     render(r); refreshPrices(); refreshTrend();
     api('/api/settings',settings);
     syncStrategies();

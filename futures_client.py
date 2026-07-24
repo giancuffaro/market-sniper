@@ -615,7 +615,7 @@ class BaseFuturesSession:
 
 
 class PaperFuturesSession(BaseFuturesSession):
-    def connect(self, app_key, app_secret):
+    def connect(self, app_key, app_secret, account=None, incoming_folder=None):
         self.account_id = "FUT-PAPER"
         self.buying_power = 5000.00
         return self.state()
@@ -660,15 +660,82 @@ class PaperFuturesSession(BaseFuturesSession):
         return {"closed": True, "pnl": pnl}
 
 
-class LiveFuturesSession(BaseFuturesSession):
-    def connect(self, app_key, app_secret):
-        raise OrderRejected(
-            "FUTURES LIVE is not wired yet — it needs: futures approval on your "
-            "Webull account, the CME OpenAPI data subscription ($228/mo), and "
-            "the futures order format confirmed. PAPER futures is fully working "
-            "meanwhile — hit PAPER + START. Ask Claude to wire LIVE when you "
-            "have futures approval + CME data.")
+class NinjaTraderSession(BaseFuturesSession):
+    """Routes real orders to NinjaTrader 8 via its ATI Order Instruction Files.
+    One-way (fire-and-forget): it drops oif*.txt into the 'incoming' folder and
+    NinjaTrader executes them. Position/P&L here are the app's own estimate from
+    the live price feed — always confirm fills in NinjaTrader itself."""
+
+    def __init__(self, mode="LIVE"):
+        super().__init__(mode)
+        self.account = "Sim101"
+        self.folder = None
+        self._oif_n = 0
+
+    def connect(self, app_key, app_secret, account=None, incoming_folder=None):
+        self.account = (account or "Sim101").strip() or "Sim101"
+        folder = (incoming_folder or "").strip() or \
+            os.path.expanduser("~/Documents/NinjaTrader 8/incoming")
+        if not os.path.isdir(folder):
+            raise OrderRejected(
+                "Couldn't find NinjaTrader's 'incoming' folder at:\n" + folder +
+                "\n\nMake sure NinjaTrader 8 is running, then either create that folder or "
+                "type the exact path (it's inside your Documents\\NinjaTrader 8 folder).")
+        self.folder = folder
+        self.account_id = "NT:" + self.account
+        self.buying_power = 0.0
+        return self.state()
+
+    def _write_oif(self, text):
+        self._oif_n += 1
+        name = "oif_ms_%d_%d.txt" % (int(time.time() * 1000), self._oif_n)
+        with open(os.path.join(self.folder, name), "w") as fh:
+            fh.write(text.strip() + "\n")
+
+    def place(self, symbol, side, qty):
+        self._guard_open(qty)
+        if symbol not in FUT:
+            raise OrderRejected("unknown symbol")
+        action = "BUY" if side == "LONG" else "SELL"
+        self._write_oif("PLACE;%s;%s;%s;%d;MARKET;;;DAY" % (self.account, symbol, action, int(qty)))
+        px = get_price(symbol)["price"]
+        self.position = {"symbol": symbol, "side": side, "qty": int(qty),
+                         "entry": px, "mark": px,
+                         "opened_at": dt.datetime.now().strftime("%H:%M")}
+        self._update_trail()
+        self.last_event = "SENT to NinjaTrader (%s): %s %d %s MARKET" % (self.account, action, int(qty), symbol)
+        return self.position
+
+    def refresh_mark(self):
+        p = self.position
+        self._eval_strategies()
+        p = self.position
+        if not p:
+            return None
+        p["mark"] = get_price(p["symbol"])["price"]
+        pv = FUT[p["symbol"]]["point_value"]
+        p["pnl"] = round(self._points_pnl() * pv * p["qty"], 2)
+        p["points"] = round(self._points_pnl(), 2)
+        self._update_trail()
+        self._maybe_auto_close()
+        return self.position
+
+    def close(self):
+        if not self.position:
+            raise OrderRejected("no open position to close")
+        p = self.position
+        self._write_oif("CLOSEPOSITION;%s;%s;;;;;;;;;;;" % (self.account, p["symbol"]))
+        pv = FUT[p["symbol"]]["point_value"]
+        pnl = round(self._points_pnl() * pv * p["qty"], 2)
+        self.day_realized += pnl
+        self.buying_power += pnl
+        self.blotter.append({"time": p["opened_at"],
+                             "desc": "%s %s x%d (NT)" % (p["symbol"], p["side"], p["qty"]),
+                             "move": "%.2f -> %.2f" % (p["entry"], p["mark"]), "pnl": pnl})
+        self.position = None
+        self.last_event = "SENT to NinjaTrader: CLOSE %s" % p["symbol"]
+        return {"closed": True, "pnl": pnl}
 
 
 def make_session(mode):
-    return PaperFuturesSession(mode) if mode == "PAPER" else LiveFuturesSession(mode)
+    return PaperFuturesSession(mode) if mode == "PAPER" else NinjaTraderSession(mode)
