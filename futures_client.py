@@ -140,7 +140,7 @@ _TREND_BASES = {
 }
 # (timeframe key, base key, group size). e.g. 3m = three 1-min bars.
 _TREND_TFS = [
-    ("1m", "b1m", 1), ("2m", "b1m", 2), ("3m", "b1m", 3),
+    ("1m", "b1m", 1),
     ("5m", "b5m", 1), ("10m", "b5m", 2), ("15m", "b5m", 3),
     ("20m", "b5m", 4), ("30m", "b5m", 6),
     ("1h", "b60m", 1), ("2h", "b60m", 2), ("4h", "b60m", 4),

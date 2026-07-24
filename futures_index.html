@@ -331,7 +331,7 @@ const FZ = (function(){
     trendTimer=setInterval(refreshTrend,20000);
   };
 
-  const TF_LIST=[['1m','1m'],['2m','2m'],['3m','3m'],['5m','5m'],['10m','10m'],['15m','15m'],
+  const TF_LIST=[['1m','1m'],['5m','5m'],['10m','10m'],['15m','15m'],
                  ['20m','20m'],['30m','30m'],['1h','1H'],['2h','2H'],['4h','4H'],['1d','D'],['1w','W']];
   function renderTrend(tr){
     const el=$('trendCells'); if(!el) return;
