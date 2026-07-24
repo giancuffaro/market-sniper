@@ -131,19 +131,35 @@ def _trend_from_closes(closes, fast=9, slow=21):
     return "FLAT"
 
 
-# Timeframe -> (yahoo interval, range, group size to resample). 4h = four 60m bars.
-_TREND_TF = {"1m": ("1m", "1d", 1), "15m": ("15m", "5d", 1), "4h": ("60m", "1mo", 4)}
+# Base series fetched once each; higher timeframes are resampled from them.
+_TREND_BASES = {
+    "b1m":  ("1m", "1d"),
+    "b5m":  ("5m", "5d"),
+    "b60m": ("60m", "1mo"),
+    "b1d":  ("1d", "1y"),
+}
+# (timeframe key, base key, group size). e.g. 3m = three 1-min bars.
+_TREND_TFS = [
+    ("1m", "b1m", 1), ("2m", "b1m", 2), ("3m", "b1m", 3),
+    ("5m", "b5m", 1), ("10m", "b5m", 2), ("15m", "b5m", 3),
+    ("20m", "b5m", 4), ("30m", "b5m", 6),
+    ("1h", "b60m", 1), ("2h", "b60m", 2), ("4h", "b60m", 4),
+    ("1d", "b1d", 1), ("1w", "b1d", 5),
+]
 
 def trend(sym):
-    out = {}
-    for tf, (interval, rng, group) in _TREND_TF.items():
+    bases = {}
+    for key, (interval, rng) in _TREND_BASES.items():
         try:
-            closes = _interval_closes(sym, interval, rng)
-            if group > 1 and closes:
-                closes = [closes[i] for i in range(len(closes) - 1, -1, -group)][::-1]
-            out[tf] = _trend_from_closes(closes)
+            bases[key] = _interval_closes(sym, interval, rng)
         except Exception:
-            out[tf] = "—"
+            bases[key] = []
+    out = {}
+    for tf, bkey, group in _TREND_TFS:
+        closes = bases.get(bkey) or []
+        if group > 1 and closes:
+            closes = [closes[i] for i in range(len(closes) - 1, -1, -group)][::-1]
+        out[tf] = _trend_from_closes(closes) if closes else "—"
     return out
 
 

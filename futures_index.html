@@ -67,15 +67,17 @@
   .pchip .p{font-size:18.5px;font-weight:700;margin-top:2px}
   .pchip .c{font-size:11.5px;color:var(--dim)}
   .pchip.up .c{color:var(--green)}.pchip.dn .c{color:var(--red)}
-  .trendbar{display:flex;align-items:center;gap:10px;border:1px solid var(--line);border-radius:10px;
-            background:var(--panel);padding:9px 12px;margin-top:10px;flex-wrap:wrap}
+  .trendbar{border:1px solid var(--line);border-radius:10px;background:var(--panel);padding:10px 12px;margin-top:10px}
   .trendbar .tlbl{color:var(--dim);font-size:11px;letter-spacing:.12em}
   .trendbar .tlbl b{color:var(--blue)}
-  .tcell{display:inline-flex;align-items:center;gap:6px;margin-left:2px}
-  .tcell .ttf{color:var(--dim);font-size:10.5px;letter-spacing:.08em}
-  .tcell .tarr{font-size:14px;font-weight:800}
-  .tcell.up .tarr{color:var(--green)} .tcell.up .ttf{color:var(--green)}
-  .tcell.dn .tarr{color:var(--red)} .tcell.dn .ttf{color:var(--red)}
+  .trendbar .tmeta{color:var(--dimmer);font-size:9.5px;letter-spacing:.06em}
+  .tcells{display:flex;flex-wrap:wrap;gap:7px 9px;margin-top:9px}
+  .tcell{display:inline-flex;align-items:center;gap:4px;border:1px solid var(--line);border-radius:7px;
+         padding:4px 7px;background:var(--panel2);min-width:44px;justify-content:center}
+  .tcell .ttf{color:var(--dim);font-size:10px;letter-spacing:.04em;font-weight:600}
+  .tcell .tarr{font-size:12px;font-weight:800;color:var(--dimmer)}
+  .tcell.up{border-color:var(--green)} .tcell.up .tarr{color:var(--green)} .tcell.up .ttf{color:var(--green)}
+  .tcell.dn{border-color:var(--red)} .tcell.dn .tarr{color:var(--red)} .tcell.dn .ttf{color:var(--red)}
   .tcell.flat .tarr{color:var(--amber)} .tcell.flat .ttf{color:var(--amber)}
   .hero{border:1px solid var(--line);border-radius:14px;background:var(--panel);padding:22px;text-align:center;margin-bottom:14px}
   .hero .big{font-size:46px;font-weight:800;letter-spacing:.08em;color:var(--dim)}
@@ -189,10 +191,8 @@
     </div>
 
     <div class="trendbar" id="trendBar">
-      <span class="tlbl">TREND <b id="trendSym">MNQ</b></span>
-      <span class="tcell" id="tf4h"><span class="ttf">4H</span><span class="tarr">·</span></span>
-      <span class="tcell" id="tf15m"><span class="ttf">15M</span><span class="tarr">·</span></span>
-      <span class="tcell" id="tf1m"><span class="ttf">1M</span><span class="tarr">·</span></span>
+      <div class="tlbl">TREND <b id="trendSym">MNQ</b> <span class="tmeta">· multi-timeframe · live</span></div>
+      <div id="trendCells" class="tcells"></div>
     </div>
 
     <div id="hero" class="hero">
@@ -331,18 +331,24 @@ const FZ = (function(){
     trendTimer=setInterval(refreshTrend,20000);
   };
 
-  function trendCell(id,val){
-    const el=$(id); if(!el) return;
-    el.className='tcell '+(val==='UP'?'up':val==='DOWN'?'dn':val==='FLAT'?'flat':'');
-    el.querySelector('.tarr').textContent = val==='UP'?'▲':val==='DOWN'?'▼':val==='FLAT'?'▬':'·';
+  const TF_LIST=[['1m','1m'],['2m','2m'],['3m','3m'],['5m','5m'],['10m','10m'],['15m','15m'],
+                 ['20m','20m'],['30m','30m'],['1h','1H'],['2h','2H'],['4h','4H'],['1d','D'],['1w','W']];
+  function renderTrend(tr){
+    const el=$('trendCells'); if(!el) return;
+    el.innerHTML = TF_LIST.map(([k,lbl])=>{
+      const v=(tr&&tr[k])||'—';
+      const cls=v==='UP'?'up':v==='DOWN'?'dn':v==='FLAT'?'flat':'';
+      const arr=v==='UP'?'▲':v==='DOWN'?'▼':v==='FLAT'?'▬':'·';
+      return `<span class="tcell ${cls}"><span class="ttf">${lbl}</span><span class="tarr">${arr}</span></span>`;
+    }).join('');
   }
   async function refreshTrend(){
     try{
       const r=await api('/api/trend?symbol='+sym);
-      $('trendSym').textContent=sym;
-      trendCell('tf4h',r.trend['4h']); trendCell('tf15m',r.trend['15m']); trendCell('tf1m',r.trend['1m']);
+      $('trendSym').textContent=sym; renderTrend(r.trend);
     }catch(e){}
   }
+  renderTrend(null);
 
   async function refreshPrices(){
     const d=await api('/api/prices');
