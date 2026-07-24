@@ -62,4 +62,8 @@ DEFAULT_SETTINGS = {
     "strike_mode": "OTM1",
     "tp_enabled": False, "tp_value": 30.0, "tp_unit": "cents",
     "sl_enabled": False, "sl_value": 20.0, "sl_unit": "cents",
+    # MY CONFIG — round-number armed entry, +$1 whole-number TP, 10% stop.
+    "my_enabled": False,
 }
+# Auto-applied bracket when a MY CONFIG armed entry fires.
+MY_CONFIG_SL_PCT = 10.0

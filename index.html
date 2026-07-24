@@ -6,7 +6,7 @@
 <title>MARKET SNIPER</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=Space+Grotesk:wght@400;500;600;700&display=swap" rel="stylesheet">
 <style>
   :root{
     --bg:#0c0e0d;--panel:#111413;--panel2:#161a18;--line:#242a27;
@@ -158,6 +158,17 @@
   .smodal{width:100%;max-width:380px;border:1px solid var(--line);border-radius:16px;background:var(--panel);padding:24px 20px;max-height:90vh;overflow-y:auto}
   .smodal h2{margin:0 0 16px;font-size:15px;letter-spacing:.2em;color:var(--txt);text-align:center}
   .sgroup{border:1px solid var(--line);border-radius:12px;padding:14px;margin-bottom:12px}
+  /* MY CONFIG — deliberately a different typeface so you know it's yours */
+  .myfont{font-family:'Space Grotesk','Inter',sans-serif}
+  .sgroup.mine{border:1.5px solid var(--green);background:var(--green-deep)}
+  .sgroup.mine .glbl{color:var(--green);letter-spacing:.14em}
+  .sgroup.mine .shint{color:var(--txt);opacity:.85}
+  .armband{border:1.5px solid var(--amber);border-radius:12px;padding:12px 14px;margin:10px 0;
+           background:var(--red-deep);display:flex;align-items:center;justify-content:space-between;gap:10px}
+  .armband .at{font-family:'Space Grotesk','Inter',sans-serif;color:var(--amber);font-weight:700}
+  .armband .as{color:var(--dim);font-size:11px;margin-top:3px}
+  .armband button{border:1px solid var(--line);background:var(--panel2);color:var(--txt);
+           border-radius:8px;padding:8px 12px;font-family:var(--ui);font-size:11px;font-weight:700;cursor:pointer;white-space:nowrap}
   .sgroup .glbl{color:var(--dim);font-size:11.5px;letter-spacing:.16em;margin-bottom:10px}
   .srow{display:flex;align-items:center;gap:10px;margin-top:8px}
   .srow input[type=number]{flex:1;background:var(--panel2);border:1px solid var(--line);border-radius:8px;color:var(--txt);font-family:var(--ui);font-size:16px;padding:10px;outline:none;min-width:0}
@@ -257,6 +268,11 @@
       <div id="heroSub" class="sub">No open position</div>
     </div>
 
+    <div id="armBand" class="armband hidden">
+      <div><div class="at myfont" id="armTitle">ARMED</div><div class="as" id="armSub"></div></div>
+      <button onclick="EZ.disarm()">CANCEL</button>
+    </div>
+
     <div id="pnlBlock" class="pnl hidden">
       <div><span id="pnlN" class="n">+$0.00</span><span id="pnlPct" class="pct">+0%</span></div>
       <div class="spot" id="pnlSpot"></div>
@@ -315,6 +331,17 @@
   <div id="setScrim" class="scrim">
     <div class="smodal">
       <h2>CONFIGURATION</h2>
+
+      <div class="sgroup mine myfont">
+        <div class="glbl">★ MY CONFIG — round-number entry</div>
+        <div class="srow">
+          <label class="tog"><input type="checkbox" id="myEnabled"> USE MY CONFIG</label>
+        </div>
+        <div class="shint myfont">When ON, <b>BUY</b> arms instead of firing: it waits for the
+        underlying to reach the nearest whole dollar, then buys the ask. Auto-sets a
+        <b>+$1</b> take-profit (next whole number) and a <b>10%</b> stop. Overrides the TP/SL
+        below while enabled.</div>
+      </div>
 
       <div class="sgroup">
         <div class="glbl">STRIKE SELECTION</div>
@@ -391,7 +418,7 @@ const EZ = (function(){
   let mode="LIVE", sym="QQQ", side="CALLS", qty=1, inTrade=false, poll=null, priceTimer=null;
   let profiles=[], activeProf=null, mirrorOn=false;
   let settings={strike_mode:"OTM1",tp_enabled:false,tp_value:30,tp_unit:"cents",
-                sl_enabled:false,sl_value:20,sl_unit:"cents"};
+                sl_enabled:false,sl_value:20,sl_unit:"cents",my_enabled:false};
   let autolock={enabled:false,minutes:10}, lastActivity=Date.now();
   const $=id=>document.getElementById(id);
   const api=(p,b)=>fetch(p,{method:b?'POST':'GET',headers:{'Content-Type':'application/json'},
@@ -526,6 +553,7 @@ const EZ = (function(){
   function openSettings(){
     $('smOTM').classList.toggle('on',settings.strike_mode==='OTM1');
     $('smITM').classList.toggle('on',settings.strike_mode==='ITM1');
+    $('myEnabled').checked=!!settings.my_enabled;
     $('tpEnabled').checked=settings.tp_enabled; $('tpValue').value=settings.tp_value; $('tpUnit').value=settings.tp_unit;
     $('slEnabled').checked=settings.sl_enabled; $('slValue').value=settings.sl_value; $('slUnit').value=settings.sl_unit;
     $('alEnabled').checked=autolock.enabled; $('alMinutes').value=autolock.minutes;
@@ -547,6 +575,7 @@ const EZ = (function(){
   }
   function closeSettings(){ $('setScrim').classList.remove('show'); }
   async function saveSettings(){
+    settings.my_enabled=$('myEnabled').checked;
     settings.tp_enabled=$('tpEnabled').checked;
     settings.tp_value=parseFloat($('tpValue').value)||settings.tp_value;
     settings.tp_unit=$('tpUnit').value;
@@ -621,11 +650,23 @@ const EZ = (function(){
 
   async function buy(s){
     side=s;
+    if(settings.my_enabled){
+      const r=await api('/api/order/arm',{symbol:sym,side:s,qty});
+      if(!r.ok && r.rejected){ showReject(r.reason); return; }
+      hideReject();
+      showEvent('ARMED · MY CONFIG — waiting for '+sym+' to reach '+Number(r.target).toFixed(0)+', then buys the ask');
+      await tick(); return;
+    }
     const r=await api('/api/order/place',{symbol:sym,side:s,qty});
     if(!r.ok && r.rejected){ showReject(r.reason); return; }
     if(r.detail){ showReject(r.detail); return; }
     if(r.mirror_ok===false) showEvent('mirror order FAILED: '+(r.mirror_reason||'?')+' — main trade still open');
     inTrade=true; hideReject(); await tick();
+  }
+  async function disarm(){
+    await api('/api/order/disarm',{});
+    showEvent('MY CONFIG entry cancelled');
+    await tick();
   }
   async function close(){
     const r=await api('/api/order/close',{});
@@ -656,6 +697,14 @@ const EZ = (function(){
 
     const pos=st.position; inTrade=!!pos;
     document.querySelectorAll('#seg button').forEach(b=>b.disabled=inTrade);
+    const armed=st.armed;
+    if(armed && !pos){
+      $('armBand').classList.remove('hidden');
+      $('armTitle').textContent='ARMED · MY CONFIG';
+      $('armSub').textContent='waiting for '+armed.symbol+' → '+Number(armed.target).toFixed(0)+' · then '+armed.side+' at ask';
+    }else{
+      $('armBand').classList.add('hidden');
+    }
     if(pos){
       const strike=pos.strike|0, typ=(pos.side==='CALLS'?'C':'P');
       $('flatActions').classList.add('hidden'); $('tradeActions').classList.remove('hidden'); $('pnlBlock').classList.remove('hidden');
@@ -684,7 +733,9 @@ const EZ = (function(){
       $('hero').className='hero in'+(pnl<0?' loss':'');
     }else{
       $('flatActions').classList.remove('hidden'); $('tradeActions').classList.add('hidden'); $('pnlBlock').classList.add('hidden');
-      $('heroBig').textContent='FLAT'; $('heroSub').textContent='No open position'; $('hero').className='hero';
+      if(armed){ $('heroBig').textContent='ARMED'; $('heroSub').textContent=armed.symbol+' → '+Number(armed.target).toFixed(0)+' · '+armed.side+' at ask'; }
+      else { $('heroBig').textContent='FLAT'; $('heroSub').textContent='No open position'; }
+      $('hero').className='hero';
     }
   }
 
@@ -706,7 +757,7 @@ const EZ = (function(){
     await api('/api/disconnect',{}); clearInterval(poll); clearInterval(priceTimer); location.reload();
   }
 
-  return {step,buy,close,hideReject,disconnect,switchAccount,toggleTheme,setTheme,lockNow,
+  return {step,buy,close,disarm,hideReject,disconnect,switchAccount,toggleTheme,setTheme,lockNow,
           openSettings,closeSettings,saveSettings,setStrikeMode,hideEvent,tpUnitChanged,
           mirrorToggle,selectProfile,saveProfile,deleteProfile,pickAccount};
 })();

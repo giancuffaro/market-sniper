@@ -235,6 +235,7 @@ class BaseSession:
         self.blotter = []
         self.settings = dict(config.DEFAULT_SETTINGS)
         self.last_event = None
+        self.armed = None   # MY CONFIG pending round-number entry
 
     def update_settings(self, new):
         s = self.settings
@@ -242,9 +243,10 @@ class BaseSession:
             s["strike_mode"] = new["strike_mode"]
         if "tp_enabled" in new: s["tp_enabled"] = bool(new["tp_enabled"])
         if "sl_enabled" in new: s["sl_enabled"] = bool(new["sl_enabled"])
+        if "my_enabled" in new: s["my_enabled"] = bool(new["my_enabled"])
         if "tp_unit" in new and new["tp_unit"] in ("cents", "usd", "whole"):
             s["tp_unit"] = new["tp_unit"]
-        if "sl_unit" in new and new["sl_unit"] in ("cents", "usd", "price"):
+        if "sl_unit" in new and new["sl_unit"] in ("cents", "usd", "price", "pct"):
             s["sl_unit"] = new["sl_unit"]
         for k in ("tp_value", "sl_value"):
             if k in new:
@@ -275,6 +277,8 @@ class BaseSession:
             u, l = s["sl_unit"], s["sl_value"]
             if u == "cents" and move_cents <= -l: return "SL"
             if u == "usd" and pnl_usd <= -l: return "SL"
+            if u == "pct" and p["entry"] > 0:
+                if (p["mark"] - p["entry"]) / p["entry"] * 100.0 <= -l: return "SL"
             if u == "price" and spot is not None:
                 if (is_call and spot <= l) or (not is_call and spot >= l):
                     return "SL"
@@ -294,6 +298,66 @@ class BaseSession:
                                f"position closed {sign}${abs(pnl):.2f}")
         except OrderRejected as e:
             self.last_event = f"{hit} hit but close blocked: {e}"
+
+    # ---- MY CONFIG: round-number armed entry -------------------------------
+    def _underlying(self, symbol):
+        """Best available underlying price: sim spot in PAPER, live feed otherwise."""
+        if hasattr(self, "_spot"):
+            try:
+                return float(self._spot(symbol))
+            except Exception:
+                pass
+        try:
+            import quotes
+            return float(quotes.get_price(symbol)["price"])
+        except Exception:
+            return None
+
+    def arm(self, symbol, side, qty):
+        """Arm a MY CONFIG entry: wait for the underlying to reach the nearest
+        whole dollar, then buy the ask. Auto-sets +$1 (next-whole) TP and 10% SL."""
+        qty = int(qty)
+        self._guard_open(qty)               # hours / max-contracts / no open pos
+        spot = self._underlying(symbol)
+        if spot is None:
+            raise OrderRejected("no underlying price available to arm the entry")
+        target = float(round(spot))         # closest round number
+        s = self.settings
+        s["my_enabled"] = True
+        s["tp_enabled"] = True; s["tp_unit"] = "whole"
+        s["sl_enabled"] = True; s["sl_unit"] = "pct"; s["sl_value"] = config.MY_CONFIG_SL_PCT
+        self.armed = {"symbol": symbol, "side": side, "qty": qty,
+                      "target": target, "spot_at_arm": round(spot, 2)}
+        return dict(self.armed)
+
+    def disarm(self):
+        self.armed = None
+        return {"armed": None}
+
+    def _maybe_trigger_entry(self):
+        a = self.armed
+        if not a or self.position is not None:
+            return
+        spot = self._underlying(a["symbol"])
+        if spot is None:
+            return
+        reached = (spot <= a["target"]) if a["side"] == "CALLS" else (spot >= a["target"])
+        if not reached:
+            return
+        self.armed = None                   # clear first so we never double-fire
+        try:
+            self.place(a["symbol"], a["side"], a["qty"])
+            p = self.position
+            if p:
+                # Anchor TP to the ROUND NUMBER (+$1 up for calls, −$1 for puts),
+                # not the noisy fill price — that's the whole point of MY CONFIG.
+                p["entry_round"] = a["target"]
+                p["tp_spot"] = a["target"] + 1.0 if a["side"] == "CALLS" else a["target"] - 1.0
+            self.last_event = (f"ENTRY TRIGGERED — {a['symbol']} reached "
+                               f"{a['target']:.0f}, bought {a['side']} at the ask "
+                               f"(TP {p['tp_spot']:.0f} · 10% stop)")
+        except OrderRejected as e:
+            self.last_event = f"MY CONFIG entry blocked at {a['target']:.0f}: {e}"
 
     def _decorate_position(self, q):
         p = self.position
@@ -323,11 +387,12 @@ class BaseSession:
             check_market_hours("CLOSE")
 
     def state(self):
+        self._maybe_trigger_entry()   # fire armed MY CONFIG entry if price reached
         ev, self.last_event = self.last_event, None
         return {"mode": self.mode, "account_id": self.account_id,
                 "account_type": self.account_type,
                 "buying_power": round(self.buying_power, 2),
-                "position": self.position,
+                "position": self.position, "armed": self.armed,
                 "day_realized": round(self.day_realized, 2),
                 "blotter": self.blotter[-20:], "settings": self.settings, "event": ev}
 

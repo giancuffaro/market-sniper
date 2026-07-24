@@ -45,6 +45,11 @@ class OrderReq(BaseModel):
     side: str
     qty: int
 
+class ArmReq(BaseModel):
+    symbol: str
+    side: str
+    qty: int
+
 class SettingsReq(BaseModel):
     strike_mode: Optional[str] = None
     tp_enabled: Optional[bool] = None
@@ -53,6 +58,7 @@ class SettingsReq(BaseModel):
     sl_enabled: Optional[bool] = None
     sl_value: Optional[float] = None
     sl_unit: Optional[str] = None
+    my_enabled: Optional[bool] = None
 
 
 def _sess():
@@ -175,6 +181,21 @@ def place(req: OrderReq):
             out["mirror_ok"] = False
             out["mirror_reason"] = str(e)[:180]
     return out
+
+@app.post("/api/order/arm")
+def arm(req: ArmReq):
+    try:
+        armed = _sess().arm(req.symbol, req.side, int(req.qty))
+    except wb.OrderRejected as e:
+        return JSONResponse({"ok": False, "rejected": True, "reason": str(e)})
+    except Exception as e:
+        return JSONResponse({"ok": False, "rejected": True,
+                             "reason": f"{type(e).__name__}: {str(e)[:200]}"})
+    return {"ok": True, "armed": armed, **armed}
+
+@app.post("/api/order/disarm")
+def disarm():
+    return {"ok": True, **_sess().disarm()}
 
 @app.post("/api/order/close")
 def close():
