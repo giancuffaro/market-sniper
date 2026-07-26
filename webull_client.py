@@ -287,7 +287,14 @@ class OptionData:
                     continue
                 except Exception as e:
                     errors.append(f"{name}(kw): {str(e)[:150]}")
-        raise OrderRejected("option snapshot failed — " + " | ".join(errors[:3]))
+        joined = " | ".join(errors[:3])
+        if "INVALID_SYMBOL" in joined or "Invalid Symbol" in joined:
+            raise OrderRejected(
+                "No option contract found for that expiration. Usually this means the "
+                "market is closed (weekend/holiday) so there's no same-day (0DTE) contract "
+                "yet — try during market hours on a trading day.")
+        raise OrderRejected("Couldn't load the option quote from Webull right now. Try again in a "
+                            "moment; if it keeps failing, the market may be closed. (" + joined[:150] + ")")
 
     def ask_bid_mark(self, occ):
         row = self.snapshot_row(occ)
