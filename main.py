@@ -103,7 +103,13 @@ def connect(req: ConnectReq):
     except wb.OrderRejected as e:
         raise HTTPException(400, str(e))
     except Exception as e:
-        raise HTTPException(400, f"connect failed: {type(e).__name__}: {str(e)[:200]}")
+        msg = str(e)
+        low = msg.lower()
+        if "x-signature" in low or "unauthorized" in low or "401" in low or "signature" in low:
+            raise HTTPException(400, "Keys rejected — your API key & secret don't match "
+                                     "(or they're mistyped). Re-copy BOTH from Webull. If they're "
+                                     "correct, check your PC clock is set to sync automatically.")
+        raise HTTPException(400, f"connect failed: {type(e).__name__}: {msg[:200]}")
     SESSION["s"] = s
     return state
 
