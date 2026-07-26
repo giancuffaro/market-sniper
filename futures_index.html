@@ -577,18 +577,23 @@ const FZ = (function(){
       }).join('<br>');
     }catch(e){}
   }
-  async function uploadData(){
+  function uploadData(){
     const f=$('dataFile').files[0];
     if(!f){ showEvent('pick a CSV file first'); return; }
     const sym=$('dataSym').value;
-    const fd=new FormData(); fd.append('symbol',sym); fd.append('file',f);
     $('dataStatus').innerHTML='<span style="color:var(--dim)">uploading & parsing '+sym+'…</span>';
-    try{
-      const r=await fetch('/api/upload_data',{method:'POST',body:fd}).then(x=>x.json());
-      if(r.detail){ showEvent('upload failed: '+r.detail); }
-      else showEvent(sym+' data loaded — '+Number(r.bars).toLocaleString()+' bars ('+r.from+'→'+r.to+')');
-    }catch(e){ showEvent('upload failed'); }
-    refreshDataStatus();
+    const reader=new FileReader();
+    reader.onload=async()=>{
+      const b64=String(reader.result).split(',')[1]||'';
+      try{
+        const r=await api('/api/upload_data',{symbol:sym,content_b64:b64});
+        if(r.detail){ showEvent('upload failed: '+r.detail); }
+        else showEvent(sym+' data loaded — '+Number(r.bars).toLocaleString()+' bars ('+r.from+'→'+r.to+')');
+      }catch(e){ showEvent('upload failed'); }
+      refreshDataStatus();
+    };
+    reader.onerror=()=>showEvent('could not read that file');
+    reader.readAsDataURL(f);
   }
 
   // ---- Backtest ---------------------------------------------------------

@@ -2,7 +2,6 @@
 fastapi>=0.110
 uvicorn[standard]>=0.29
 pydantic>=2.0
-python-multipart>=0.0.9
 
 # Live prices (quotes.py) use only the Python standard library — no package needed.
 

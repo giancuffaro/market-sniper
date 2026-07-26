@@ -8,23 +8,11 @@ import os
 import pathlib
 from typing import Optional
 
-from fastapi import FastAPI, HTTPException, UploadFile, File, Form
+from fastapi import FastAPI, HTTPException
 from fastapi.responses import HTMLResponse, JSONResponse
 from pydantic import BaseModel
 
 import futures_client as fc
-
-# CSV upload needs python-multipart. If it's missing, the app must still boot —
-# so we only register the multipart upload route when it's available.
-try:
-    import multipart  # noqa: F401  (python-multipart)
-    HAS_MULTIPART = True
-except Exception:
-    try:
-        import python_multipart  # noqa: F401
-        HAS_MULTIPART = True
-    except Exception:
-        HAS_MULTIPART = False
 
 app = FastAPI(title="MARKET SNIPER FUTURES")
 SESSION = {"s": None}
@@ -128,19 +116,21 @@ def backtest(req: BacktestReq):
 def data_status():
     return fc.data_status()
 
-if HAS_MULTIPART:
-    @app.post("/api/upload_data")
-    async def upload_data(symbol: str = Form(...), file: UploadFile = File(...)):
-        raw = await file.read()
-        try:
-            return {"ok": True, **fc.save_uploaded(symbol, raw)}
-        except fc.OrderRejected as e:
-            raise HTTPException(400, str(e))
-else:
-    @app.post("/api/upload_data")
-    async def upload_data_unavailable():
-        raise HTTPException(400, "CSV upload needs the python-multipart package. "
-                                 "Close the app and run:  pip install python-multipart")
+class UploadReq(BaseModel):
+    symbol: str
+    content_b64: str = ""
+
+@app.post("/api/upload_data")
+def upload_data(req: UploadReq):
+    import base64
+    try:
+        raw = base64.b64decode(req.content_b64)
+    except Exception:
+        raise HTTPException(400, "Couldn't read that file — make sure it's the CSV you exported.")
+    try:
+        return {"ok": True, **fc.save_uploaded(req.symbol, raw)}
+    except fc.OrderRejected as e:
+        raise HTTPException(400, str(e))
 
 @app.get("/api/trend")
 def trend(symbol: str = "MNQ"):
