@@ -36,18 +36,39 @@ except Exception:
     DataClient = None
 
 
-def _today_expiry():
-    return dt.date.today().isoformat()
+# NYSE holidays — extend yearly. Weekends are handled separately.
+_HOLIDAYS = {
+    "2026-01-01", "2026-01-19", "2026-02-16", "2026-04-03", "2026-05-25",
+    "2026-06-19", "2026-07-03", "2026-09-07", "2026-11-26", "2026-12-25",
+    "2027-01-01", "2027-01-18", "2027-02-15", "2027-03-26", "2027-05-31",
+    "2027-06-18", "2027-07-05", "2027-09-06", "2027-11-25", "2027-12-24",
+}
 
-# SPY/QQQ have daily (0DTE) expirations; other symbols (e.g. TSLA) are weekly —
-# use the nearest Friday on/after today so live orders hit a real expiration.
+def _is_trading_day(d):
+    return d.weekday() < 5 and d.isoformat() not in _HOLIDAYS
+
+def _next_trading_day(d):
+    for _ in range(12):
+        if _is_trading_day(d):
+            return d
+        d += dt.timedelta(days=1)
+    return d
+
+def _today_expiry():
+    return _next_trading_day(dt.date.today()).isoformat()
+
+# SPY/QQQ have daily (0DTE) expirations; other symbols (e.g. TSLA) are weekly.
+# Never return a weekend/holiday — those OCC symbols don't exist (INVALID_SYMBOL).
 DAILY_EXPIRY = ("SPY", "QQQ")
 def _expiry_for(symbol):
     today = dt.date.today()
     if symbol in DAILY_EXPIRY:
-        return today.isoformat()
+        return _next_trading_day(today).isoformat()
     days = (4 - today.weekday()) % 7          # 4 = Friday
-    return (today + dt.timedelta(days=days)).isoformat()
+    fri = today + dt.timedelta(days=days)
+    while not _is_trading_day(fri):           # holiday Friday -> Thursday expiry
+        fri -= dt.timedelta(days=1)
+    return fri.isoformat()
 
 def occ_symbol(symbol, expiration, option_type, strike):
     d = expiration.replace("-", "")[2:]
