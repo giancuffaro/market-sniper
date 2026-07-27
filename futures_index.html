@@ -177,7 +177,26 @@
     </div>
     <div class="modes" id="modes">
       <button data-m="PAPER" class="on">PAPER</button>
-      <button data-m="LIVE">NINJATRADER</button>
+      <button data-m="LIVE">NINJA</button>
+      <button data-m="TRADOVATE">TRADOVATE</button>
+    </div>
+
+    <div id="tvConfig" style="display:none">
+      <div class="srow"><label style="min-width:82px">USERNAME</label>
+        <input id="tvUser" type="text" placeholder="Tradovate username" style="font-size:14px"></div>
+      <div class="srow" style="margin-top:8px"><label style="min-width:82px">PASSWORD</label>
+        <input id="tvPass" type="password" placeholder="Tradovate password" style="font-size:14px"></div>
+      <div class="srow" style="margin-top:8px"><label style="min-width:82px">API KEY</label>
+        <input id="tvKey" type="text" placeholder="API Key (cid)" style="font-size:13px"></div>
+      <div class="srow" style="margin-top:8px"><label style="min-width:82px">API SECRET</label>
+        <input id="tvSec" type="password" placeholder="API Secret" style="font-size:13px"></div>
+      <div class="srow" style="margin-top:8px"><label style="min-width:82px">MODE</label>
+        <select id="tvEnv" style="flex:1;background:var(--panel2);border:1px solid var(--line);border-radius:8px;color:var(--txt);font-family:var(--ui);font-size:14px;padding:9px">
+          <option value="demo">DEMO (paper — safe)</option>
+          <option value="live">LIVE (real money)</option>
+        </select></div>
+      <div class="note" style="color:var(--amber)">⚠ Needs Tradovate <b>API access</b> enabled + an API Key/Secret
+      (from Tradovate's API management). Start on <b>DEMO</b>. LIVE = real orders, filled instantly.</div>
     </div>
 
     <div id="ntConfig" style="display:none">
@@ -370,17 +389,23 @@ const FZ = (function(){
     mode=b.dataset.m;
     document.querySelectorAll('#modes button').forEach(x=>x.classList.toggle('on',x===b));
     $('ntConfig').style.display = mode==='LIVE' ? 'block' : 'none';
+    $('tvConfig').style.display = mode==='TRADOVATE' ? 'block' : 'none';
   });
 
   $('connectBtn').onclick=async()=>{
     $('connectErr').textContent='';
     const body={app_key:'',app_secret:'',mode};
     if(mode==='LIVE'){ body.account=$('ntAccount').value.trim()||'Sim101'; body.incoming_folder=$('ntFolder').value.trim(); }
+    if(mode==='TRADOVATE'){ body.tv_user=$('tvUser').value.trim(); body.tv_pass=$('tvPass').value;
+      body.tv_key=$('tvKey').value.trim(); body.tv_sec=$('tvSec').value.trim(); body.tv_env=$('tvEnv').value; }
+    $('connectBtn').textContent='CONNECTING…';
     const r=await api('/api/connect',body);
+    $('connectBtn').textContent='START';
     if(r.detail){ $('connectErr').textContent=r.detail; return; }
     $('connectScreen').classList.add('hidden'); $('dash').classList.remove('hidden');
-    $('modePill').textContent = mode==='PAPER' ? 'PAPER' : 'NINJA';
-    $('footMode').textContent = mode==='PAPER' ? '◦ PAPER — SIMULATED FILLS · LIVE PRICES ◦' : ('● NINJATRADER · '+(r.account_id||'')+' — REAL ORDERS ●');
+    $('modePill').textContent = mode==='PAPER' ? 'PAPER' : (mode==='TRADOVATE' ? 'TRADOVATE' : 'NINJA');
+    $('footMode').textContent = mode==='PAPER' ? '◦ PAPER — SIMULATED FILLS · LIVE PRICES ◦'
+      : ('● '+(r.account_id||mode)+' — REAL ORDERS ●');
     render(r); refreshPrices(); refreshTrend();
     api('/api/settings',settings);
     syncStrategies();

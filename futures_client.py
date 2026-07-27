@@ -16,6 +16,7 @@ import math
 import random
 import datetime as dt
 import urllib.request
+import urllib.error
 
 FUT = {
     "MNQ": {"yahoo": "NQ=F", "tick": 0.25, "point_value": 2.0, "seed": 23150.0},
@@ -737,5 +738,127 @@ class NinjaTraderSession(BaseFuturesSession):
         return {"closed": True, "pnl": pnl}
 
 
+_TV_BASE = {"demo": "https://demo.tradovateapi.com/v1",
+            "live": "https://live.tradovateapi.com/v1"}
+_MONTH_CODE = {3: "H", 6: "M", 9: "U", 12: "Z"}
+
+def _tv_front_symbol(sym):
+    """Nearest quarterly contract in Tradovate style, e.g. MNQM6 (June 2026)."""
+    today = dt.date.today()
+    y, m = today.year, today.month
+    for qm in (3, 6, 9, 12):
+        if qm > m or (qm == m and today.day < 12):   # roll ~mid expiry month
+            return "%s%s%d" % (sym, _MONTH_CODE[qm], y % 10)
+    return "%s%s%d" % (sym, _MONTH_CODE[3], (y + 1) % 10)
+
+def _tv_req(env, path, token=None, body=None, method="GET"):
+    url = _TV_BASE[env] + path
+    data = json.dumps(body).encode() if body is not None else None
+    headers = {"Content-Type": "application/json", "Accept": "application/json"}
+    if token:
+        headers["Authorization"] = "Bearer " + token
+    req = urllib.request.Request(url, data=data, headers=headers, method=method)
+    with urllib.request.urlopen(req, timeout=15) as r:
+        return json.load(r)
+
+
+class TradovateSession(BaseFuturesSession):
+    """Real order routing to Tradovate over its REST API (demo or live)."""
+
+    def __init__(self, mode="TRADOVATE"):
+        super().__init__(mode)
+        self.env = "demo"; self.token = None
+        self.acct_id = None; self.acct_spec = None
+
+    def connect(self, name, password, cid, sec, env="demo"):
+        self.env = "live" if env == "live" else "demo"
+        body = {"name": (name or "").strip(), "password": password or "",
+                "appId": "MarketSniper", "appVersion": "1.0",
+                "cid": (cid or "").strip(), "sec": (sec or "").strip()}
+        try:
+            res = _tv_req(self.env, "/auth/accesstokenrequest", body=body, method="POST")
+        except urllib.error.HTTPError as e:
+            raise OrderRejected("Tradovate login failed (%s). Check username/password and that "
+                                "your API Key + Secret are correct." % e.code)
+        except Exception as e:
+            raise OrderRejected("Couldn't reach Tradovate: " + str(e)[:120])
+        if not res.get("accessToken"):
+            raise OrderRejected("Tradovate login rejected: " +
+                                str(res.get("errorText") or "check your credentials / API access")[:150])
+        self.token = res["accessToken"]
+        try:
+            accts = _tv_req(self.env, "/account/list", token=self.token)
+        except Exception:
+            accts = []
+        if not accts:
+            raise OrderRejected("Logged in, but no Tradovate accounts were returned. Make sure your "
+                                "account is funded/approved and API access is enabled.")
+        a = accts[0]
+        self.acct_id = a.get("id")
+        self.acct_spec = a.get("name") or a.get("nickname")
+        self.account_id = "TV:%s (%s)" % (self.acct_spec, self.env)
+        self.buying_power = 0.0
+        return self.state()
+
+    def _order(self, symbol, action, qty):
+        body = {"accountSpec": self.acct_spec, "accountId": self.acct_id,
+                "action": action, "symbol": _tv_front_symbol(symbol),
+                "orderQty": int(qty), "orderType": "Market", "isAutomated": True}
+        try:
+            res = _tv_req(self.env, "/order/placeorder", token=self.token, body=body, method="POST")
+        except urllib.error.HTTPError as e:
+            raise OrderRejected("Tradovate order rejected (%s)." % e.code)
+        except Exception as e:
+            raise OrderRejected("Tradovate order failed: " + str(e)[:120])
+        if res.get("failureReason") or res.get("failureText"):
+            raise OrderRejected("Tradovate: " + str(res.get("failureText") or res.get("failureReason")))
+        return body["symbol"]
+
+    def place(self, symbol, side, qty):
+        self._guard_open(qty)
+        if symbol not in FUT:
+            raise OrderRejected("unknown symbol")
+        contract = self._order(symbol, "Buy" if side == "LONG" else "Sell", qty)
+        px = get_price(symbol)["price"]
+        self.position = {"symbol": symbol, "side": side, "qty": int(qty), "entry": px, "mark": px,
+                         "opened_at": dt.datetime.now().strftime("%H:%M"), "contract": contract}
+        self._update_trail()
+        self.last_event = "Tradovate (%s): %s %d %s MARKET" % (
+            self.env, "BUY" if side == "LONG" else "SELL", int(qty), contract)
+        return self.position
+
+    def refresh_mark(self):
+        self._eval_strategies()
+        p = self.position
+        if not p:
+            return None
+        p["mark"] = get_price(p["symbol"])["price"]
+        pv = FUT[p["symbol"]]["point_value"]
+        p["pnl"] = round(self._points_pnl() * pv * p["qty"], 2)
+        p["points"] = round(self._points_pnl(), 2)
+        self._update_trail()
+        self._maybe_auto_close()
+        return self.position
+
+    def close(self):
+        if not self.position:
+            raise OrderRejected("no open position to close")
+        p = self.position
+        self._order(p["symbol"], "Sell" if p["side"] == "LONG" else "Buy", p["qty"])
+        pv = FUT[p["symbol"]]["point_value"]
+        pnl = round(self._points_pnl() * pv * p["qty"], 2)
+        self.day_realized += pnl; self.buying_power += pnl
+        self.blotter.append({"time": p["opened_at"],
+                             "desc": "%s %s x%d (TV)" % (p["symbol"], p["side"], p["qty"]),
+                             "move": "%.2f -> %.2f" % (p["entry"], p["mark"]), "pnl": pnl})
+        self.position = None
+        self.last_event = "Tradovate: CLOSE " + p["symbol"]
+        return {"closed": True, "pnl": pnl}
+
+
 def make_session(mode):
-    return PaperFuturesSession(mode) if mode == "PAPER" else NinjaTraderSession(mode)
+    if mode == "PAPER":
+        return PaperFuturesSession(mode)
+    if mode == "TRADOVATE":
+        return TradovateSession(mode)
+    return NinjaTraderSession(mode)

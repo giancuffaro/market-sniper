@@ -26,6 +26,11 @@ class ConnectReq(BaseModel):
     mode: str = "PAPER"
     account: str = ""
     incoming_folder: str = ""
+    tv_user: str = ""
+    tv_pass: str = ""
+    tv_key: str = ""
+    tv_sec: str = ""
+    tv_env: str = "demo"
 
 class OrderReq(BaseModel):
     symbol: str
@@ -62,12 +67,17 @@ def prices():
 
 @app.post("/api/connect")
 def connect(req: ConnectReq):
-    if req.mode not in ("PAPER", "LIVE"):
-        raise HTTPException(400, "mode must be PAPER or LIVE")
+    if req.mode not in ("PAPER", "LIVE", "TRADOVATE"):
+        raise HTTPException(400, "mode must be PAPER, LIVE or TRADOVATE")
     s = fc.make_session(req.mode)
     try:
-        state = s.connect(req.app_key.strip(), req.app_secret.strip(),
-                          req.account.strip(), req.incoming_folder.strip())
+        if req.mode == "TRADOVATE":
+            state = s.connect(req.tv_user, req.tv_pass, req.tv_key, req.tv_sec, req.tv_env)
+        elif req.mode == "LIVE":
+            state = s.connect(req.app_key.strip(), req.app_secret.strip(),
+                              req.account.strip(), req.incoming_folder.strip())
+        else:
+            state = s.connect(req.app_key.strip(), req.app_secret.strip())
     except fc.OrderRejected as e:
         raise HTTPException(400, str(e))
     SESSION["s"] = s
