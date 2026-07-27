@@ -47,6 +47,8 @@ class SettingsReq(BaseModel):
     sl_points: Optional[float] = None
     trail_enabled: Optional[bool] = None
     trail_points: Optional[float] = None
+    round_enabled: Optional[bool] = None
+    round_step: Optional[float] = None
 
 
 def _sess():
@@ -103,6 +105,19 @@ def place(req: OrderReq):
         return {"ok": True, "position": pos}
     except fc.OrderRejected as e:
         return JSONResponse({"ok": False, "rejected": True, "reason": str(e)})
+
+@app.post("/api/order/arm")
+def arm(req: OrderReq):
+    if req.side not in ("LONG", "SHORT"):
+        raise HTTPException(400, "side must be LONG or SHORT")
+    try:
+        return {"ok": True, "armed": _sess().arm(req.symbol, req.side, int(req.qty))}
+    except fc.OrderRejected as e:
+        return JSONResponse({"ok": False, "rejected": True, "reason": str(e)})
+
+@app.post("/api/order/disarm")
+def disarm():
+    return {"ok": True, **_sess().disarm()}
 
 @app.post("/api/order/close")
 def close():

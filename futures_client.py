@@ -30,7 +30,25 @@ DEFAULT_SETTINGS = {
     "tp_enabled": False, "tp_points": 10.0,
     "sl_enabled": False, "sl_points": 5.0,
     "trail_enabled": False, "trail_points": 5.0,
+    "round_enabled": False, "round_step": 50.0,
 }
+
+ROUND_STEPS = (10.0, 25.0, 50.0, 100.0)
+
+
+def round_target(price, side, step):
+    """The round-number price an armed entry waits for.
+
+    LONG  -> the level at or BELOW price (buy the pullback)
+    SHORT -> the level at or ABOVE price (sell the rally)
+    Ex: LONG MNQ at 28716 with step 50 -> 28700.  SHORT at 28716 -> 28750.
+    """
+    step = float(step)
+    if step <= 0:
+        raise OrderRejected("round-number step must be greater than 0")
+    q = price / step
+    lvl = math.floor(q) * step if side == "LONG" else math.ceil(q) * step
+    return round(lvl, 2)
 
 _CACHE = {}
 _UA = {"User-Agent": "Mozilla/5.0 (MARKET-SNIPER-FUT)"}
@@ -472,6 +490,45 @@ class BaseFuturesSession:
         self.last_event = None
         self.strategies = default_futures_strategies()
         self._fired = set()   # (strategy_id, bar_ts) already entered on that bar
+        self.armed = None     # pending round-number entry
+
+    # ---- ROUND-NUMBER ENTRY -------------------------------------------------
+    def arm(self, symbol, side, qty):
+        """Wait for price to reach the nearest round level, then enter there."""
+        qty = int(qty)
+        self._guard_open(qty)
+        px = get_price(symbol)["price"]
+        step = float(self.settings.get("round_step") or 50.0)
+        target = round_target(px, side, step)
+        self.armed = {"symbol": symbol, "side": side, "qty": qty,
+                      "target": target, "step": step, "price_at_arm": round(px, 2)}
+        return dict(self.armed)
+
+    def disarm(self):
+        self.armed = None
+        return {"armed": None}
+
+    def _maybe_trigger_entry(self):
+        a = self.armed
+        if not a or self.position is not None:
+            return
+        px = get_price(a["symbol"])["price"]
+        reached = (px <= a["target"]) if a["side"] == "LONG" else (px >= a["target"])
+        if not reached:
+            return
+        self.armed = None                      # clear first so we never double-fire
+        try:
+            self.place(a["symbol"], a["side"], a["qty"])
+            if self.position:
+                self.position["entry_round"] = a["target"]
+                if self.mode == "PAPER":
+                    # A resting limit at the level fills AT the level — don't credit
+                    # the sim with slippage in our favour just because we saw a tick past it.
+                    self.position["entry"] = a["target"]
+            self.last_event = (f"ENTRY TRIGGERED — {a['symbol']} reached "
+                               f"{a['target']:g} · {a['side']} {a['qty']}")
+        except OrderRejected as e:
+            self.last_event = f"armed entry blocked: {e}"
 
     def update_strategies(self, strategies):
         if not isinstance(strategies, list):
@@ -511,7 +568,7 @@ class BaseFuturesSession:
         return (None, bar_ts)
 
     def _eval_strategies(self):
-        if self.position is not None:
+        if self.position is not None or self.armed is not None:
             return
         for st in self.strategies:
             if not st.get("enabled"):
@@ -536,9 +593,16 @@ class BaseFuturesSession:
 
     def update_settings(self, new):
         s = self.settings
-        for k in ("tp_enabled", "sl_enabled", "trail_enabled"):
+        for k in ("tp_enabled", "sl_enabled", "trail_enabled", "round_enabled"):
             if k in new:
                 s[k] = bool(new[k])
+        if "round_step" in new:
+            try:
+                v = float(new["round_step"])
+                if v > 0:
+                    s["round_step"] = v
+            except (TypeError, ValueError):
+                pass
         for k in ("tp_points", "sl_points", "trail_points"):
             if k in new:
                 try:
@@ -606,11 +670,13 @@ class BaseFuturesSession:
             raise OrderRejected("a position is already open — close it first")
 
     def state(self):
-        self._eval_strategies()   # fire any enabled strategy on an EMA cross
+        self._maybe_trigger_entry()   # fire an armed round-number entry if price got there
+        self._eval_strategies()       # fire any enabled strategy on an EMA cross
         ev, self.last_event = self.last_event, None
         return {"mode": self.mode, "account_id": self.account_id,
                 "buying_power": round(self.buying_power, 2),
-                "position": self.position, "day_realized": round(self.day_realized, 2),
+                "position": self.position, "armed": self.armed,
+                "day_realized": round(self.day_realized, 2),
                 "blotter": self.blotter[-20:], "settings": self.settings,
                 "strategies": self.strategies, "event": ev}
 
