@@ -856,9 +856,137 @@ class TradovateSession(BaseFuturesSession):
         return {"closed": True, "pnl": pnl}
 
 
+_TS_BASE = "https://api.topstepx.com"
+
+def _ts_req(path, token=None, body=None):
+    headers = {"Content-Type": "application/json", "Accept": "application/json"}
+    if token:
+        headers["Authorization"] = "Bearer " + token
+    req = urllib.request.Request(_TS_BASE + path, data=json.dumps(body or {}).encode(),
+                                 headers=headers, method="POST")
+    with urllib.request.urlopen(req, timeout=15) as r:
+        return json.load(r)
+
+
+class TopstepSession(BaseFuturesSession):
+    """Real order routing to a Topstep (TopstepX / ProjectX) account."""
+
+    def __init__(self, mode="TOPSTEP"):
+        super().__init__(mode)
+        self.token = None; self.acct = None
+        self._contracts = {}
+
+    def connect(self, username, apikey, account_hint=""):
+        try:
+            res = _ts_req("/api/Auth/loginKey",
+                          body={"userName": (username or "").strip(), "apiKey": (apikey or "").strip()})
+        except urllib.error.HTTPError as e:
+            raise OrderRejected("Topstep login failed (%s). Check your TopstepX username and API key." % e.code)
+        except Exception as e:
+            raise OrderRejected("Couldn't reach Topstep: " + str(e)[:120])
+        if not res.get("success") or not res.get("token"):
+            raise OrderRejected("Topstep login rejected — wrong username/API key, or the $29-mo "
+                                "(50%% off code: topstep) ProjectX API subscription isn't active. "
+                                "(code %s)" % res.get("errorCode"))
+        self.token = res["token"]
+        try:
+            ares = _ts_req("/api/Account/search", token=self.token, body={"onlyActiveAccounts": True})
+        except Exception:
+            ares = {}
+        accts = ares.get("accounts") if isinstance(ares, dict) else ares
+        if not accts:
+            raise OrderRejected("Logged in, but no active Topstep accounts found.")
+        hint = (account_hint or "").strip().lower()
+        self.acct = next((a for a in accts if hint and hint in str(a.get("name", "")).lower()), accts[0])
+        self.account_id = "TS:" + str(self.acct.get("name") or self.acct.get("id"))
+        try:
+            self.buying_power = float(self.acct.get("balance") or 0)
+        except (TypeError, ValueError):
+            self.buying_power = 0.0
+        return self.state()
+
+    def _contract_for(self, sym):
+        if sym in self._contracts:
+            return self._contracts[sym]
+        cid = None
+        try:
+            res = _ts_req("/api/Contract/search", token=self.token,
+                          body={"searchText": sym, "live": False})
+            rows = res.get("contracts") or []
+            for c in rows:
+                cid_c = str(c.get("id", ""))
+                if (".%s." % sym) in cid_c or str(c.get("name", "")).startswith(sym):
+                    cid = cid_c
+                    break
+        except Exception:
+            pass
+        if not cid:  # fallback: build front-quarter id like CON.F.US.MNQ.U26
+            t = _tv_front_symbol(sym)          # e.g. MNQU6
+            code, yr = t[-2], "%02d" % (dt.date.today().year % 100)
+            cid = "CON.F.US.%s.%s%s" % (sym, code, yr)
+        self._contracts[sym] = cid
+        return cid
+
+    def _order(self, symbol, side_num, qty):
+        body = {"accountId": self.acct.get("id"), "contractId": self._contract_for(symbol),
+                "type": 2, "side": side_num, "size": int(qty)}   # type 2 = Market
+        try:
+            res = _ts_req("/api/Order/place", token=self.token, body=body)
+        except urllib.error.HTTPError as e:
+            raise OrderRejected("Topstep order rejected (%s)." % e.code)
+        except Exception as e:
+            raise OrderRejected("Topstep order failed: " + str(e)[:120])
+        if not res.get("success", True):
+            raise OrderRejected("Topstep: order refused (code %s) — check the account's rules/limits."
+                                % res.get("errorCode"))
+        return body["contractId"]
+
+    def place(self, symbol, side, qty):
+        self._guard_open(qty)
+        if symbol not in FUT:
+            raise OrderRejected("unknown symbol")
+        contract = self._order(symbol, 0 if side == "LONG" else 1, qty)   # 0=Buy 1=Sell
+        px = get_price(symbol)["price"]
+        self.position = {"symbol": symbol, "side": side, "qty": int(qty), "entry": px, "mark": px,
+                         "opened_at": dt.datetime.now().strftime("%H:%M"), "contract": contract}
+        self._update_trail()
+        self.last_event = "Topstep: %s %d %s MARKET" % ("BUY" if side == "LONG" else "SELL", int(qty), contract)
+        return self.position
+
+    def refresh_mark(self):
+        self._eval_strategies()
+        p = self.position
+        if not p:
+            return None
+        p["mark"] = get_price(p["symbol"])["price"]
+        pv = FUT[p["symbol"]]["point_value"]
+        p["pnl"] = round(self._points_pnl() * pv * p["qty"], 2)
+        p["points"] = round(self._points_pnl(), 2)
+        self._update_trail()
+        self._maybe_auto_close()
+        return self.position
+
+    def close(self):
+        if not self.position:
+            raise OrderRejected("no open position to close")
+        p = self.position
+        self._order(p["symbol"], 1 if p["side"] == "LONG" else 0, p["qty"])
+        pv = FUT[p["symbol"]]["point_value"]
+        pnl = round(self._points_pnl() * pv * p["qty"], 2)
+        self.day_realized += pnl; self.buying_power += pnl
+        self.blotter.append({"time": p["opened_at"],
+                             "desc": "%s %s x%d (TS)" % (p["symbol"], p["side"], p["qty"]),
+                             "move": "%.2f -> %.2f" % (p["entry"], p["mark"]), "pnl": pnl})
+        self.position = None
+        self.last_event = "Topstep: CLOSE " + p["symbol"]
+        return {"closed": True, "pnl": pnl}
+
+
 def make_session(mode):
     if mode == "PAPER":
         return PaperFuturesSession(mode)
     if mode == "TRADOVATE":
         return TradovateSession(mode)
+    if mode == "TOPSTEP":
+        return TopstepSession(mode)
     return NinjaTraderSession(mode)

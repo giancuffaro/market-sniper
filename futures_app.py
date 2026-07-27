@@ -31,6 +31,9 @@ class ConnectReq(BaseModel):
     tv_key: str = ""
     tv_sec: str = ""
     tv_env: str = "demo"
+    ts_user: str = ""
+    ts_key: str = ""
+    ts_acct: str = ""
 
 class OrderReq(BaseModel):
     symbol: str
@@ -67,12 +70,14 @@ def prices():
 
 @app.post("/api/connect")
 def connect(req: ConnectReq):
-    if req.mode not in ("PAPER", "LIVE", "TRADOVATE"):
-        raise HTTPException(400, "mode must be PAPER, LIVE or TRADOVATE")
+    if req.mode not in ("PAPER", "LIVE", "TRADOVATE", "TOPSTEP"):
+        raise HTTPException(400, "mode must be PAPER, LIVE, TRADOVATE or TOPSTEP")
     s = fc.make_session(req.mode)
     try:
         if req.mode == "TRADOVATE":
             state = s.connect(req.tv_user, req.tv_pass, req.tv_key, req.tv_sec, req.tv_env)
+        elif req.mode == "TOPSTEP":
+            state = s.connect(req.ts_user, req.ts_key, req.ts_acct)
         elif req.mode == "LIVE":
             state = s.connect(req.app_key.strip(), req.app_secret.strip(),
                               req.account.strip(), req.incoming_folder.strip())

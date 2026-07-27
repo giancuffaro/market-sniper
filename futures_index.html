@@ -175,10 +175,23 @@
       <div><h1>MARKET SNIPER</h1><div class="sub">FUTURES · MNQ / MES · <span id="appVer">v?</span></div></div>
       <div class="theme-dots" role="group" aria-label="Theme color"><button class="tdot tdot-white" data-set="light" onclick="FZ.setTheme('light')" aria-label="White theme"></button><button class="tdot tdot-gray" data-set="gray" onclick="FZ.setTheme('gray')" aria-label="Gray theme"></button><button class="tdot tdot-black" data-set="dark" onclick="FZ.setTheme('dark')" aria-label="Black theme"></button></div>
     </div>
-    <div class="modes" id="modes">
+    <div class="modes" id="modes" style="flex-wrap:wrap">
       <button data-m="PAPER" class="on">PAPER</button>
       <button data-m="LIVE">NINJA</button>
-      <button data-m="TRADOVATE">TRADOVATE</button>
+      <button data-m="TRADOVATE" style="font-size:12.5px">TRADOVATE</button>
+      <button data-m="TOPSTEP" style="font-size:12.5px">TOPSTEP</button>
+    </div>
+
+    <div id="tsConfig" style="display:none">
+      <div class="srow"><label style="min-width:82px">USERNAME</label>
+        <input id="tsUser" type="text" placeholder="TopstepX username" style="font-size:14px"></div>
+      <div class="srow" style="margin-top:8px"><label style="min-width:82px">API KEY</label>
+        <input id="tsKey" type="password" placeholder="ProjectX API key" style="font-size:13px"></div>
+      <div class="srow" style="margin-top:8px"><label style="min-width:82px">ACCOUNT</label>
+        <input id="tsAcct" type="text" placeholder="optional — part of the account name" style="font-size:13px"></div>
+      <div class="note" style="color:var(--amber)">⚠ Needs the ProjectX <b>API subscription</b> (TopstepX →
+      Settings → API tab; $29/mo, code <b>topstep</b> = 50% off). Orders hit your eval/funded account for real.
+      Leave ACCOUNT blank to use your first active one. Mind Topstep's automation rules — stay at the controls.</div>
     </div>
 
     <div id="tvConfig" style="display:none">
@@ -390,6 +403,7 @@ const FZ = (function(){
     document.querySelectorAll('#modes button').forEach(x=>x.classList.toggle('on',x===b));
     $('ntConfig').style.display = mode==='LIVE' ? 'block' : 'none';
     $('tvConfig').style.display = mode==='TRADOVATE' ? 'block' : 'none';
+    $('tsConfig').style.display = mode==='TOPSTEP' ? 'block' : 'none';
   });
 
   $('connectBtn').onclick=async()=>{
@@ -398,12 +412,13 @@ const FZ = (function(){
     if(mode==='LIVE'){ body.account=$('ntAccount').value.trim()||'Sim101'; body.incoming_folder=$('ntFolder').value.trim(); }
     if(mode==='TRADOVATE'){ body.tv_user=$('tvUser').value.trim(); body.tv_pass=$('tvPass').value;
       body.tv_key=$('tvKey').value.trim(); body.tv_sec=$('tvSec').value.trim(); body.tv_env=$('tvEnv').value; }
+    if(mode==='TOPSTEP'){ body.ts_user=$('tsUser').value.trim(); body.ts_key=$('tsKey').value.trim(); body.ts_acct=$('tsAcct').value.trim(); }
     $('connectBtn').textContent='CONNECTING…';
     const r=await api('/api/connect',body);
     $('connectBtn').textContent='START';
     if(r.detail){ $('connectErr').textContent=r.detail; return; }
     $('connectScreen').classList.add('hidden'); $('dash').classList.remove('hidden');
-    $('modePill').textContent = mode==='PAPER' ? 'PAPER' : (mode==='TRADOVATE' ? 'TRADOVATE' : 'NINJA');
+    $('modePill').textContent = mode==='PAPER' ? 'PAPER' : (mode==='TRADOVATE' ? 'TRADOVATE' : (mode==='TOPSTEP' ? 'TOPSTEP' : 'NINJA'));
     $('footMode').textContent = mode==='PAPER' ? '◦ PAPER — SIMULATED FILLS · LIVE PRICES ◦'
       : ('● '+(r.account_id||mode)+' — REAL ORDERS ●');
     render(r); refreshPrices(); refreshTrend();
