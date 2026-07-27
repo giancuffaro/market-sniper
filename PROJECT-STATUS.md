@@ -13,7 +13,7 @@ Current version **v3.0** (renamed from EZEXECUTION → Option Sniper → Market 
 - Futures account (…3T0B) auto-flagged FUTURES ⚠ and redirected (config.FUTURES_ACCOUNT_SUFFIXES)
 
 ## v3.0 changes
-Single launcher (unblock merged in), INSTALL.bat, one merged TUTORIAL.html,
+Single launcher (unblock merged in), 🧰 INSTALL.bat, one merged TUTORIAL.html,
 labels API KEY/SECRET, LIVE-warning removed, LIVE default, name = MARKET SNIPER.
 
 ## Awaiting first live confirmation

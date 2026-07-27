@@ -6,8 +6,6 @@ echo.
 git stash >nul 2>&1
 git pull origin main
 echo.
-echo ==============================================================
-echo   Update complete. Launch START-MARKET-SNIPER or START-FUTURES.
-echo ==============================================================
-echo You can close this window.
-timeout /t 6 >nul
+echo Update complete - closing in 5 seconds...
+timeout /t 5 >nul
+exit

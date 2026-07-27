@@ -25,7 +25,7 @@ except Exception as _e:
     SDK_HINT = f"import failed: {str(_e)[:80]}"
     try:
         import webullsdkcore  # noqa: F401
-        SDK_HINT = "an OLDER Webull SDK is installed — double-click INSTALL.bat, then relaunch"
+        SDK_HINT = "an OLDER Webull SDK is installed — double-click 🧰 INSTALL.bat, then relaunch"
     except Exception:
         pass
 
@@ -204,7 +204,7 @@ class OptionData:
     def _client(self):
         if self._dc is None:
             if DataClient is None:
-                raise OrderRejected("webull.data.DataClient not importable — run INSTALL.bat again.")
+                raise OrderRejected("webull.data.DataClient not importable — run 🧰 INSTALL.bat again.")
             self._dc = DataClient(self._api)
         return self._dc
 
@@ -673,7 +673,7 @@ class LiveSession(BaseSession):
     def connect(self, app_key, app_secret, account_id=None):
         if not SDK_AVAILABLE:
             detail = f" ({SDK_HINT})" if SDK_HINT else ""
-            raise OrderRejected("Webull SDK not usable" + detail + " — run INSTALL.bat, then relaunch.")
+            raise OrderRejected("Webull SDK not usable" + detail + " — run 🧰 INSTALL.bat, then relaunch.")
         if config.REQUIRE_LIVE_ENV_OK and os.environ.get("ALLOW_LIVE") != "1":
             raise OrderRejected("LIVE blocked: launch with START-MARKET-SNIPER (sets ALLOW_LIVE=1).")
         api_client = ApiClient(app_key, app_secret, config.REGION)

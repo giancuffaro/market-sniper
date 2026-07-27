@@ -11,7 +11,7 @@ with the ⇄ buttons → the red ✕ inside either app shuts everything down.
 ## New computer (once)
 1. Install Git (git-scm.com) and Python 3 (python.org, "Add Python to PATH")
 2. `git clone https://github.com/giancuffaro/market-sniper.git`
-3. Double-click **INSTALL.bat**, wait for VERIFIED
+3. Double-click **🧰 INSTALL.bat**, wait for VERIFIED
 4. **🎯 START MARKET SNIPER.bat**
 
 ## The files
@@ -19,7 +19,7 @@ with the ⇄ buttons → the red ✕ inside either app shuts everything down.
 🎯 START MARKET SNIPER.bat  daily launcher (auto-update, starts BOTH apps)
 🛑 STOP EVERYTHING.bat      emergency shutdown (red ✕ in-app does it too)
 🔄 UPDATE.bat               manual update pull (rarely needed)
-INSTALL.bat                one-time setup (SDK + dependencies)
+🧰 INSTALL.bat                one-time setup (SDK + dependencies)
 CHECK-SETUP.bat            health report
 TUTORIAL.html              the complete illustrated guide (Save-as-PDF button)
 main.py / webull_client.py / config.py / index.html / quotes.py    options app
