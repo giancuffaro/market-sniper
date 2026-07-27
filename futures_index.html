@@ -337,12 +337,14 @@
             <option value="50" selected>every 50 points</option>
             <option value="100">every 100 points</option>
           </select></div>
-        <div class="shint">When ON, <b>BUY / SELL arms instead of firing</b>. It waits for price to
-        reach the nearest level, then enters there. <b>LONG</b> waits for the level <b>below</b>
-        (buy the pullback), <b>SHORT</b> waits for the level <b>above</b> (sell the rally).
-        Ex: LONG MNQ at <b>28,716</b> with a 50-pt grid → fills at <b>28,700</b>. SHORT there → <b>28,750</b>.
-        Your Take Profit / Stop / Trailing below still apply once filled. CANCEL on the amber
-        bar disarms it.</div>
+        <div class="shint">When ON, <b>BUY / SELL rests a LIMIT order</b> on the nearest level instead
+        of firing at market. <b>LONG</b> buys the level <b>below</b> price, <b>SHORT</b> sells the level
+        <b>above</b> — so the order can only fill at that price <b>or better. No slippage.</b>
+        Ex: LONG MNQ at <b>28,716</b> on a 50-pt grid rests a buy limit at <b>28,700</b>; SHORT there
+        rests a sell limit at <b>28,750</b>. On NinjaTrader / Tradovate / Topstep the order is really
+        working at the broker (CANCEL on the amber bar pulls it). Trade-off vs a market order: if
+        price never comes back to the level, <b>you don't get filled</b>. Your Take Profit / Stop /
+        Trailing below still apply once it fills.</div>
       </div>
 
       <div class="sgroup">
@@ -492,8 +494,8 @@ const FZ = (function(){
       if(settings.round_enabled){
         const k=Number(settings.round_step)||50;
         const lo=Math.floor(q.price/k)*k, hi=Math.ceil(q.price/k)*k;
-        $('longSub').textContent='ARM → '+lo.toLocaleString();
-        $('shortSub').textContent='ARM → '+hi.toLocaleString();
+        $('longSub').textContent='BUY LIMIT '+lo.toLocaleString();
+        $('shortSub').textContent='SELL LIMIT '+hi.toLocaleString();
       }else{
         const sub=`@ ${q.price.toFixed(2)}`;
         $('longSub').textContent=sub; $('shortSub').textContent=sub;
@@ -516,7 +518,11 @@ const FZ = (function(){
     if(!settings.round_enabled) inTrade=true;
     hideReject(); await tick();
   }
-  async function disarm(){ await api('/api/order/disarm',{}); await tick(); }
+  async function disarm(){
+    const r=await api('/api/order/disarm',{});
+    if(r && !r.ok && r.rejected) showReject(r.reason);
+    await tick();
+  }
   async function close(){
     const r=await api('/api/order/close',{});
     if(!r.ok && r.rejected){ showReject(r.reason); return; }
@@ -540,9 +546,11 @@ const FZ = (function(){
     document.querySelectorAll('#seg button').forEach(b=>b.disabled=inTrade||!!armed);
     if(armed && !pos){
       $('armBand').classList.remove('hidden');
-      $('armTitle').textContent='ARMED · '+armed.side+' '+armed.symbol+' × '+armed.qty;
-      $('armSub').textContent='waiting for '+Number(armed.target).toLocaleString()+
-        ' (every '+(+armed.step)+' pts) · armed at '+Number(armed.price_at_arm).toLocaleString();
+      const kind=(armed.side==='LONG'?'BUY':'SELL')+' LIMIT';
+      $('armTitle').textContent=(armed.working?'WORKING · ':'LIMIT RESTING · ')+kind+' '+
+        armed.qty+' '+armed.symbol+' @ '+Number(armed.target).toLocaleString();
+      $('armSub').textContent=(armed.working?'live at your broker':'simulated (paper)')+
+        ' · every '+(+armed.step)+' pts · placed at '+Number(armed.price_at_arm).toLocaleString();
     }else{ $('armBand').classList.add('hidden'); }
     if(pos){
       $('flatActions').classList.add('hidden'); $('tradeActions').classList.remove('hidden'); $('pnlBlock').classList.remove('hidden');
@@ -563,8 +571,9 @@ const FZ = (function(){
       $('flatActions').classList.remove('hidden'); $('tradeActions').classList.add('hidden'); $('pnlBlock').classList.add('hidden');
       $('hero').className='hero';
       if(armed){
-        $('heroBig').textContent='ARMED';
-        $('heroSub').textContent=armed.symbol+' → '+Number(armed.target).toLocaleString()+' · then '+armed.side;
+        $('heroBig').textContent='LIMIT @ '+Number(armed.target).toLocaleString();
+        $('heroSub').textContent=(armed.side==='LONG'?'BUY':'SELL')+' '+armed.qty+' '+armed.symbol+
+          ' · waiting for the fill';
       }else{
         $('heroBig').textContent='FLAT'; $('heroSub').textContent='No open position';
       }

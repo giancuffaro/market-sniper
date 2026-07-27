@@ -50,6 +50,12 @@ def round_target(price, side, step):
     lvl = math.floor(q) * step if side == "LONG" else math.ceil(q) * step
     return round(lvl, 2)
 
+
+def to_tick(sym, price):
+    """Snap a price to the instrument's tick so the broker won't reject it."""
+    t = FUT[sym]["tick"]
+    return round(round(float(price) / t) * t, 4)
+
 _CACHE = {}
 _UA = {"User-Agent": "Mozilla/5.0 (MARKET-SNIPER-FUT)"}
 
@@ -492,19 +498,43 @@ class BaseFuturesSession:
         self._fired = set()   # (strategy_id, bar_ts) already entered on that bar
         self.armed = None     # pending round-number entry
 
-    # ---- ROUND-NUMBER ENTRY -------------------------------------------------
+    # ---- ROUND-NUMBER ENTRY (resting LIMIT at the level) --------------------
     def arm(self, symbol, side, qty):
-        """Wait for price to reach the nearest round level, then enter there."""
+        """Rest a LIMIT order on the nearest round level.
+
+        LONG  -> buy limit at the level BELOW price   (never pays more)
+        SHORT -> sell limit at the level ABOVE price  (never sells for less)
+        Because the limit sits at or better than the market it can only fill at
+        that price or better — no slippage. On live routes the order is working
+        at the broker; in PAPER it is simulated.
+        """
         qty = int(qty)
         self._guard_open(qty)
+        if symbol not in FUT:
+            raise OrderRejected("unknown symbol")
         px = get_price(symbol)["price"]
         step = float(self.settings.get("round_step") or 50.0)
-        target = round_target(px, side, step)
+        target = to_tick(symbol, round_target(px, side, step))
+        order_id = None
+        if hasattr(self, "place_limit"):          # live routes rest it at the broker
+            order_id = self.place_limit(symbol, side, qty, target)
         self.armed = {"symbol": symbol, "side": side, "qty": qty,
-                      "target": target, "step": step, "price_at_arm": round(px, 2)}
+                      "target": target, "step": step, "price_at_arm": round(px, 2),
+                      "working": order_id is not None, "order_id": order_id}
         return dict(self.armed)
 
     def disarm(self):
+        a = self.armed
+        if a and a.get("order_id") and hasattr(self, "cancel_limit"):
+            try:
+                self.cancel_limit(a["order_id"])
+                self.last_event = "Working limit at %g CANCELLED at the broker." % a["target"]
+            except OrderRejected as e:
+                # Never silently drop it — a live order may still be out there.
+                self.armed = None
+                raise OrderRejected(
+                    "Couldn't cancel the working limit (%s). The order may STILL be live at your "
+                    "broker — cancel it there before trading again." % e)
         self.armed = None
         return {"armed": None}
 
@@ -518,17 +548,27 @@ class BaseFuturesSession:
             return
         self.armed = None                      # clear first so we never double-fire
         try:
-            self.place(a["symbol"], a["side"], a["qty"])
+            # Live: the resting limit already filled at the broker — just record it.
+            # Paper: simulate the fill now, at the limit price.
+            if not a.get("working"):
+                self.place(a["symbol"], a["side"], a["qty"], limit=a["target"])
+            else:
+                self._adopt_filled(a)
             if self.position:
                 self.position["entry_round"] = a["target"]
-                if self.mode == "PAPER":
-                    # A resting limit at the level fills AT the level — don't credit
-                    # the sim with slippage in our favour just because we saw a tick past it.
-                    self.position["entry"] = a["target"]
-            self.last_event = (f"ENTRY TRIGGERED — {a['symbol']} reached "
-                               f"{a['target']:g} · {a['side']} {a['qty']}")
+                self.position["entry"] = a["target"]   # a limit fills AT its price or better
+                self._update_trail()
+            self.last_event = (f"LIMIT FILLED — {a['symbol']} {a['side']} {a['qty']} "
+                               f"at {a['target']:g}")
         except OrderRejected as e:
             self.last_event = f"armed entry blocked: {e}"
+
+    def _adopt_filled(self, a):
+        """Record the position for a limit that was already working at the broker."""
+        self.position = {"symbol": a["symbol"], "side": a["side"], "qty": a["qty"],
+                         "entry": a["target"], "mark": get_price(a["symbol"])["price"],
+                         "opened_at": dt.datetime.now().strftime("%H:%M")}
+        self._update_trail()
 
     def update_strategies(self, strategies):
         if not isinstance(strategies, list):
@@ -687,11 +727,11 @@ class PaperFuturesSession(BaseFuturesSession):
         self.buying_power = 5000.00
         return self.state()
 
-    def place(self, symbol, side, qty):
+    def place(self, symbol, side, qty, limit=None):
         self._guard_open(qty)
         px = get_price(symbol)["price"]
         self.position = {"symbol": symbol, "side": side, "qty": qty,
-                         "entry": px, "mark": px,
+                         "entry": float(limit) if limit else px, "mark": px,
                          "opened_at": dt.datetime.now().strftime("%H:%M")}
         self._update_trail()
         return self.position
@@ -759,19 +799,46 @@ class NinjaTraderSession(BaseFuturesSession):
         with open(os.path.join(self.folder, name), "w") as fh:
             fh.write(text.strip() + "\n")
 
-    def place(self, symbol, side, qty):
+    def place(self, symbol, side, qty, limit=None):
         self._guard_open(qty)
         if symbol not in FUT:
             raise OrderRejected("unknown symbol")
         action = "BUY" if side == "LONG" else "SELL"
-        self._write_oif("PLACE;%s;%s;%s;%d;MARKET;;;DAY" % (self.account, symbol, action, int(qty)))
-        px = get_price(symbol)["price"]
+        if limit:
+            px = to_tick(symbol, limit)
+            self._write_oif("PLACE;%s;%s;%s;%d;LIMIT;%s;;DAY" % (
+                self.account, symbol, action, int(qty), _fmt_px(px)))
+            kind = "LIMIT %s" % _fmt_px(px)
+        else:
+            px = get_price(symbol)["price"]
+            self._write_oif("PLACE;%s;%s;%s;%d;MARKET;;;DAY" % (self.account, symbol, action, int(qty)))
+            kind = "MARKET"
         self.position = {"symbol": symbol, "side": side, "qty": int(qty),
-                         "entry": px, "mark": px,
+                         "entry": px, "mark": get_price(symbol)["price"],
                          "opened_at": dt.datetime.now().strftime("%H:%M")}
         self._update_trail()
-        self.last_event = "SENT to NinjaTrader (%s): %s %d %s MARKET" % (self.account, action, int(qty), symbol)
+        self.last_event = "SENT to NinjaTrader (%s): %s %d %s %s" % (
+            self.account, action, int(qty), symbol, kind)
         return self.position
+
+    # --- working limit for round-number entry ---
+    def place_limit(self, symbol, side, qty, price):
+        self._guard_open(qty)
+        if symbol not in FUT:
+            raise OrderRejected("unknown symbol")
+        action = "BUY" if side == "LONG" else "SELL"
+        oid = "MS%d" % int(time.time() * 1000)
+        px = _fmt_px(to_tick(symbol, price))
+        # PLACE;ACCOUNT;INSTRUMENT;ACTION;QTY;TYPE;LIMIT;STOP;TIF;OCO;ORDER ID
+        self._write_oif("PLACE;%s;%s;%s;%d;LIMIT;%s;;DAY;;%s" % (
+            self.account, symbol, action, int(qty), px, oid))
+        self.last_event = "NinjaTrader (%s): working %s LIMIT %d %s @ %s" % (
+            self.account, action, int(qty), symbol, px)
+        return oid
+
+    def cancel_limit(self, order_id):
+        self._write_oif("CANCEL;%s;;;;;;;;;;;" % order_id)
+        return True
 
     def refresh_mark(self):
         p = self.position
@@ -816,6 +883,10 @@ def _tv_front_symbol(sym):
         if qm > m or (qm == m and today.day < 12):   # roll ~mid expiry month
             return "%s%s%d" % (sym, _MONTH_CODE[qm], y % 10)
     return "%s%s%d" % (sym, _MONTH_CODE[3], (y + 1) % 10)
+
+def _fmt_px(v):
+    """Trim trailing zeros so 28700.0 goes out as 28700, 23150.25 stays 23150.25."""
+    return ("%.4f" % float(v)).rstrip("0").rstrip(".")
 
 def _tv_req(env, path, token=None, body=None, method="GET"):
     url = _TV_BASE[env] + path
@@ -866,10 +937,14 @@ class TradovateSession(BaseFuturesSession):
         self.buying_power = 0.0
         return self.state()
 
-    def _order(self, symbol, action, qty):
+    def _order(self, symbol, action, qty, limit=None):
         body = {"accountSpec": self.acct_spec, "accountId": self.acct_id,
                 "action": action, "symbol": _tv_front_symbol(symbol),
                 "orderQty": int(qty), "orderType": "Market", "isAutomated": True}
+        if limit is not None:
+            body["orderType"] = "Limit"
+            body["price"] = to_tick(symbol, limit)
+            body["timeInForce"] = "Day"
         try:
             res = _tv_req(self.env, "/order/placeorder", token=self.token, body=body, method="POST")
         except urllib.error.HTTPError as e:
@@ -878,20 +953,43 @@ class TradovateSession(BaseFuturesSession):
             raise OrderRejected("Tradovate order failed: " + str(e)[:120])
         if res.get("failureReason") or res.get("failureText"):
             raise OrderRejected("Tradovate: " + str(res.get("failureText") or res.get("failureReason")))
-        return body["symbol"]
+        return body["symbol"], res.get("orderId") or res.get("id")
 
-    def place(self, symbol, side, qty):
+    def place(self, symbol, side, qty, limit=None):
         self._guard_open(qty)
         if symbol not in FUT:
             raise OrderRejected("unknown symbol")
-        contract = self._order(symbol, "Buy" if side == "LONG" else "Sell", qty)
-        px = get_price(symbol)["price"]
-        self.position = {"symbol": symbol, "side": side, "qty": int(qty), "entry": px, "mark": px,
+        contract, _ = self._order(symbol, "Buy" if side == "LONG" else "Sell", qty, limit)
+        px = float(limit) if limit else get_price(symbol)["price"]
+        self.position = {"symbol": symbol, "side": side, "qty": int(qty), "entry": px,
+                         "mark": get_price(symbol)["price"],
                          "opened_at": dt.datetime.now().strftime("%H:%M"), "contract": contract}
         self._update_trail()
-        self.last_event = "Tradovate (%s): %s %d %s MARKET" % (
-            self.env, "BUY" if side == "LONG" else "SELL", int(qty), contract)
+        self.last_event = "Tradovate (%s): %s %d %s %s" % (
+            self.env, "BUY" if side == "LONG" else "SELL", int(qty), contract,
+            ("LIMIT %s" % _fmt_px(px)) if limit else "MARKET")
         return self.position
+
+    # --- working limit for round-number entry ---
+    def place_limit(self, symbol, side, qty, price):
+        self._guard_open(qty)
+        if symbol not in FUT:
+            raise OrderRejected("unknown symbol")
+        contract, oid = self._order(symbol, "Buy" if side == "LONG" else "Sell", qty, price)
+        if not oid:
+            raise OrderRejected("Tradovate accepted the limit but returned no order id — "
+                                "check the order in Tradovate before continuing.")
+        self.last_event = "Tradovate (%s): working %s LIMIT %d %s @ %s" % (
+            self.env, "BUY" if side == "LONG" else "SELL", int(qty), contract, _fmt_px(price))
+        return str(oid)
+
+    def cancel_limit(self, order_id):
+        try:
+            _tv_req(self.env, "/order/cancelorder", token=self.token,
+                    body={"orderId": int(order_id)}, method="POST")
+        except Exception as e:
+            raise OrderRejected("Tradovate cancel failed: " + str(e)[:120])
+        return True
 
     def refresh_mark(self):
         self._eval_strategies()
@@ -993,9 +1091,13 @@ class TopstepSession(BaseFuturesSession):
         self._contracts[sym] = cid
         return cid
 
-    def _order(self, symbol, side_num, qty):
+    def _order(self, symbol, side_num, qty, limit=None):
+        # ProjectX order types: 1 = Limit, 2 = Market
         body = {"accountId": self.acct.get("id"), "contractId": self._contract_for(symbol),
-                "type": 2, "side": side_num, "size": int(qty)}   # type 2 = Market
+                "type": 2, "side": side_num, "size": int(qty)}
+        if limit is not None:
+            body["type"] = 1
+            body["limitPrice"] = to_tick(symbol, limit)
         try:
             res = _ts_req("/api/Order/place", token=self.token, body=body)
         except urllib.error.HTTPError as e:
@@ -1005,19 +1107,43 @@ class TopstepSession(BaseFuturesSession):
         if not res.get("success", True):
             raise OrderRejected("Topstep: order refused (code %s) — check the account's rules/limits."
                                 % res.get("errorCode"))
-        return body["contractId"]
+        return body["contractId"], res.get("orderId")
 
-    def place(self, symbol, side, qty):
+    def place(self, symbol, side, qty, limit=None):
         self._guard_open(qty)
         if symbol not in FUT:
             raise OrderRejected("unknown symbol")
-        contract = self._order(symbol, 0 if side == "LONG" else 1, qty)   # 0=Buy 1=Sell
-        px = get_price(symbol)["price"]
-        self.position = {"symbol": symbol, "side": side, "qty": int(qty), "entry": px, "mark": px,
+        contract, _ = self._order(symbol, 0 if side == "LONG" else 1, qty, limit)  # 0=Buy 1=Sell
+        px = float(limit) if limit else get_price(symbol)["price"]
+        self.position = {"symbol": symbol, "side": side, "qty": int(qty), "entry": px,
+                         "mark": get_price(symbol)["price"],
                          "opened_at": dt.datetime.now().strftime("%H:%M"), "contract": contract}
         self._update_trail()
-        self.last_event = "Topstep: %s %d %s MARKET" % ("BUY" if side == "LONG" else "SELL", int(qty), contract)
+        self.last_event = "Topstep: %s %d %s %s" % (
+            "BUY" if side == "LONG" else "SELL", int(qty), contract,
+            ("LIMIT %s" % _fmt_px(px)) if limit else "MARKET")
         return self.position
+
+    # --- working limit for round-number entry ---
+    def place_limit(self, symbol, side, qty, price):
+        self._guard_open(qty)
+        if symbol not in FUT:
+            raise OrderRejected("unknown symbol")
+        contract, oid = self._order(symbol, 0 if side == "LONG" else 1, qty, price)
+        if not oid:
+            raise OrderRejected("Topstep accepted the limit but returned no order id — "
+                                "check the order in your Topstep platform before continuing.")
+        self.last_event = "Topstep: working %s LIMIT %d %s @ %s" % (
+            "BUY" if side == "LONG" else "SELL", int(qty), contract, _fmt_px(price))
+        return str(oid)
+
+    def cancel_limit(self, order_id):
+        try:
+            _ts_req("/api/Order/cancel", token=self.token,
+                    body={"accountId": self.acct.get("id"), "orderId": int(order_id)})
+        except Exception as e:
+            raise OrderRejected("Topstep cancel failed: " + str(e)[:120])
+        return True
 
     def refresh_mark(self):
         self._eval_strategies()

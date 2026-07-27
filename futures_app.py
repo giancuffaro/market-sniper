@@ -117,7 +117,10 @@ def arm(req: OrderReq):
 
 @app.post("/api/order/disarm")
 def disarm():
-    return {"ok": True, **_sess().disarm()}
+    try:
+        return {"ok": True, **_sess().disarm()}
+    except fc.OrderRejected as e:
+        return JSONResponse({"ok": False, "rejected": True, "reason": str(e)})
 
 @app.post("/api/order/close")
 def close():
