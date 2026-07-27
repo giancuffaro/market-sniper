@@ -156,7 +156,9 @@
   .trow .pl{width:78px;text-align:right}.pl.up{color:var(--green)}.pl.dn{color:var(--red)}
   .footer{color:var(--dimmer);font-size:11px;letter-spacing:.14em;text-align:center;padding:14px 0 2px}
   .footer a{color:var(--dim);cursor:pointer;text-decoration:underline}
-  .scrim{position:absolute;inset:0;background:rgba(0,0,0,.6);display:none;align-items:center;justify-content:center;padding:22px;z-index:5}
+  /* fixed, not absolute: the dark area must cover the WHOLE window, otherwise
+     clicking the page background beside the app column wouldn't close the popup */
+  .scrim{position:fixed;inset:0;background:rgba(0,0,0,.6);display:none;align-items:center;justify-content:center;padding:22px;z-index:5}
   .scrim.show{display:flex}
   .smodal{width:100%;max-width:410px;border:1px solid var(--line);border-radius:16px;background:var(--panel);padding:24px 20px;max-height:90vh;overflow-y:auto}
   .smodal h2{margin:0 0 16px;font-size:15px;letter-spacing:.2em;color:var(--txt);text-align:center}
@@ -485,6 +487,7 @@ const EZ = (function(){
   let settings={strike_mode:"OTM1",tp_enabled:false,tp_value:30,tp_unit:"cents",
                 sl_enabled:false,sl_value:20,sl_unit:"cents",my_enabled:false};
   let autolock={enabled:false,minutes:10}, lastActivity=Date.now();
+  let prefs={}, prefsReady=false, prefsLoaded=null;
   const $=id=>document.getElementById(id);
   const api=(p,b)=>fetch(p,{method:b?'POST':'GET',headers:{'Content-Type':'application/json'},
                            body:b?JSON.stringify(b):undefined}).then(r=>r.json());
@@ -493,10 +496,37 @@ const EZ = (function(){
   try{ const sv=JSON.parse(localStorage.getItem(LSS)||"null"); if(sv) settings={...settings,...sv}; }catch(e){}
   try{ const av=JSON.parse(localStorage.getItem(LSA)||"null"); if(av) autolock={...autolock,...av}; }catch(e){}
 
-  function applyTheme(t){ if(t==="white")t="light"; if(t==="black")t="dark"; document.body.dataset.theme=t; localStorage.setItem(LST,t); document.querySelectorAll(".tdot").forEach(function(d){d.classList.toggle("active",d.dataset.set===t);}); }
+  function applyTheme(t){ if(t==="white")t="light"; if(t==="black")t="dark"; document.body.dataset.theme=t; localStorage.setItem(LST,t); document.querySelectorAll(".tdot").forEach(function(d){d.classList.toggle("active",d.dataset.set===t);}); savePrefs({theme:t}); }
   function setTheme(t){ applyTheme(t); }
   applyTheme(localStorage.getItem(LST)||"dark");
   function toggleTheme(){ var o=["light","gray","dark"]; var i=o.indexOf(document.body.dataset.theme); applyTheme(o[(i+1)%o.length]); }
+
+  /* ---- Remembered setup -------------------------------------------------
+     Your choices live in my-settings.json next to the app, not in the browser.
+     They survive clearing history, switching browsers, and running UPDATE.bat.
+     The browser copy is kept too, purely so the screen paints instantly. */
+  function savePrefs(patch){
+    if(!prefsReady) return;                       // don't overwrite before the load lands
+    prefs={...prefs,...patch};
+    api('/api/prefs',patch).catch(()=>{});
+  }
+  async function loadRemembered(){
+    let r=null;
+    try{ r=await api('/api/prefs'); }catch(e){}
+    if(r){
+      if(r.settings) settings={...settings,...r.settings};
+      if(r.strategies&&r.strategies.length) strategies=r.strategies;
+      prefs=r.prefs||{};
+      if(prefs.theme) applyTheme(prefs.theme);
+      if(prefs.autolock) autolock={...autolock,...prefs.autolock};
+      if(prefs.symbol) sym=prefs.symbol;
+      if(prefs.qty) qty=Math.max(1,parseInt(prefs.qty)||1);
+      const qEl=$('qty'); if(qEl) qEl.textContent=qty;
+      document.querySelectorAll('#seg button').forEach(b=>b.classList.toggle('on',b.dataset.s===sym));
+    }
+    prefsReady=true;
+    try{ renderStrategies(); }catch(e){}
+  }
 
   fetch('/api/health').then(r=>r.json())
     .then(h=>{$('appVer').textContent='v'+(h.version||'old');})
@@ -555,6 +585,7 @@ const EZ = (function(){
     $('connectErr').textContent='';
     const k=$('appKey').value, s=$('appSecret').value;
     if(!$('remember').checked) localStorage.removeItem(LSPA);
+    try{ await prefsLoaded; }catch(e){}   // never push stale browser settings over the saved file
     btn.disabled=true; btn.textContent='CONNECTING…';
     try{
       const r=await api('/api/connect',{app_key:k,app_secret:s,mode});
@@ -653,6 +684,7 @@ const EZ = (function(){
     autolock.enabled=$('alEnabled').checked;
     autolock.minutes=Math.max(1,parseInt($('alMinutes').value)||10);
     localStorage.setItem(LSA,JSON.stringify(autolock));
+    savePrefs({autolock});
     await api('/api/settings',settings);
     closeSettings(); refreshQuote();
   }
@@ -700,7 +732,7 @@ const EZ = (function(){
   document.querySelectorAll('#seg button').forEach(b=>b.onclick=()=>{
     if(inTrade) return;
     document.querySelectorAll('#seg button').forEach(x=>x.classList.remove('on'));
-    b.classList.add('on'); sym=b.dataset.s; refreshQuote();
+    b.classList.add('on'); sym=b.dataset.s; savePrefs({symbol:sym}); refreshQuote();
   });
   // Hotkeys: A=SPY  S=QQQ  D=TSLA  (ignored while typing or in a trade)
   const HOTKEYS={a:'SPY',s:'QQQ',d:'TSLA'};
@@ -713,7 +745,7 @@ const EZ = (function(){
     const btn=[...document.querySelectorAll('#seg button')].find(b=>b.dataset.s===want);
     if(btn){ e.preventDefault(); btn.click(); }
   });
-  function step(d){ if(inTrade)return; qty=Math.max(1,qty+d); $('qty').textContent=qty; }
+  function step(d){ if(inTrade)return; qty=Math.max(1,qty+d); $('qty').textContent=qty; savePrefs({qty}); }
 
   async function refreshQuote(){
     try{
@@ -845,7 +877,8 @@ const EZ = (function(){
     strategies=strategies.filter(x=>x.id!==editingStrat);
     persistStrategies(); renderStrategies(); cancelStrategyEdit();
   }
-  loadStrategies();
+  loadStrategies();                       // browser copy first, so nothing flashes empty
+  prefsLoaded = loadRemembered();         // then the file on disk wins (survives updates)
 
   function render(st){
     if(!st) return;

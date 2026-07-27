@@ -10,6 +10,7 @@ from fastapi.responses import HTMLResponse, JSONResponse
 from pydantic import BaseModel
 
 import config
+import user_config as uc
 import webull_client as wb
 try:
     import quotes
@@ -222,6 +223,35 @@ def close():
             out["mirror_ok"] = False
             out["mirror_reason"] = str(e)[:180]
     return out
+
+# ---- Remembered setup (survives restarts AND updates) ----------------------
+# Kept in my-settings.json next to the app so it isn't lost when the browser
+# forgets, and isn't lost when UPDATE.bat pulls a new version.
+OPT_PREF_KEYS = ("theme", "mode", "symbol", "qty", "autolock")
+
+
+@app.get("/api/prefs")
+def get_prefs():
+    """Everything the app should remember, in one call — read before you connect
+    so the screen and MY CONFIG open already filled in."""
+    saved = uc.load("options_settings", {})
+    settings = dict(config.DEFAULT_SETTINGS)
+    settings.update({k: v for k, v in saved.items() if k in config.DEFAULT_SETTINGS})
+    return {"prefs": uc.load("options_prefs", {}),
+            "settings": settings,
+            "strategies": wb._restore_strategies(uc.load("options_strategies", None)),
+            "saved_to": uc.where()}
+
+
+@app.post("/api/prefs")
+def set_prefs(req: dict):
+    p = dict(uc.load("options_prefs", {}))
+    for k in OPT_PREF_KEYS:
+        if k in req and req[k] is not None:
+            p[k] = req[k]
+    uc.save("options_prefs", p)
+    return {"ok": True, "prefs": p}
+
 
 @app.get("/api/settings")
 def get_settings():

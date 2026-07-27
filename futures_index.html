@@ -129,7 +129,9 @@
   .trow .s{flex:1;color:var(--txt)}
   .pl.up{color:var(--green)}.pl.dn{color:var(--red)}
   .footer{color:var(--dimmer);font-size:11px;text-align:center;padding:14px 0 2px;letter-spacing:.14em}
-  .scrim{position:absolute;inset:0;background:rgba(0,0,0,.6);display:none;align-items:center;justify-content:center;padding:22px;z-index:5}
+  /* fixed, not absolute: the dark area must cover the WHOLE window, otherwise
+     clicking the page background beside the app column wouldn't close the popup */
+  .scrim{position:fixed;inset:0;background:rgba(0,0,0,.6);display:none;align-items:center;justify-content:center;padding:22px;z-index:5}
   .scrim.show{display:flex}
   .smodal{width:100%;max-width:410px;border:1px solid var(--line);border-radius:16px;background:var(--panel);padding:24px 20px;max-height:90vh;overflow-y:auto}
   .smodal h2{margin:0 0 16px;font-size:15px;letter-spacing:.18em;text-align:center}
@@ -229,6 +231,16 @@
       <b>Sim101</b> (NinjaTrader's built-in simulator) to test safely — switch to your live account name only
       once you trust it. NinjaTrader must be running with the ATI enabled, and orders are fire-and-forget
       (watch NinjaTrader to confirm fills).</div>
+    </div>
+
+    <div id="rememberRow" style="display:none;margin:2px 0 10px">
+      <label style="display:flex;align-items:center;gap:8px;color:var(--dim);font-size:12px;cursor:pointer">
+        <input type="checkbox" id="rememberLogin"> Remember my login on this PC
+      </label>
+      <div class="note" style="margin-top:6px">Your username, account and folder are always remembered.
+      Tick this to also save the <b>password / API key</b> — stored in plain text in
+      <b>my-settings.json</b> inside this folder, on this computer only. It is never uploaded and never
+      goes to GitHub. Leave it off on a shared computer. Unticking it erases anything already saved.</div>
     </div>
 
     <button class="go" id="connectBtn">START</button>
@@ -336,6 +348,7 @@
             <option value="25">every 25 points</option>
             <option value="50" selected>every 50 points</option>
             <option value="100">every 100 points</option>
+            <option value="250">every 250 points</option>
           </select></div>
         <div class="shint">When ON, <b>BUY / SELL rests a LIMIT order</b> on the nearest level instead
         of firing at market. <b>LONG</b> buys the level <b>below</b> price, <b>SHORT</b> sells the level
@@ -417,16 +430,62 @@
 const FZ = (function(){
   const LSS="ezfut_settings", LST="ezexec_theme", LSST="ezfut_strategies";
   let mode="PAPER", sym="MNQ", qty=1, inTrade=false, poll=null, priceTimer=null, trendTimer=null;
-  let settings={tp_enabled:false,tp_points:10,sl_enabled:false,sl_points:5,trail_enabled:false,trail_points:5};
+  let settings={tp_enabled:false,tp_points:10,sl_enabled:false,sl_points:5,trail_enabled:false,trail_points:5,
+                round_enabled:false,round_step:50};
+  let prefs={}, prefsReady=false, prefsLoaded=null;
   const $=id=>document.getElementById(id);
   const api=(p,b)=>fetch(p,{method:b?'POST':'GET',headers:{'Content-Type':'application/json'},
                            body:b?JSON.stringify(b):undefined}).then(r=>r.json());
   try{ const sv=JSON.parse(localStorage.getItem(LSS)||"null"); if(sv) settings={...settings,...sv}; }catch(e){}
 
-  function applyTheme(t){ if(t==="white")t="light"; if(t==="black")t="dark"; document.body.dataset.theme=t; localStorage.setItem(LST,t); document.querySelectorAll(".tdot").forEach(function(d){d.classList.toggle("active",d.dataset.set===t);}); }
+  function applyTheme(t){ if(t==="white")t="light"; if(t==="black")t="dark"; document.body.dataset.theme=t; localStorage.setItem(LST,t); document.querySelectorAll(".tdot").forEach(function(d){d.classList.toggle("active",d.dataset.set===t);}); savePrefs({theme:t}); }
   function setTheme(t){ applyTheme(t); }
   applyTheme(localStorage.getItem(LST)||"dark");
   function toggleTheme(){ var o=["light","gray","dark"]; var i=o.indexOf(document.body.dataset.theme); applyTheme(o[(i+1)%o.length]); }
+
+  /* ---- Remembered setup -------------------------------------------------
+     Your choices live in my-settings.json next to the app, not in the browser.
+     That means they survive clearing history, switching browsers, and running
+     UPDATE.bat. The browser copy is kept too, purely so the screen paints
+     instantly before the file comes back. */
+  function savePrefs(patch){
+    if(!prefsReady) return;                       // don't overwrite before the load lands
+    prefs={...prefs,...patch};
+    api('/api/prefs',patch).catch(()=>{});
+  }
+  function selectMode(m){
+    const b=document.querySelector('#modes button[data-m="'+m+'"]'); if(b) b.click();
+  }
+  async function loadRemembered(){
+    let r=null;
+    try{ r=await api('/api/prefs'); }catch(e){}
+    if(r){
+      if(r.settings) settings={...settings,...r.settings};
+      if(r.strategies&&r.strategies.length) strategies=r.strategies;
+      prefs=r.prefs||{};
+      if(prefs.theme) applyTheme(prefs.theme);
+      if(prefs.symbol) sym=prefs.symbol;
+      if(prefs.qty) qty=Math.max(1,parseInt(prefs.qty)||1);
+      $('qty').textContent=qty;
+      document.querySelectorAll('#seg button').forEach(b=>b.classList.toggle('on',b.dataset.s===sym));
+      if(prefs.nt_account) $('ntAccount').value=prefs.nt_account;
+      if(prefs.nt_folder)  $('ntFolder').value=prefs.nt_folder;
+      if(prefs.tv_user)    $('tvUser').value=prefs.tv_user;
+      if(prefs.tv_env)     $('tvEnv').value=prefs.tv_env;
+      if(prefs.ts_user)    $('tsUser').value=prefs.ts_user;
+      if(prefs.ts_acct)    $('tsAcct').value=prefs.ts_acct;
+      $('rememberLogin').checked=!!prefs.remember_login;
+      if(prefs.remember_login){
+        if(prefs.tv_pass) $('tvPass').value=prefs.tv_pass;
+        if(prefs.tv_key)  $('tvKey').value=prefs.tv_key;
+        if(prefs.tv_sec)  $('tvSec').value=prefs.tv_sec;
+        if(prefs.ts_key)  $('tsKey').value=prefs.ts_key;
+      }
+      if(prefs.mode&&prefs.mode!=='PAPER') selectMode(prefs.mode);
+    }
+    prefsReady=true;
+    renderStrategies();
+  }
 
   fetch('/api/health').then(r=>r.json()).then(h=>{$('appVer').textContent='v'+h.version;})
     .catch(()=>{$('appVer').textContent='server not running';});
@@ -437,10 +496,15 @@ const FZ = (function(){
     $('ntConfig').style.display = mode==='LIVE' ? 'block' : 'none';
     $('tvConfig').style.display = mode==='TRADOVATE' ? 'block' : 'none';
     $('tsConfig').style.display = mode==='TOPSTEP' ? 'block' : 'none';
+    // Only broker modes have a secret worth offering to remember.
+    $('rememberRow').style.display = (mode==='TRADOVATE'||mode==='TOPSTEP') ? 'block' : 'none';
+    savePrefs({mode});
   });
+  $('rememberLogin').onchange=()=>savePrefs({remember_login:$('rememberLogin').checked});
 
   $('connectBtn').onclick=async()=>{
     $('connectErr').textContent='';
+    try{ await prefsLoaded; }catch(e){}   // never push stale browser settings over the saved file
     const body={app_key:'',app_secret:'',mode};
     if(mode==='LIVE'){ body.account=$('ntAccount').value.trim()||'Sim101'; body.incoming_folder=$('ntFolder').value.trim(); }
     if(mode==='TRADOVATE'){ body.tv_user=$('tvUser').value.trim(); body.tv_pass=$('tvPass').value;
@@ -450,6 +514,13 @@ const FZ = (function(){
     const r=await api('/api/connect',body);
     $('connectBtn').textContent='START';
     if(r.detail){ $('connectErr').textContent=r.detail; return; }
+    // Remember how you connected so the next launch is already set up.
+    savePrefs({mode, remember_login:$('rememberLogin').checked,
+               nt_account:$('ntAccount').value.trim(), nt_folder:$('ntFolder').value.trim(),
+               tv_user:$('tvUser').value.trim(), tv_env:$('tvEnv').value,
+               ts_user:$('tsUser').value.trim(), ts_acct:$('tsAcct').value.trim(),
+               tv_pass:$('tvPass').value, tv_key:$('tvKey').value.trim(),
+               tv_sec:$('tvSec').value.trim(), ts_key:$('tsKey').value.trim()});
     $('connectScreen').classList.add('hidden'); $('dash').classList.remove('hidden');
     $('modePill').textContent = mode==='PAPER' ? 'PAPER' : (mode==='TRADOVATE' ? 'TRADOVATE' : (mode==='TOPSTEP' ? 'TOPSTEP' : 'NINJA'));
     $('footMode').textContent = mode==='PAPER' ? '◦ PAPER — SIMULATED FILLS · LIVE PRICES ◦'
@@ -506,9 +577,9 @@ const FZ = (function(){
   document.querySelectorAll('#seg button').forEach(b=>b.onclick=()=>{
     if(inTrade) return;
     document.querySelectorAll('#seg button').forEach(x=>x.classList.remove('on'));
-    b.classList.add('on'); sym=b.dataset.s; refreshPrices(); refreshTrend();
+    b.classList.add('on'); sym=b.dataset.s; savePrefs({symbol:sym}); refreshPrices(); refreshTrend();
   });
-  function step(d){ if(inTrade)return; qty=Math.max(1,qty+d); $('qty').textContent=qty; }
+  function step(d){ if(inTrade)return; qty=Math.max(1,qty+d); $('qty').textContent=qty; savePrefs({qty}); }
 
   async function open(side){
     const path = settings.round_enabled ? '/api/order/arm' : '/api/order/place';
@@ -609,6 +680,8 @@ const FZ = (function(){
     catch(e){ strategies=defaultStrategies(); }
   }
   async function syncStrategies(){ try{ await api('/api/strategies',{strategies}); }catch(e){} }
+  /* Saved twice on purpose: to the browser so the list paints instantly, and to
+     my-settings.json via /api/strategies so it survives an update or a new browser. */
   function persistStrategies(){ localStorage.setItem(LSST,JSON.stringify(strategies)); syncStrategies(); }
   function renderStrategies(){
     const el=$('stratList'); if(!el) return;
@@ -652,7 +725,8 @@ const FZ = (function(){
     s[field] = field==='qty' ? Math.max(1,parseInt(val)||1) : val;
     persistStrategies(); renderStrategies();
   }
-  loadStrategies();
+  loadStrategies();                       // browser copy first, so nothing flashes empty
+  prefsLoaded = loadRemembered();         // then the file on disk wins (survives updates)
 
   // ---- Quit / shut down -------------------------------------------------
   async function quitApp(){

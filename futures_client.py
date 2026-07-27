@@ -18,6 +18,8 @@ import datetime as dt
 import urllib.request
 import urllib.error
 
+import user_config as uc
+
 FUT = {
     "MNQ": {"yahoo": "NQ=F", "tick": 0.25, "point_value": 2.0, "seed": 23150.0},
     "MES": {"yahoo": "ES=F", "tick": 0.25, "point_value": 5.0, "seed": 6360.0},
@@ -33,7 +35,7 @@ DEFAULT_SETTINGS = {
     "round_enabled": False, "round_step": 50.0,
 }
 
-ROUND_STEPS = (10.0, 25.0, 50.0, 100.0)
+ROUND_STEPS = (10.0, 25.0, 50.0, 100.0, 250.0)
 
 
 def round_target(price, side, step):
@@ -231,6 +233,22 @@ def _coerce_fstrategy(st):
         slow = max(fast + 1, min(int(trig.get("slow") or 21), 100))
         base["trigger"] = {"type": "ema_cross", "fast": fast, "slow": slow}
     return base
+
+
+def _restore_strategies(saved):
+    """Your saved strategies, or the built-ins on a first run.
+
+    If a newer version of the app ships a built-in you don't have saved yet,
+    it gets added (switched OFF) instead of being lost.
+    """
+    kept = [c for c in (_coerce_fstrategy(s) for s in (saved or [])) if c]
+    if not kept:
+        return default_futures_strategies()
+    have = {s["id"] for s in kept}
+    for d in default_futures_strategies():
+        if d["id"] not in have:
+            kept.append(d)
+    return kept
 
 
 # ---- Uploaded historical data (NinjaTrader CSV export) ------------------
@@ -492,9 +510,13 @@ class BaseFuturesSession:
         self.position = None
         self.day_realized = 0.0
         self.blotter = []
+        # Start from whatever you had switched on last time (my-settings.json),
+        # not from the factory defaults.
         self.settings = dict(DEFAULT_SETTINGS)
+        self.settings.update({k: v for k, v in uc.load("futures_settings", {}).items()
+                              if k in DEFAULT_SETTINGS})
         self.last_event = None
-        self.strategies = default_futures_strategies()
+        self.strategies = _restore_strategies(uc.load("futures_strategies", None))
         self._fired = set()   # (strategy_id, bar_ts) already entered on that bar
         self.armed = None     # pending round-number entry
 
@@ -574,6 +596,7 @@ class BaseFuturesSession:
         if not isinstance(strategies, list):
             raise OrderRejected("strategies must be a list")
         self.strategies = [c for c in (_coerce_fstrategy(s) for s in strategies) if c]
+        uc.save("futures_strategies", self.strategies)   # remembered for next launch
         return self.strategies
 
     def _strategy_side(self, st, sym):
@@ -651,6 +674,7 @@ class BaseFuturesSession:
                         s[k] = v
                 except (TypeError, ValueError):
                     pass
+        uc.save("futures_settings", s)      # remembered for next launch
         return s
 
     def _points_pnl(self):

@@ -10,6 +10,7 @@ except Exception:
     ET = None
 
 import config
+import user_config as uc
 try:
     import quotes
 except Exception:
@@ -135,6 +136,23 @@ def _coerce_strategy(st):
         out["trigger"] = {"type": "cross", "level": float(trig.get("level") or 0),
                           "dir": "down" if trig.get("dir") == "down" else "up"}
     return out
+
+
+def _restore_strategies(saved):
+    """Your saved strategies, or the built-ins on a first run.
+
+    If a newer version of the app ships a built-in you don't have saved yet,
+    it gets added (switched OFF) instead of being lost.
+    """
+    kept = [c for c in (_coerce_strategy(s) for s in (saved or [])) if c]
+    if not kept:
+        return default_strategies()
+    have = {s["id"] for s in kept}
+    for d in default_strategies():
+        if d["id"] not in have:
+            kept.append(d)
+    return kept
+
 
 def buy_limit(ask):
     return round(ask + max(config.MARKETABLE_BUFFER_MIN, ask * config.MARKETABLE_BUFFER_PCT), 2)
@@ -317,10 +335,14 @@ class BaseSession:
         self.position = None
         self.day_realized = 0.0
         self.blotter = []
+        # Start from whatever you had switched on last time (my-settings.json),
+        # not from the factory defaults.
         self.settings = dict(config.DEFAULT_SETTINGS)
+        self.settings.update({k: v for k, v in uc.load("options_settings", {}).items()
+                              if k in config.DEFAULT_SETTINGS})
         self.last_event = None
         self.armed = None   # MY CONFIG pending round-number entry
-        self.strategies = default_strategies()
+        self.strategies = _restore_strategies(uc.load("options_strategies", None))
         self._fired = set()   # (strategy_id, date) that already entered today
 
     def update_settings(self, new):
@@ -342,6 +364,7 @@ class BaseSession:
                         s[k] = v
                 except (TypeError, ValueError):
                     pass
+        uc.save("options_settings", s)      # remembered for next launch
         return s
 
     def _bracket_hit(self):
@@ -451,6 +474,7 @@ class BaseSession:
             raise OrderRejected("strategies must be a list")
         cleaned = [c for c in (_coerce_strategy(s) for s in strategies) if c]
         self.strategies = cleaned
+        uc.save("options_strategies", cleaned)   # remembered for next launch
         return self.strategies
 
     def _strategy_side(self, st, sym):

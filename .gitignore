@@ -1,5 +1,7 @@
 __pycache__/
 *.pyc
 data/
+# Your saved setup — stays on your computer, survives every UPDATE.bat.
+my-settings.json
 webull_trade_sdk.log
 *.log

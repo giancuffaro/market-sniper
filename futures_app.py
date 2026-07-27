@@ -13,6 +13,7 @@ from fastapi.responses import HTMLResponse, JSONResponse
 from pydantic import BaseModel
 
 import futures_client as fc
+import user_config as uc
 
 app = FastAPI(title="MARKET SNIPER FUTURES")
 SESSION = {"s": None}
@@ -128,6 +129,47 @@ def close():
         return {"ok": True, **_sess().close()}
     except fc.OrderRejected as e:
         return JSONResponse({"ok": False, "rejected": True, "reason": str(e)})
+
+# ---- Remembered setup (survives restarts AND updates) ----------------------
+# Plain identifiers are always remembered. Passwords / API secrets are ONLY
+# written to disk if you tick "Remember my login on this PC".
+PREF_KEYS = ("theme", "mode", "symbol", "qty",
+             "nt_account", "nt_folder", "tv_user", "tv_env", "ts_user", "ts_acct")
+SECRET_KEYS = ("tv_pass", "tv_key", "tv_sec", "ts_key")
+
+
+@app.get("/api/prefs")
+def get_prefs():
+    """Everything the app should remember, in one call — read before you connect
+    so the setup screen and CONFIGURATION open already filled in."""
+    p = uc.load("futures_prefs", {})
+    saved = uc.load("futures_settings", {})
+    settings = dict(fc.DEFAULT_SETTINGS)
+    settings.update({k: v for k, v in saved.items() if k in fc.DEFAULT_SETTINGS})
+    return {"prefs": p,
+            "settings": settings,
+            "strategies": fc._restore_strategies(uc.load("futures_strategies", None)),
+            "saved_to": uc.where()}
+
+
+@app.post("/api/prefs")
+def set_prefs(req: dict):
+    p = dict(uc.load("futures_prefs", {}))
+    for k in PREF_KEYS:
+        if k in req and req[k] is not None:
+            p[k] = req[k]
+    if "remember_login" in req:
+        p["remember_login"] = bool(req["remember_login"])
+    if p.get("remember_login"):
+        for k in SECRET_KEYS:
+            if k in req and req[k] is not None:
+                p[k] = req[k]
+    else:
+        for k in SECRET_KEYS:      # unticking it wipes anything already stored
+            p.pop(k, None)
+    uc.save("futures_prefs", p)
+    return {"ok": True, "prefs": p}
+
 
 @app.get("/api/settings")
 def get_settings():
