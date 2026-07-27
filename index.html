@@ -158,7 +158,7 @@
   .footer a{color:var(--dim);cursor:pointer;text-decoration:underline}
   .scrim{position:absolute;inset:0;background:rgba(0,0,0,.6);display:none;align-items:center;justify-content:center;padding:22px;z-index:5}
   .scrim.show{display:flex}
-  .smodal{width:100%;max-width:440px;border:1px solid var(--line);border-radius:16px;background:var(--panel);padding:24px 20px;max-height:90vh;overflow-y:auto}
+  .smodal{width:100%;max-width:410px;border:1px solid var(--line);border-radius:16px;background:var(--panel);padding:24px 20px;max-height:90vh;overflow-y:auto}
   .smodal h2{margin:0 0 16px;font-size:15px;letter-spacing:.2em;color:var(--txt);text-align:center}
   .sgroup{border:1px solid var(--line);border-radius:12px;padding:14px;margin-bottom:12px}
   /* MY CONFIG — deliberately a different typeface so you know it's yours */
@@ -944,6 +944,19 @@ const EZ = (function(){
           openSettings,closeSettings,saveSettings,setStrikeMode,hideEvent,tpUnitChanged,
           mirrorToggle,selectProfile,saveProfile,deleteProfile,pickAccount,
           showTab,toggleStrategy,newStrategy,editStrategy,saveStrategy,deleteStrategy,cancelStrategyEdit,stTypeChanged};
+})();
+</script>
+<script>
+/* Click the dark area outside a popup (or press Esc) to close it. */
+(function(){
+  document.addEventListener('click', function(e){
+    if (e.target.classList && e.target.classList.contains('scrim')) e.target.classList.remove('show');
+  });
+  document.addEventListener('keydown', function(e){
+    if (e.key !== 'Escape') return;
+    var open = document.querySelectorAll('.scrim.show');
+    if (open.length) open[open.length-1].classList.remove('show');
+  });
 })();
 </script>
 </body>
