@@ -1,7 +1,7 @@
 """MARKET SNIPER — Webull session wrapper. v3.1
 (Symbols: SPY/QQQ daily-0DTE, TSLA weekly via nearest-Friday expiry.)"""
 
-import os, uuid, math, random
+import os, uuid, math, random, threading, functools
 import datetime as dt
 try:
     from zoneinfo import ZoneInfo
@@ -344,6 +344,13 @@ class BaseSession:
         self.armed = None   # MY CONFIG pending round-number entry
         self.strategies = _restore_strategies(uc.load("options_strategies", None))
         self._fired = set()   # (strategy_id, date) that already entered today
+        # ONE order at a time. The screen refreshes every second, and that refresh
+        # is what fires an automatic take-profit / stop-loss close. Without this
+        # lock, that automatic close and your finger on the CLOSE button can both
+        # send a SELL for the same contracts — the second one arrives at Webull
+        # with nothing left to sell, and comes back as the baffling
+        # "covered call / not enough shares" rejection.
+        self._order_lock = threading.RLock()
 
     def update_settings(self, new):
         s = self.settings
@@ -394,9 +401,18 @@ class BaseSession:
         return None
 
     def _maybe_auto_close(self):
-        hit = self._bracket_hit()
-        if not hit:
-            return
+        # Re-check INSIDE the lock. If you pressed CLOSE a split second earlier,
+        # the position is already gone by the time we get in here and we must not
+        # send a second SELL.
+        with self._order_lock:
+            if not self.position:
+                return
+            hit = self._bracket_hit()
+            if not hit:
+                return
+            return self._do_auto_close(hit)
+
+    def _do_auto_close(self, hit):
         try:
             pnl = round((self.position["mark"] - self.position["entry"]) * 100 * self.position["qty"], 2)
             self.close()
@@ -544,6 +560,20 @@ class BaseSession:
         if self.mode == "PAPER" and not config.ENFORCE_MARKET_HOURS_IN_PAPER:
             return False
         return True
+
+    def forget_position(self):
+        """Escape hatch for a position the app thinks you have but the broker
+        doesn't. Sends NOTHING to Webull — it only clears the app's own screen so
+        you aren't stuck watching CLOSE fail forever. Only use it after you've
+        confirmed in the Webull app that you really are flat."""
+        with self._order_lock:
+            p, self.position = self.position, None
+            self.armed = None
+        if p:
+            self.last_event = (f"Cleared {p['symbol']} {int(p['strike'])}"
+                               f"{'C' if p['side'] == 'CALLS' else 'P'} from the screen. "
+                               f"No order was sent — check Webull to be sure you're flat.")
+        return {"cleared": bool(p)}
 
     def _guard_open(self, qty):
         if self._hours_enforced():
@@ -942,6 +972,95 @@ class LiveSession(BaseSession):
         self.last_event = (f"CLOSE SENT — SELL {p['qty']} × {p['symbol']} limit "
                            f"${limit:.2f} (marketable). Verify the fill in your Webull app.")
         return {"closed": True}
+
+
+def _serialize_orders(cls):
+    """Only ever let ONE order-sending method run at a time per session.
+
+    Applied to both PAPER and LIVE. It is what stops two SELLs going out for the
+    same contracts when the automatic stop-loss and your CLOSE press land in the
+    same second."""
+    for name in ("place", "close", "arm", "disarm"):
+        fn = cls.__dict__.get(name)
+        if fn is None:
+            continue
+
+        def _wrap(inner):
+            @functools.wraps(inner)
+            def guarded(self, *a, **kw):
+                with self._order_lock:
+                    return inner(self, *a, **kw)
+            return guarded
+
+        setattr(cls, name, _wrap(fn))
+    return cls
+
+
+_serialize_orders(PaperSession)
+_serialize_orders(LiveSession)
+
+
+# ---- Turning broker gibberish into English --------------------------------
+# Webull answers a bad order with things like
+#   ServerException: HTTP Status: 417, Code: OAUTH_OPENAPI_OPTION_CAVERED_CALL_STOCK_NO_ENOUGH
+# which tells you nothing about what to actually do. Everything the screen shows
+# you goes through here first.
+_PLAIN = (
+    (("CAVERED_CALL_STOCK_NO_ENOUGH", "COVERED_CALL_STOCK_NO_ENOUGH",
+      "insufficient number of underlying shares"),
+     "Webull couldn't find those contracts in your account, so it read the order as "
+     "SELLING a brand-new call instead of closing yours — and that needs 100 shares of "
+     "the stock as collateral, which you don't have. Almost always this means the BUY "
+     "never actually filled, or the position was already closed (a stop-loss or "
+     "take-profit may have beaten you to it). Open Webull and check your positions. If "
+     "you really are flat, press “I'm actually flat — clear it” below to "
+     "reset the screen."),
+    (("NO_ENOUGH_BUYING_POWER", "BUYING_POWER", "INSUFFICIENT_FUND", "NOT_ENOUGH_FUND"),
+     "Not enough buying power for that order. Lower the contract count, or free up cash "
+     "in the account."),
+    (("ORDER_NOT_EXIST", "ORDER_NOT_FOUND"),
+     "Webull says that order no longer exists — it was probably already filled or "
+     "cancelled. Check your positions in the Webull app."),
+    (("TRADING_NOT_ALLOWED", "MARKET_CLOSED", "NOT_IN_TRADING"),
+     "The market isn't accepting that order right now. Options trade 9:30am–4:00pm ET "
+     "on weekdays."),
+    (("OPTION_NOT_SUPPORT", "NOT_TRADABLE", "INSTRUMENT_NOT"),
+     "Webull won't trade that specific contract through the API. Try the other strike "
+     "setting (OTM/ITM) in SETTINGS, or trade it manually."),
+    (("NOT_PERMITTED", "UNAUTHORIZED_TRADE", "OPTION_LEVEL", "NO_PERMISSION"),
+     "Your Webull account isn't approved for this kind of options order. Check your "
+     "options trading level in the Webull app."),
+    (("X-SIGNATURE", "SIGNATURE", "401"),
+     "Webull rejected your API key and secret. Re-copy BOTH from Webull, and make sure "
+     "your PC clock is set to sync automatically — a clock that's off by a minute breaks "
+     "the signature."),
+    (("RATE_LIMIT", "TOO_MANY_REQUEST", "429"),
+     "You're sending orders faster than Webull allows. Wait a few seconds and try again."),
+    (("TIMEOUT", "TIMED OUT", "READ TIMED"),
+     "Webull didn't answer in time. The order may or may not have gone through — check "
+     "your Webull app before pressing anything again."),
+)
+
+
+def friendly_error(e):
+    """Plain-language version of whatever went wrong, safe to show on screen."""
+    raw = str(e) or e.__class__.__name__
+    up = raw.upper()
+    for needles, plain in _PLAIN:
+        if any(n.upper() in up for n in needles):
+            return plain
+    if isinstance(e, OrderRejected):
+        return raw                       # already written in English by us
+    short = raw[:200].strip()
+    return f"Webull turned the order down. It said: {short}"
+
+
+def is_phantom_position(msg):
+    """True when the reason we were turned down is 'those contracts aren't in
+    your account' — the one case where clearing the screen is the right move."""
+    up = str(msg or "").upper()
+    return ("CAVERED_CALL" in up or "COVERED_CALL" in up
+            or "UNDERLYING SHARES" in up or "CLEAR IT" in up)
 
 
 def make_session(mode):

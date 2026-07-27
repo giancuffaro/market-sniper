@@ -43,6 +43,9 @@
   .wrap{max-width:500px;margin:0 auto;min-height:100vh;background:var(--bg);position:relative;overflow:hidden}
   .app{padding:0 16px 24px}
   .hidden{display:none!important}
+  /* Everything that could open a NEW trade goes dead while you're already in one. */
+  .locknote{text-align:center;color:var(--dim);font-size:12.5px;letter-spacing:.1em;margin:2px 0 12px}
+  .locked{opacity:.32;filter:grayscale(1);pointer-events:none}
   .connect{padding:40px 22px}
   .connect h1{font-size:23px;letter-spacing:.16em;font-weight:800;margin:0 0 4px}
   .connect .sub{color:var(--blue);font-size:12.5px;letter-spacing:.16em;margin-bottom:22px}
@@ -319,6 +322,8 @@
       </div>
     </div>
 
+    <div id="lockNote" class="locknote hidden">🔒 In a trade — CLOSE is the only button until you're out.</div>
+
     <div id="tradeActions" class="hidden">
       <button class="close-btn" onclick="FZ.close()">CLOSE POSITION<small id="closeSub"></small></button>
     </div>
@@ -582,6 +587,13 @@ const FZ = (function(){
   function step(d){ if(inTrade)return; qty=Math.max(1,qty+d); $('qty').textContent=qty; savePrefs({qty}); }
 
   async function open(side){
+    // Last line of defence — the buttons are already hidden and dead while you're
+    // in a trade, but nothing gets past here either.
+    if(inTrade){
+      showReject("You're in a trade. CLOSE it first — while a position is open the only "
+                +"order this app will send is a CLOSE.");
+      return;
+    }
     const path = settings.round_enabled ? '/api/order/arm' : '/api/order/place';
     const r=await api(path,{symbol:sym,side,qty});
     if(!r.ok && r.rejected){ showReject(r.reason); return; }
@@ -614,7 +626,7 @@ const FZ = (function(){
         <span>${t.move}</span><span class="pl ${up?'up':'dn'}">&nbsp;${up?'+':'−'}$${Math.abs(t.pnl).toFixed(2)}</span></div>`;
     }).join('');
     const pos=st.position, armed=st.armed; inTrade=!!pos;
-    document.querySelectorAll('#seg button').forEach(b=>b.disabled=inTrade||!!armed);
+    lockdown(inTrade, !!armed);
     if(armed && !pos){
       $('armBand').classList.remove('hidden');
       const kind=(armed.side==='LONG'?'BUY':'SELL')+' LIMIT';
@@ -824,6 +836,17 @@ const FZ = (function(){
     localStorage.setItem(LSS,JSON.stringify(settings));
     await api('/api/settings',settings);
     closeSettings();
+  }
+
+  // While a position is open the ONLY live control is CLOSE. While a limit is
+  // resting, the side buttons stay off too — CANCEL is the way out of that one.
+  function lockdown(on,armed){
+    document.querySelectorAll('#seg button').forEach(b=>b.disabled=on||armed);
+    document.querySelectorAll('#flatActions button').forEach(b=>b.disabled=on);
+    document.querySelectorAll('.stepper button').forEach(b=>b.disabled=on||armed);
+    $('seg').classList.toggle('locked',on||armed);
+    document.querySelector('.row').classList.toggle('locked',on||armed);
+    $('lockNote').classList.toggle('hidden',!on);
   }
 
   function showEvent(msg){

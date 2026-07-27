@@ -125,6 +125,15 @@
   .reject .h{color:var(--red);font-size:12.5px;font-weight:700}
   .reject .b{color:var(--txt);font-size:14px;margin-top:4px}
   .reject .x{position:absolute;top:9px;right:12px;color:var(--dim);cursor:pointer}
+  /* Only appears when the broker says it can't see the contracts the app thinks
+     you're holding — otherwise CLOSE would keep failing with nowhere to go. */
+  .fixbtn{display:none;width:100%;margin-top:10px;background:transparent;color:var(--red);
+    border:1px solid var(--red);border-radius:8px;padding:9px 0;font-family:var(--ui);
+    font-size:12.5px;letter-spacing:.12em;font-weight:700;cursor:pointer}
+  .fixbtn.show{display:block}
+  /* Everything that could open a NEW trade goes dead while you're in one. */
+  .locknote{text-align:center;color:var(--dim);font-size:12.5px;letter-spacing:.1em;margin:2px 0 12px}
+  .locked{opacity:.32;filter:grayscale(1);pointer-events:none}
   .event{display:none;border:1px solid var(--green);background:var(--green-deep);border-radius:10px;padding:12px 14px;margin-bottom:12px;position:relative}
   .event.show{display:block}
   .event.sl{border-color:var(--red);background:var(--red-deep)}
@@ -312,7 +321,8 @@
 
     <div id="reject" class="reject"><div class="x" onclick="EZ.hideReject()">✕</div>
       <div class="h" id="rejectHead">◆ ORDER REJECTED</div>
-      <div class="b" id="rejectBody"></div></div>
+      <div class="b" id="rejectBody"></div>
+      <button id="rejectFix" class="fixbtn" onclick="EZ.forgetPosition()">I'M ACTUALLY FLAT — CLEAR IT</button></div>
 
     <div class="seg" id="seg">
       <button data-s="SPY">SPY</button>
@@ -335,6 +345,8 @@
         <button class="buy-p" onclick="EZ.buy('PUTS')">BUY PUTS<small id="putSub">loading…</small></button>
       </div>
     </div>
+
+    <div id="lockNote" class="locknote hidden">🔒 In a trade — CLOSE is the only button until you're out.</div>
 
     <div id="tradeActions" class="hidden">
       <button class="close-btn" onclick="EZ.close()">CLOSE <span id="closeSide">CALLS</span>
@@ -759,16 +771,24 @@ const EZ = (function(){
   }
 
   async function buy(s){
+    // Last line of defence. The buttons are already hidden and dead while you're
+    // in a trade, but if anything ever reaches this function anyway it stops here
+    // rather than sending an order Webull would read as opening a naked short.
+    if(inTrade){
+      showReject("You're in a trade. CLOSE it first — while a position is open the only "
+                +"order this app will send is a CLOSE.");
+      return;
+    }
     side=s;
     if(settings.my_enabled){
       const r=await api('/api/order/arm',{symbol:sym,side:s,qty});
-      if(!r.ok && r.rejected){ showReject(r.reason); return; }
+      if(!r.ok && r.rejected){ showReject(r.reason,r.phantom); return; }
       hideReject();
       showEvent('ARMED · MY CONFIG — waiting for '+sym+' to reach '+Number(r.target).toFixed(0)+', then buys the ask');
       await tick(); return;
     }
     const r=await api('/api/order/place',{symbol:sym,side:s,qty});
-    if(!r.ok && r.rejected){ showReject(r.reason); return; }
+    if(!r.ok && r.rejected){ showReject(r.reason,r.phantom); return; }
     if(r.detail){ showReject(r.detail); return; }
     if(r.mirror_ok===false) showEvent('mirror order FAILED: '+(r.mirror_reason||'?')+' — main trade still open');
     inTrade=true; hideReject(); await tick();
@@ -780,7 +800,7 @@ const EZ = (function(){
   }
   async function close(){
     const r=await api('/api/order/close',{});
-    if(!r.ok && r.rejected){ showReject(r.reason); return; }
+    if(!r.ok && r.rejected){ showReject(r.reason,r.phantom); return; }
     if(r.mirror_ok===false) showEvent('mirror close FAILED: '+(r.mirror_reason||'?')+' — check that account!');
     inTrade=false; await tick(); refreshQuote();
   }
@@ -899,7 +919,7 @@ const EZ = (function(){
     }).join('');
 
     const pos=st.position; inTrade=!!pos;
-    document.querySelectorAll('#seg button').forEach(b=>b.disabled=inTrade);
+    lockdown(inTrade);
     const armed=st.armed;
     if(armed && !pos){
       $('armBand').classList.remove('hidden');
@@ -942,12 +962,35 @@ const EZ = (function(){
     }
   }
 
-  function showReject(msg){
+  // While a position is open the ONLY live control is CLOSE. Every way of
+  // starting a new trade — the two buy buttons, the symbol picker, the contract
+  // stepper, the A/S/D hotkeys — is switched off until you're flat again.
+  function lockdown(on){
+    document.querySelectorAll('#seg button').forEach(b=>b.disabled=on);
+    document.querySelectorAll('#flatActions button').forEach(b=>b.disabled=on);
+    document.querySelectorAll('.stepper button').forEach(b=>b.disabled=on);
+    $('seg').classList.toggle('locked',on);
+    document.querySelector('.row').classList.toggle('locked',on);
+    $('lockNote').classList.toggle('hidden',!on);
+  }
+
+  function showReject(msg,canClear){
     const now=new Date().toLocaleTimeString('en-US',{hour12:false});
     $('rejectHead').textContent='◆ ORDER REJECTED · '+now;
-    $('rejectBody').textContent=msg; $('reject').classList.add('show');
+    $('rejectBody').textContent=msg;
+    $('rejectFix').classList.toggle('show',!!canClear);
+    $('reject').classList.add('show');
   }
-  function hideReject(){ $('reject').classList.remove('show'); }
+  function hideReject(){ $('reject').classList.remove('show'); $('rejectFix').classList.remove('show'); }
+
+  // Only offered when Webull says it can't see the contracts we think you own.
+  async function forgetPosition(){
+    if(!confirm("Only do this if you've checked the Webull app and you are NOT holding "
+               +"these contracts.\n\nThis sends NO order. It just clears the position off "
+               +"this screen so you can trade again.")) return;
+    try{ await api('/api/position/forget',{}); }catch(e){}
+    hideReject(); await tick(); refreshQuote();
+  }
 
   async function switchAccount(){
     if(inTrade && !confirm('You have an OPEN position. Leave anyway?')) return;
@@ -973,7 +1016,7 @@ const EZ = (function(){
     setTimeout(()=>{ try{ window.open('','_self'); window.close(); }catch(e){} }, 150);
   }
 
-  return {step,buy,close,disarm,hideReject,disconnect,quitApp,switchAccount,toggleTheme,setTheme,lockNow,
+  return {step,buy,close,disarm,hideReject,forgetPosition,disconnect,quitApp,switchAccount,toggleTheme,setTheme,lockNow,
           openSettings,closeSettings,saveSettings,setStrikeMode,hideEvent,tpUnitChanged,
           mirrorToggle,selectProfile,saveProfile,deleteProfile,pickAccount,
           showTab,toggleStrategy,newStrategy,editStrategy,saveStrategy,deleteStrategy,cancelStrategyEdit,stTypeChanged};

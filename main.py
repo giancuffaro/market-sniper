@@ -152,10 +152,8 @@ def _mirror_info():
 def quote(req: QuoteReq):
     try:
         return _sess().quote(req.symbol, req.side)
-    except wb.OrderRejected as e:
-        raise HTTPException(400, str(e))
     except Exception as e:
-        raise HTTPException(400, f"quote failed: {type(e).__name__}: {str(e)[:200]}")
+        raise HTTPException(400, wb.friendly_error(e))
 
 @app.get("/api/state")
 def state():
@@ -169,15 +167,25 @@ def state():
     st["mirror"] = _mirror_info()
     return st
 
+def _reject(e):
+    """Every rejection the screen sees is written in plain English first."""
+    reason = wb.friendly_error(e)
+    return JSONResponse({"ok": False, "rejected": True, "reason": reason,
+                         "phantom": wb.is_phantom_position(reason),
+                         "raw": f"{type(e).__name__}: {str(e)[:300]}"})
+
+
 @app.post("/api/order/place")
 def place(req: OrderReq):
+    s = _sess()
+    if s.position is not None:
+        return _reject(wb.OrderRejected(
+            "You're already in a trade. Close it first — while a position is open the "
+            "only thing this app will send is a CLOSE order."))
     try:
-        pos = _sess().place(req.symbol, req.side, int(req.qty))
-    except wb.OrderRejected as e:
-        return JSONResponse({"ok": False, "rejected": True, "reason": str(e)})
+        pos = s.place(req.symbol, req.side, int(req.qty))
     except Exception as e:
-        return JSONResponse({"ok": False, "rejected": True,
-                             "reason": f"{type(e).__name__}: {str(e)[:200]}"})
+        return _reject(e)
     out = {"ok": True, "position": pos}
     m = MIRROR["s"]
     if m is not None:
@@ -191,13 +199,15 @@ def place(req: OrderReq):
 
 @app.post("/api/order/arm")
 def arm(req: ArmReq):
+    s = _sess()
+    if s.position is not None:
+        return _reject(wb.OrderRejected(
+            "You're already in a trade. Close it first — while a position is open the "
+            "only thing this app will send is a CLOSE order."))
     try:
-        armed = _sess().arm(req.symbol, req.side, int(req.qty))
-    except wb.OrderRejected as e:
-        return JSONResponse({"ok": False, "rejected": True, "reason": str(e)})
+        armed = s.arm(req.symbol, req.side, int(req.qty))
     except Exception as e:
-        return JSONResponse({"ok": False, "rejected": True,
-                             "reason": f"{type(e).__name__}: {str(e)[:200]}"})
+        return _reject(e)
     return {"ok": True, "armed": armed, **armed}
 
 @app.post("/api/order/disarm")
@@ -208,11 +218,8 @@ def disarm():
 def close():
     try:
         res = _sess().close()
-    except wb.OrderRejected as e:
-        return JSONResponse({"ok": False, "rejected": True, "reason": str(e)})
     except Exception as e:
-        return JSONResponse({"ok": False, "rejected": True,
-                             "reason": f"{type(e).__name__}: {str(e)[:200]}"})
+        return _reject(e)
     out = {"ok": True, **res}
     m = MIRROR["s"]
     if m is not None and m.position is not None:
@@ -283,6 +290,12 @@ def set_strategies(req: dict):
         except Exception:
             pass
     return {"ok": True, "strategies": strategies}
+
+@app.post("/api/position/forget")
+def forget_position():
+    """Clear a position the broker doesn't actually have. Sends NOTHING to Webull."""
+    return {"ok": True, **_sess().forget_position()}
+
 
 @app.post("/api/disconnect")
 def disconnect():
