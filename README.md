@@ -4,20 +4,22 @@ One-tap 0DTE options execution for Webull (SPY/QQQ), plus a separate paper
 futures app (MNQ/MES). Full instructions with pictures: **TUTORIAL.html**.
 
 ## Daily use
-Double-click **START-MARKET-SNIPER.bat** → browser opens → pick LIVE or PAPER
-→ tap a saved account → CONNECT → trade.
+Double-click **🎯 START MARKET SNIPER.bat** → BOTH apps start (options 8000 +
+futures 8010, auto-updated from GitHub) → browser opens → jump between them
+with the ⇄ buttons → the red ✕ inside either app shuts everything down.
 
 ## New computer (once)
-1. Install Python 3 from python.org ("Add Python to PATH")
-2. Double-click **INSTALL.bat**, wait for VERIFIED
-3. **START-MARKET-SNIPER.bat**
+1. Install Git (git-scm.com) and Python 3 (python.org, "Add Python to PATH")
+2. `git clone https://github.com/giancuffaro/market-sniper.git`
+3. Double-click **INSTALL.bat**, wait for VERIFIED
+4. **🎯 START MARKET SNIPER.bat**
 
 ## The files
 ```
+🎯 START MARKET SNIPER.bat  daily launcher (auto-update, starts BOTH apps)
+🛑 STOP EVERYTHING.bat      emergency shutdown (red ✕ in-app does it too)
+🔄 UPDATE.bat               manual update pull (rarely needed)
 INSTALL.bat                one-time setup (SDK + dependencies)
-START-MARKET-SNIPER.bat    daily launcher (self-unblocking, auto-opens browser)
-START-FUTURES.bat          separate futures app (MNQ/MES paper, port 8010)
-Market-Sniper.html         shortcut to a running dashboard
 CHECK-SETUP.bat            health report
 TUTORIAL.html              the complete illustrated guide (Save-as-PDF button)
 main.py / webull_client.py / config.py / index.html / quotes.py    options app
@@ -25,7 +27,6 @@ futures_app.py / futures_client.py / futures_index.html            futures app
 requirements.txt           dependencies
 PROJECT-STATUS.md          build history / state
 ```
-Mac users: `.command` versions of the launchers exist.
 
 ## Costs
 $4.99/mo OPRA options data (required for LIVE) + normal Webull contract fees.
