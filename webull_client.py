@@ -327,14 +327,18 @@ class OptionData:
 
 
 class BaseSession:
-    def __init__(self, mode):
+    def __init__(self, mode="LIVE"):
         self.mode = mode
         self.account_id = None
         self.account_type = None
         self.buying_power = 0.0
         self.position = None
+        # Today's running total and trade list. Loaded from disk so closing the
+        # app at lunch and reopening it doesn't wipe the morning's numbers.
         self.day_realized = 0.0
         self.blotter = []
+        self._day = None
+        self._load_day()
         # Start from whatever you had switched on last time (my-settings.json),
         # not from the factory defaults.
         self.settings = dict(config.DEFAULT_SETTINGS)
@@ -414,10 +418,12 @@ class BaseSession:
 
     def _do_auto_close(self, hit):
         try:
-            pnl = round((self.position["mark"] - self.position["entry"]) * 100 * self.position["qty"], 2)
-            self.close()
+            res = self.close()
+            pnl = float(res.get("pnl") or 0.0)
             if self.blotter:
+                # so you can see at a glance which exits were automatic
                 self.blotter[-1]["desc"] += f"  [{hit}]"
+                self._save_day()
             sign = "+" if pnl >= 0 else "−"
             self.last_event = (f"{'TAKE PROFIT' if hit=='TP' else 'STOP LOSS'} HIT — "
                                f"position closed {sign}${abs(pnl):.2f}")
@@ -426,12 +432,7 @@ class BaseSession:
 
     # ---- MY CONFIG: round-number armed entry -------------------------------
     def _underlying(self, symbol):
-        """Best available underlying price: sim spot in PAPER, live feed otherwise."""
-        if hasattr(self, "_spot"):
-            try:
-                return float(self._spot(symbol))
-            except Exception:
-                pass
+        """Best available price for the stock itself (not the option)."""
         try:
             import quotes
             return float(quotes.get_price(symbol)["price"])
@@ -555,11 +556,55 @@ class BaseSession:
             p["tp_spot"] = next_whole(q["spot"], p["side"])
 
     def _hours_enforced(self):
-        if not config.ENFORCE_MARKET_HOURS:
-            return False
-        if self.mode == "PAPER" and not config.ENFORCE_MARKET_HOURS_IN_PAPER:
-            return False
-        return True
+        return bool(config.ENFORCE_MARKET_HOURS)
+
+    # ---- TODAY / DAY NET ---------------------------------------------------
+    # Every closed trade lands here. It is written to my-settings.json as it
+    # happens, so the running total survives closing the app, restarting the
+    # PC, and UPDATE.bat. A new calendar day starts the count over at zero.
+
+    def _load_day(self):
+        today = dt.date.today().isoformat()
+        saved = uc.load("options_day", {})
+        if saved.get("date") == today:
+            try:
+                self.day_realized = float(saved.get("net", 0.0))
+                self.blotter = [b for b in saved.get("blotter", []) if isinstance(b, dict)]
+            except Exception:
+                self.day_realized, self.blotter = 0.0, []
+        else:
+            self.day_realized, self.blotter = 0.0, []
+        self._day = today
+
+    def _save_day(self):
+        uc.save("options_day", {"date": self._day,
+                                "net": round(self.day_realized, 2),
+                                "blotter": self.blotter[-50:]})
+
+    def _roll_day(self):
+        """Midnight rolls the tally over — yesterday's number shouldn't sit on
+        today's screen."""
+        today = dt.date.today().isoformat()
+        if today != self._day:
+            self._day, self.day_realized, self.blotter = today, 0.0, []
+            self._save_day()
+
+    def _record_close(self, p, exit_price, estimated=False):
+        """The one place a finished trade gets written down. Nothing else
+        touches DAY NET, so the number on screen and the list under it can
+        never disagree."""
+        pnl = round((float(exit_price) - p["entry"]) * 100 * p["qty"], 2)
+        self.day_realized = round(self.day_realized + pnl, 2)
+        tag = "C" if p["side"] == "CALLS" else "P"
+        self.blotter.append({
+            "time": p.get("opened_at") or _now_et().strftime("%H:%M"),
+            "desc": f"{p['symbol']} {int(p['strike'])}{tag} x{p['qty']}"
+                    + ("  ~est" if estimated else ""),
+            "move": f"{p['entry']:.2f} -> {float(exit_price):.2f}",
+            "pnl": pnl,
+            "estimated": bool(estimated)})
+        self._save_day()
+        return pnl
 
     def forget_position(self):
         """Escape hatch for a position the app thinks you have but the broker
@@ -590,6 +635,7 @@ class BaseSession:
             check_market_hours("CLOSE")
 
     def state(self):
+        self._roll_day()              # a new day starts DAY NET back at zero
         self._maybe_trigger_entry()   # fire armed MY CONFIG entry if price reached
         self._eval_strategies()       # fire any enabled strategy whose condition is met
         ev, self.last_event = self.last_event, None
@@ -602,116 +648,12 @@ class BaseSession:
                 "strategies": self.strategies, "event": ev}
 
 
-class PaperSession(BaseSession):
-    SPOTS = {"SPY": 626.40, "QQQ": 500.13, "TSLA": 330.00}
-
-    def connect(self, app_key, app_secret, account_id=None):
-        self.account_id = "PAPER-0000"
-        self.buying_power = 24318.00
-        self._od = None
-        if app_key and app_secret and SDK_AVAILABLE:
-            try:
-                api = ApiClient(app_key, app_secret, config.REGION)
-                api.add_endpoint(config.REGION, config.LIVE_TRADE_ENDPOINT)
-                self._od = OptionData(api)
-                self.account_type = "SIM · REAL DATA"
-            except Exception:
-                self._od = None
-        if self._od is None:
-            self.account_type = "SIM · FAKE DATA"
-        return self.state()
-
-    def _spot(self, symbol):
-        if quotes is not None:
-            try:
-                return quotes.get_price(symbol)["price"]
-            except Exception:
-                pass
-        return round(self.SPOTS[symbol] + random.uniform(-0.6, 0.6), 2)
-
-    def quote(self, symbol, side):
-        spot = self._spot(symbol)
-        step = config.SYMBOLS[symbol]["strike_step"]
-        strike = pick_strike(spot, side, step, self.settings["strike_mode"])
-        option_type = "CALL" if side == "CALLS" else "PUT"
-        ask = None
-        if self._od is not None and config.SYMBOLS[symbol]["enabled"]:
-            try:
-                a, b, m, _ = self._od.ask_bid_mark(
-                    occ_symbol(symbol, _expiry_for(symbol), option_type, strike))
-                ask = a or m
-            except Exception:
-                ask = None
-        if ask is None:
-            ask = round(random.uniform(1.05, 1.45), 2)
-        return {"symbol": symbol, "side": side, "spot": spot, "strike": strike,
-                "ask": round(float(ask), 2), "option_type": option_type}
-
-    def place(self, symbol, side, qty):
-        self._guard_open(qty)
-        q = self.quote(symbol, side)
-        cost = q["ask"] * 100 * qty
-        if cost > self.buying_power:
-            raise OrderRejected(f"BUY {qty} x {symbol} {int(q['strike'])}"
-                                f"{'C' if side=='CALLS' else 'P'} — insufficient buying power")
-        self.buying_power -= cost
-        self.position = {"symbol": symbol, "side": side, "qty": qty,
-                         "strike": q["strike"], "option_type": q["option_type"],
-                         "expiration": _expiry_for(symbol), "entry": q["ask"], "mark": q["ask"],
-                         "opened_at": dt.datetime.now().strftime("%H:%M")}
-        self._decorate_position(q)
-        return self.position
-
-    def refresh_mark(self):
-        if not self.position:
-            return None
-        p = self.position
-        updated = False
-        if self._od is not None and config.SYMBOLS[p["symbol"]]["enabled"]:
-            try:
-                a, b, m, _ = self._od.ask_bid_mark(
-                    occ_symbol(p["symbol"], p["expiration"], p["option_type"], p["strike"]))
-                real = m or ((a + b) / 2 if a and b else a or b)
-                if real:
-                    p["mark"] = round(float(real), 3)
-                    updated = True
-            except Exception:
-                pass
-        p["spot"] = self._spot(p["symbol"])
-        if not updated:
-            entry_spot = p.get("entry_spot")
-            if entry_spot and p["spot"]:
-                move = (p["spot"] - entry_spot) if p["side"] == "CALLS" else (entry_spot - p["spot"])
-                base = p["entry"] + config.SIM_DELTA * move
-                p["mark"] = max(0.01, round(base + random.uniform(-0.01, 0.01), 3))
-            else:
-                p["mark"] = max(0.01, round(p["mark"] + random.uniform(-0.05, 0.05), 3))
-        p["pnl"] = round((p["mark"] - p["entry"]) * 100 * p["qty"], 2)
-        p["pnl_pct"] = round((p["mark"] - p["entry"]) / p["entry"] * 100, 1)
-        self._maybe_auto_close()
-        return self.position
-
-    def close(self):
-        if not self.position:
-            raise OrderRejected("no open position to close")
-        self._guard_close()
-        p = self.position
-        pnl = round((p["mark"] - p["entry"]) * 100 * p["qty"], 2)
-        self.buying_power += p["mark"] * 100 * p["qty"]
-        self.day_realized += pnl
-        self.blotter.append({"time": p["opened_at"],
-                             "desc": f"{p['symbol']} {int(p['strike'])}"
-                                     f"{'C' if p['side']=='CALLS' else 'P'} x{p['qty']}",
-                             "move": f"{p['entry']:.2f} -> {p['mark']:.2f}", "pnl": pnl})
-        self.position = None
-        return {"closed": True, "pnl": pnl}
-
-
 class LiveSession(BaseSession):
     def __init__(self, mode="LIVE"):
         super().__init__(mode)
         self.trade = None
         self._endpoint = config.LIVE_TRADE_ENDPOINT
+        self._pending_close = None   # a close whose real fill price we're chasing
 
     def _balance_for(self, aid):
         try:
@@ -913,6 +855,11 @@ class LiveSession(BaseSession):
         if self._bal_tick >= 15:
             self._bal_tick = 0
             self._load_balance()
+        # runs even when you're flat — the trade we're confirming is already closed
+        try:
+            self._confirm_close_fill()
+        except Exception:
+            self._pending_close = None
         p = self.position
         if not p:
             return None
@@ -969,17 +916,85 @@ class LiveSession(BaseSession):
         if getattr(res, "status_code", None) != 200:
             raise OrderRejected(f"close rejected (HTTP {getattr(res,'status_code','?')}): {str(body)[:200]}")
         self.position = None
+        # Write the trade down IMMEDIATELY, at the price we expect to get. This
+        # is why DAY NET used to sit at $0.00 all day: the close was sent and the
+        # position cleared, but nothing was ever added up. The number is marked
+        # "~est" until Webull tells us the price it actually filled at, which we
+        # go and ask for on the next few refreshes.
+        pnl = self._record_close(p, bid, estimated=True)
+        self._pending_close = {"coid": orders[0]["client_order_id"],
+                               "row": len(self.blotter) - 1,
+                               "entry": p["entry"], "qty": p["qty"], "tries": 0}
+        sign = "+" if pnl >= 0 else "−"
         self.last_event = (f"CLOSE SENT — SELL {p['qty']} × {p['symbol']} limit "
-                           f"${limit:.2f} (marketable). Verify the fill in your Webull app.")
-        return {"closed": True}
+                           f"${limit:.2f} (marketable). Booked {sign}${abs(pnl):.2f} at the "
+                           f"bid; confirming the real fill…")
+        return {"closed": True, "pnl": pnl, "estimated": True}
+
+    def _confirm_close_fill(self):
+        """Replace the estimated exit price with the price Webull actually filled
+        at, and correct DAY NET by the difference. Gives up quietly after a few
+        tries — an estimate at the bid is close enough to keep trading on."""
+        pc = getattr(self, "_pending_close", None)
+        if not pc:
+            return
+        pc["tries"] += 1
+        if pc["tries"] > 10 or not (0 <= pc["row"] < len(self.blotter)):
+            self._pending_close = None
+            return
+        fill = self._lookup_fill_price(pc["coid"])
+        if fill is None:
+            return
+        self._pending_close = None
+        row = self.blotter[pc["row"]]
+        old = row["pnl"]
+        new = round((fill - pc["entry"]) * 100 * pc["qty"], 2)
+        row["pnl"] = new
+        row["move"] = f"{pc['entry']:.2f} -> {fill:.2f}"
+        row["desc"] = row["desc"].replace("  ~est", "")
+        row["estimated"] = False
+        self.day_realized = round(self.day_realized - old + new, 2)
+        self._save_day()
+        if abs(new - old) >= 0.01:
+            self.last_event = (f"Fill confirmed at ${fill:.2f} — that trade was "
+                               f"{'+' if new >= 0 else '−'}${abs(new):.2f}, not "
+                               f"{'+' if old >= 0 else '−'}${abs(old):.2f}. DAY NET corrected.")
+
+    def _lookup_fill_price(self, coid):
+        """Ask Webull what an order actually filled at. None = it hasn't told us
+        yet (or this SDK build has no way to ask)."""
+        if not coid:
+            return None
+        for _name, fn in self._order_query_fns():
+            for call in ((self.account_id, coid), (self.account_id,),
+                         {"account_id": self.account_id, "client_order_id": coid},
+                         {"account_id": self.account_id}):
+                try:
+                    res = fn(**call) if isinstance(call, dict) else fn(*call)
+                    if getattr(res, "status_code", 200) != 200:
+                        continue
+                    body = res.json() if hasattr(res, "json") else res
+                    if coid not in str(body):
+                        continue
+                    fp = _find_key(body, "filled_price", "avg_filled_price",
+                                   "avgFilledPrice", "average_price", "averagePrice",
+                                   "avg_price", "avgPrice", "filled_avg_price",
+                                   "deal_price", "dealPrice", "trade_price")
+                    fp = float(fp)
+                    if 0 < fp < 10000:
+                        return round(fp, 3)
+                except (TypeError, ValueError):
+                    continue
+                except Exception:
+                    continue
+        return None
 
 
 def _serialize_orders(cls):
     """Only ever let ONE order-sending method run at a time per session.
 
-    Applied to both PAPER and LIVE. It is what stops two SELLs going out for the
-    same contracts when the automatic stop-loss and your CLOSE press land in the
-    same second."""
+    It is what stops two SELLs going out for the same contracts when the
+    automatic stop-loss and your CLOSE press land in the same second."""
     for name in ("place", "close", "arm", "disarm"):
         fn = cls.__dict__.get(name)
         if fn is None:
@@ -996,7 +1011,6 @@ def _serialize_orders(cls):
     return cls
 
 
-_serialize_orders(PaperSession)
 _serialize_orders(LiveSession)
 
 
@@ -1063,5 +1077,7 @@ def is_phantom_position(msg):
             or "UNDERLYING SHARES" in up or "CLEAR IT" in up)
 
 
-def make_session(mode):
-    return PaperSession(mode) if mode == "PAPER" else LiveSession(mode)
+def make_session():
+    """One kind of session only. This app trades your real Webull account —
+    there is no paper mode for options, on purpose."""
+    return LiveSession()

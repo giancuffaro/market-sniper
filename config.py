@@ -43,7 +43,6 @@ def build_option_order(client_order_id, symbol, strike, expiration, option_type,
 
 MARKETABLE_BUFFER_PCT = 0.02
 MARKETABLE_BUFFER_MIN = 0.02
-SIM_DELTA = 0.45
 
 MAX_CONTRACTS       = 10
 DAILY_LOSS_LIMIT    = 500.0
@@ -57,7 +56,6 @@ ENFORCE_MARKET_HOURS = True
 MARKET_OPEN        = (9, 30)
 ENTRY_CUTOFF       = (15, 40)
 MARKET_CLOSE_HARD  = (16, 0)
-ENFORCE_MARKET_HOURS_IN_PAPER = True
 
 DEFAULT_SETTINGS = {
     "strike_mode": "OTM1",

@@ -29,7 +29,6 @@ HERE = pathlib.Path(__file__).parent
 class ConnectReq(BaseModel):
     app_key: str = ""
     app_secret: str = ""
-    mode: str = "PAPER"
     account_id: Optional[str] = None
 
 class MirrorReq(BaseModel):
@@ -87,11 +86,23 @@ def prices():
     except Exception as e:
         return JSONResponse({"error": str(e)}, status_code=200)
 
+@app.get("/api/trend")
+def trend(symbol: str = "QQQ"):
+    """Multi-timeframe trend read-out for the strip under the price chips."""
+    if quotes is None:
+        return {"symbol": symbol, "trend": {}}
+    if symbol not in config.SYMBOLS:
+        raise HTTPException(400, f"{symbol} isn't one of the tradable symbols.")
+    try:
+        return {"symbol": symbol, "trend": quotes.trend(symbol)}
+    except Exception as e:
+        return {"symbol": symbol, "trend": {}, "error": str(e)[:120]}
+
+
 @app.post("/api/connect")
 def connect(req: ConnectReq):
-    if req.mode not in ("PAPER", "LIVE"):
-        raise HTTPException(400, "mode must be PAPER or LIVE")
-    s = wb.make_session(req.mode)
+    # Options is live-only: one kind of session, trading your real Webull account.
+    s = wb.make_session()
     try:
         fut = _EXEC.submit(s.connect, req.app_key.strip(), req.app_secret.strip(),
                            req.account_id)
@@ -116,10 +127,8 @@ def connect(req: ConnectReq):
 
 @app.post("/api/mirror/connect")
 def mirror_connect(req: MirrorReq):
-    main = _sess()
-    if main.mode != "LIVE":
-        raise HTTPException(400, "mirror trading only works in LIVE mode")
-    m = wb.make_session("LIVE")
+    _sess()
+    m = wb.make_session()
     try:
         fut = _EXEC.submit(m.connect, req.app_key.strip(), req.app_secret.strip(), None)
         fut.result(timeout=CONNECT_TIMEOUT_S)

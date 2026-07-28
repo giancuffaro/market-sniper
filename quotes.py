@@ -64,6 +64,90 @@ def get_all():
     return {s: get_price(s) for s in YSYM}
 
 
+# ---- TREND ANALYZER ------------------------------------------------------
+# The same read-out the futures app has, for SPY / QQQ / TSLA.
+#
+# For each timeframe it compares a fast 9-period average of price against a
+# slower 21-period one. Fast above slow = buyers in control = UP. Fast below =
+# DOWN. Too close to call = FLAT. Nothing here places a trade; it's a glance at
+# whether the short timeframes agree with the long ones before you click.
+
+_TREND_CACHE = {}     # sym -> {"data":..,"ts":..}
+_TREND_TTL = 20.0
+
+
+def _ema(vals, period):
+    k = 2.0 / (period + 1)
+    e = vals[0]
+    for v in vals[1:]:
+        e = v * k + e * (1 - k)
+    return e
+
+
+def _closes(ysym, interval, rng):
+    url = ("https://query1.finance.yahoo.com/v8/finance/chart/"
+           f"{urllib.request.quote(ysym)}?range={rng}&interval={interval}")
+    req = urllib.request.Request(url, headers=_UA)
+    with urllib.request.urlopen(req, timeout=6) as r:
+        res = json.load(r)["chart"]["result"][0]
+    c = (res.get("indicators", {}).get("quote") or [{}])[0].get("close") or []
+    return [float(x) for x in c if x is not None]
+
+
+def _trend_from_closes(closes, fast=9, slow=21):
+    if len(closes) < slow + 1:
+        return "—"
+    f, s = _ema(closes, fast), _ema(closes, slow)
+    thr = closes[-1] * 0.0005          # ~0.05% dead-band, so noise reads FLAT
+    if f - s > thr:
+        return "UP"
+    if f - s < -thr:
+        return "DOWN"
+    return "FLAT"
+
+
+# Four series are fetched; the rest are built by grouping those bars, so a full
+# refresh is four requests instead of eleven.
+_TREND_BASES = {
+    "b1m":  ("1m", "1d"),
+    "b5m":  ("5m", "5d"),
+    "b60m": ("60m", "1mo"),
+    "b1d":  ("1d", "1y"),
+}
+# (label, which series, how many bars to glue together). 10m = two 5-min bars.
+_TREND_TFS = [
+    ("1m", "b1m", 1),
+    ("5m", "b5m", 1), ("10m", "b5m", 2), ("15m", "b5m", 3),
+    ("20m", "b5m", 4), ("30m", "b5m", 6),
+    ("1h", "b60m", 1), ("2h", "b60m", 2), ("4h", "b60m", 4),
+    ("1d", "b1d", 1), ("1w", "b1d", 5),
+]
+
+
+def trend(symbol):
+    """{'1m':'UP','5m':'DOWN',...}. A dash means that timeframe couldn't be
+    read — the app carries on, it just shows nothing for that box."""
+    now = time.time()
+    c = _TREND_CACHE.get(symbol)
+    if c and now - c["ts"] < _TREND_TTL:
+        return c["data"]
+    ysym = YSYM.get(symbol, symbol)
+    bases = {}
+    for key, (interval, rng) in _TREND_BASES.items():
+        try:
+            bases[key] = _closes(ysym, interval, rng)
+        except Exception:
+            bases[key] = []
+    out = {}
+    for tf, bkey, group in _TREND_TFS:
+        closes = bases.get(bkey) or []
+        if group > 1 and closes:
+            closes = [closes[i] for i in range(len(closes) - 1, -1, -group)][::-1]
+        out[tf] = _trend_from_closes(closes) if closes else "—"
+    _TREND_CACHE[symbol] = {"data": out, "ts": now}
+    return out
+
+
 # ---- Opening Range (for ORB strategies) ---------------------------------
 _ORB_CACHE = {}     # (sym,minutes) -> {"data":..,"ts":..}
 _ORB_TTL = 20.0
