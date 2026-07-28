@@ -394,6 +394,18 @@
         <div id="stratList"></div>
 
         <div class="sgroup">
+          <div class="glbl">WHAT A TRADE COSTS YOU</div>
+          <div class="srow2" style="margin-top:6px"><label>COMMISSION $ / ROUND TURN</label>
+            <input type="number" id="btComm" min="0" step="0.01" value="1.24"></div>
+          <div class="srow2" style="margin-top:8px"><label>SLIPPAGE (TICKS)</label>
+            <input type="number" id="btSlip" min="0" step="0.25" value="1"></div>
+          <div class="shint">Every backtest below is charged these on each trade, in and out.
+          Put in what YOUR broker actually charges — a strategy that makes 0.2 points a trade
+          looks profitable until you pay $1.24 plus a tick to get in and out, and then it isn't.
+          One MNQ tick is $0.50; one MES tick is $1.25.</div>
+        </div>
+
+        <div class="sgroup">
           <div class="glbl">HISTORICAL DATA — for deep backtests (optional)</div>
           <div id="dataStatus" class="btfoot" style="margin-top:2px"></div>
           <div class="srow2" style="margin-top:10px"><label>SYMBOL</label>
@@ -473,6 +485,8 @@ const FZ = (function(){
       if(prefs.qty) qty=Math.max(1,parseInt(prefs.qty)||1);
       $('qty').textContent=qty;
       document.querySelectorAll('#seg button').forEach(b=>b.classList.toggle('on',b.dataset.s===sym));
+      if(prefs.bt_commission!=null) $('btComm').value=prefs.bt_commission;
+      if(prefs.bt_slippage!=null)   $('btSlip').value=prefs.bt_slippage;
       if(prefs.nt_account) $('ntAccount').value=prefs.nt_account;
       if(prefs.nt_folder)  $('ntFolder').value=prefs.nt_folder;
       if(prefs.tv_user)    $('tvUser').value=prefs.tv_user;
@@ -755,11 +769,18 @@ const FZ = (function(){
     setTimeout(()=>{ try{ window.open('','_self'); window.close(); }catch(e){} }, 150);
   }
 
+  // Costs stick around — you shouldn't have to retype your broker's rate.
+  ['btComm','btSlip'].forEach(id=>{ const el=$(id); if(el) el.onchange=()=>savePrefs(
+      {bt_commission:parseFloat($('btComm').value), bt_slippage:parseFloat($('btSlip').value)}); });
+
   // ---- Historical data upload ------------------------------------------
+  let dataHave={MNQ:false,MES:false};
+  const MAX_CSV_MB=200;
   async function refreshDataStatus(){
     const el=$('dataStatus'); if(!el) return;
     try{
       const d=await api('/api/data_status');
+      dataHave={MNQ:!!(d.MNQ&&d.MNQ.uploaded_at), MES:!!(d.MES&&d.MES.uploaded_at)};
       el.innerHTML=['MNQ','MES'].map(s=>{
         const m=d[s];
         if(!m||!m.uploaded_at) return `<b style="color:var(--dim)">${s}</b>: no file — using free Yahoo data`;
@@ -770,6 +791,11 @@ const FZ = (function(){
   function uploadData(){
     const f=$('dataFile').files[0];
     if(!f){ showEvent('pick a CSV file first'); return; }
+    if(f.size > MAX_CSV_MB*1024*1024){
+      showEvent('That file is '+Math.round(f.size/1048576)+' MB — too big. Re-export a shorter '
+               +'date range in NinjaTrader, or 5-minute bars instead of 1-minute.');
+      return;
+    }
     const sym=$('dataSym').value;
     $('dataStatus').innerHTML='<span style="color:var(--dim)">uploading & parsing '+sym+'…</span>';
     const reader=new FileReader();
@@ -793,9 +819,12 @@ const FZ = (function(){
   async function backtestStrategy(id){
     const s=strategies.find(x=>x.id===id); if(!s) return;
     const dur=$('btdur_'+id).value;
-    showBacktest('<div class="btwait">Running backtest on free historical data…<br>('+(DUR_LABEL[dur]||dur)+', '+s.symbol+')</div>');
+    const comm=parseFloat(($('btComm')||{}).value); const slip=parseFloat(($('btSlip')||{}).value);
+    const src=(dataHave[s.symbol]?'your NinjaTrader data':'free Yahoo data');
+    showBacktest('<div class="btwait">Running backtest on '+src+'…<br>('+(DUR_LABEL[dur]||dur)+', '+s.symbol+')</div>');
     try{
-      const r=await api('/api/backtest',{strategy:s,duration:dur});
+      const r=await api('/api/backtest',{strategy:s,duration:dur,
+                        commission:isNaN(comm)?null:comm, slippage_ticks:isNaN(slip)?null:slip});
       renderBacktest(s,r);
     }catch(e){ showBacktest('<div class="btwait">Backtest failed — try again.</div>'); }
   }
@@ -808,7 +837,10 @@ const FZ = (function(){
     const html=`
       <div class="bthead"><b>${s.name}</b> · ${s.symbol}<br><b style="color:${r.source&&r.source.indexOf('NinjaTrader')>=0?'var(--green)':'var(--dim)'}">${r.source||'data'}</b> · ${r.interval} · ${r.from} → ${r.to} · ${Number(r.bars).toLocaleString()} bars</div>
       <div class="btnet ${netCls}">${money(r.net)}</div>
-      <div style="text-align:center;color:var(--dim);font-size:11px">net P&L · 1 contract</div>
+      <div style="text-align:center;color:var(--dim);font-size:11px">net P&amp;L after costs · 1 contract</div>
+      <div style="text-align:center;color:var(--dim);font-size:11px;margin-top:6px">
+        ${money(r.gross_net)} before costs − ${money(r.cost_total)} in commission &amp; slippage
+        <br><span style="font-size:10px">(${money(r.cost_per_trade)} a trade: $${r.commission} commission + ${r.slippage_ticks} tick slippage)</span></div>
       <div class="btgrid">
         ${st('TRADES', r.trades)}
         ${st('WIN RATE', r.win_rate+'%')}
@@ -824,7 +856,7 @@ const FZ = (function(){
       ${r.note?`<div class="btnote">⚠ ${r.note}</div>`:''}
       <div class="btfoot">${r.source&&r.source.indexOf('NinjaTrader')>=0
         ? 'Your uploaded NinjaTrader bars.'
-        : 'Free Yahoo data at the finest resolution the period allows (1-min history is limited, so longer tests use hourly/daily). Upload NinjaTrader data for deep 1-min history.'} Assumes 1 contract, no commissions/slippage — treat as a directional gut-check, not a promise.</div>`;
+        : 'Free Yahoo data at the finest resolution the period allows (1-min history is limited, so longer tests use hourly/daily). Upload NinjaTrader data for deep 1-min history.'} Assumes 1 contract, entries and exits at the bar close, and the commission and slippage you set. Past results are not a promise.</div>`;
     showBacktest(html);
   }
   function closeSettings(){ $('setScrim').classList.remove('show'); }

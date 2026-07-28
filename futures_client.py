@@ -429,8 +429,26 @@ def _sim_vwap(bars, band):
     return trades
 
 
-def _bt_stats(trades, sym):
+# What a round turn really costs you. A backtest that ignores these will show
+# a green number on a strategy that bleeds money in real life — the edge on a
+# scalping system is often smaller than the cost of trading it.
+DEFAULT_COMMISSION = 1.24     # $ per round turn, per contract (Webull micros, approx)
+DEFAULT_SLIPPAGE_TICKS = 1.0  # ticks given up on entry+exit combined
+
+
+def _bt_stats(trades, sym, commission=None, slippage_ticks=None):
+    """`trades` is a list of gross point moves. Commission and slippage are
+    charged per round turn, then the whole picture is recomputed on the
+    after-cost numbers — that is the only P&L that would have hit your account."""
     pv = FUT[sym]["point_value"]
+    tick = FUT[sym]["tick"]
+    comm = DEFAULT_COMMISSION if commission is None else max(0.0, float(commission))
+    slip_t = DEFAULT_SLIPPAGE_TICKS if slippage_ticks is None else max(0.0, float(slippage_ticks))
+    cost_per_trade = comm + slip_t * tick * pv           # dollars, per round turn
+    gross_net = round(sum(trades) * pv, 2)
+    cost_total = round(cost_per_trade * len(trades), 2)
+    # charge the cost against every trade before anything is counted
+    trades = [p - cost_per_trade / pv for p in trades]
     wins = [p for p in trades if p > 0]
     losses = [p for p in trades if p < 0]
     gp, gl = sum(wins) * pv, abs(sum(losses)) * pv
@@ -449,6 +467,10 @@ def _bt_stats(trades, sym):
         "largest_loss": round(min(losses) * pv, 2) if losses else 0.0,
         "profit_factor": round(gp / gl, 2) if gl > 0 else None,
         "max_drawdown": round(mdd, 2), "point_value": pv,
+        "gross_net": gross_net, "cost_total": cost_total,
+        "cost_per_trade": round(cost_per_trade, 2),
+        "commission": round(comm, 2), "slippage_ticks": slip_t,
+        "slippage_dollars": round(slip_t * tick * pv, 2),
     }
 
 
@@ -456,7 +478,7 @@ def _bt_stats(trades, sym):
 _BT_MAP = {"1mo": ("1mo", "5m"), "3mo": ("3mo", "60m"), "6mo": ("6mo", "60m"),
            "1y": ("1y", "60m"), "2y": ("2y", "60m"), "5y": ("5y", "1d")}
 
-def backtest(strategy, duration):
+def backtest(strategy, duration, commission=None, slippage_ticks=None):
     sym = strategy.get("symbol", "MNQ")
     if sym not in FUT:
         sym = "MNQ"
@@ -472,6 +494,12 @@ def backtest(strategy, duration):
         bars = [b for b in uploaded if b["t"] >= cutoff]
         if len(bars) < 30:
             bars = uploaded
+        # Say so plainly rather than quietly testing a shorter window than asked.
+        span_days = (uploaded[-1]["t"] - uploaded[0]["t"]) / 86400.0
+        if span_days < months * 30 * 0.9:
+            note = ("Your file only covers about %d days, so that's the whole test — "
+                    "export a longer range in NinjaTrader for a real %s look."
+                    % (round(span_days), duration))
     else:
         source = "Yahoo (free)"
         if stype == "vwap_pullback":
@@ -490,7 +518,7 @@ def backtest(strategy, duration):
         trades = _sim_vwap(bars, float(trig.get("band", 2.0)))
     else:
         trades = _sim_ema(bars, int(trig.get("fast", 9)), int(trig.get("slow", 21)))
-    out = _bt_stats(trades, sym)
+    out = _bt_stats(trades, sym, commission, slippage_ticks)
     out.update({"symbol": sym, "interval": interval, "duration": duration, "source": source,
                 "from": dt.datetime.utcfromtimestamp(bars[0]["t"]).strftime("%Y-%m-%d"),
                 "to": dt.datetime.utcfromtimestamp(bars[-1]["t"]).strftime("%Y-%m-%d"),

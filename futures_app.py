@@ -133,7 +133,7 @@ def close():
 # ---- Remembered setup (survives restarts AND updates) ----------------------
 # Plain identifiers are always remembered. Passwords / API secrets are ONLY
 # written to disk if you tick "Remember my login on this PC".
-PREF_KEYS = ("theme", "mode", "symbol", "qty",
+PREF_KEYS = ("theme", "mode", "symbol", "qty", "bt_commission", "bt_slippage",
              "nt_account", "nt_folder", "tv_user", "tv_env", "ts_user", "ts_acct")
 SECRET_KEYS = ("tv_pass", "tv_key", "tv_sec", "ts_key")
 
@@ -182,10 +182,12 @@ def set_settings(req: SettingsReq):
 class BacktestReq(BaseModel):
     strategy: dict
     duration: str = "6mo"
+    commission: Optional[float] = None      # $ per round turn, per contract
+    slippage_ticks: Optional[float] = None  # ticks lost on entry + exit
 
 @app.post("/api/backtest")
 def backtest(req: BacktestReq):
-    return fc.backtest(req.strategy, req.duration)
+    return fc.backtest(req.strategy, req.duration, req.commission, req.slippage_ticks)
 
 @app.get("/api/data_status")
 def data_status():
@@ -195,6 +197,8 @@ class UploadReq(BaseModel):
     symbol: str
     content_b64: str = ""
 
+MAX_UPLOAD_MB = 200
+
 @app.post("/api/upload_data")
 def upload_data(req: UploadReq):
     import base64
@@ -202,6 +206,11 @@ def upload_data(req: UploadReq):
         raw = base64.b64decode(req.content_b64)
     except Exception:
         raise HTTPException(400, "Couldn't read that file — make sure it's the CSV you exported.")
+    if len(raw) > MAX_UPLOAD_MB * 1024 * 1024:
+        raise HTTPException(400,
+            f"That file is {len(raw)/1048576:.0f} MB — too big to load in one go "
+            f"(limit {MAX_UPLOAD_MB} MB). Re-export a shorter date range in NinjaTrader, "
+            f"or a coarser bar size like 5-minute instead of 1-minute.")
     try:
         return {"ok": True, **fc.save_uploaded(req.symbol, raw)}
     except fc.OrderRejected as e:
