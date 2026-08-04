@@ -5,20 +5,23 @@ COMPLETELY SEPARATE from the options app. Nothing here imports the options code.
   MNQ (Micro Nasdaq): tick 0.25 = $0.50  ->  $2 per point
   MES (Micro S&P):    tick 0.25 = $1.25  ->  $5 per point
 
-  PaperFuturesSession — simulated fills, REAL live prices (Yahoo NQ=F / ES=F proxies).
-  LiveFuturesSession  — not wired yet (needs futures approval + CME data $228/mo).
+  WebullFuturesSession — REAL Webull PAPER (sandbox): real orders, real fills,
+                         simulated money. Replaced the old fake-fill sim.
+  NinjaTrader / Tradovate / Topstep — real-broker routes for live futures.
 """
 
 import os
 import json
 import time
 import math
+import uuid
 import random
 import datetime as dt
 import urllib.request
 import urllib.error
 
 import user_config as uc
+import config
 
 FUT = {
     "MNQ": {"yahoo": "NQ=F", "tick": 0.25, "point_value": 2.0, "seed": 23150.0},
@@ -774,73 +777,6 @@ class BaseFuturesSession:
                 "strategies": self.strategies, "event": ev}
 
 
-class PaperFuturesSession(BaseFuturesSession):
-    def connect(self, app_key, app_secret, account=None, incoming_folder=None):
-        self.account_id = "FUT-PAPER"
-        self.buying_power = 5000.00
-        return self.state()
-
-    def place(self, symbol, side, qty, limit=None):
-        self._guard_open(qty)
-        if symbol not in FUT:
-            raise OrderRejected("unknown symbol")
-        px = get_price(symbol)["price"]
-        tick = FUT[symbol]["tick"]
-        if limit is not None:
-            # A resting limit fills AT its level or better — no slippage. This
-            # is the armed round-number entry, and it's honestly a better fill.
-            entry = float(limit)
-        else:
-            # A MARKET order crosses the spread: you buy a tick higher, sell a
-            # tick lower. That single tick is the slippage the backtester also
-            # charges (DEFAULT_SLIPPAGE_TICKS), so paper can never score better
-            # than its own backtest — the one direction a simulator must never
-            # be wrong in.
-            entry = to_tick(symbol, px + tick if side == "LONG" else px - tick)
-        self.position = {"symbol": symbol, "side": side, "qty": qty,
-                         "entry": round(float(entry), 2), "mark": px,
-                         "opened_at": dt.datetime.now().strftime("%H:%M")}
-        self._update_trail()
-        return self.position
-
-    def refresh_mark(self):
-        p = self.position
-        if not p:
-            return None
-        real = get_price(p["symbol"])
-        if real["live"]:
-            p["mark"] = real["price"]
-        else:
-            p["mark"] = round(p["mark"] + random.choice([-1, -1, 0, 1, 1]) * FUT[p["symbol"]]["tick"], 2)
-        pv = FUT[p["symbol"]]["point_value"]
-        p["pnl"] = round(self._points_pnl() * pv * p["qty"], 2)
-        p["points"] = round(self._points_pnl(), 2)
-        self._update_trail()
-        self._maybe_auto_close()
-        return self.position
-
-    def close(self):
-        if not self.position:
-            raise OrderRejected("no open position to close")
-        p = self.position
-        pv = FUT[p["symbol"]]["point_value"]
-        gross = round(self._points_pnl() * pv * p["qty"], 2)
-        # The round turn is charged HERE, on the close, the same $1.24/contract
-        # the backtester uses — so paper P&L and backtest P&L agree by
-        # construction. Net is what actually moves the account.
-        fees = round(DEFAULT_COMMISSION * p["qty"], 2)
-        net = round(gross - fees, 2)
-        self.day_realized += net
-        self.day_fees = round(self.day_fees + fees, 2)
-        self.buying_power += net
-        self.blotter.append({"time": p["opened_at"],
-                             "desc": f"{p['symbol']} {p['side']} x{p['qty']}",
-                             "move": f"{p['entry']:.2f} -> {p['mark']:.2f}",
-                             "gross": gross, "fees": fees, "pnl": net})
-        self.position = None
-        return {"closed": True, "pnl": net, "gross": gross, "fees": fees}
-
-
 class NinjaTraderSession(BaseFuturesSession):
     """Routes real orders to NinjaTrader 8 via its ATI Order Instruction Files.
     One-way (fire-and-forget): it drops oif*.txt into the 'incoming' folder and
@@ -1248,9 +1184,196 @@ class TopstepSession(BaseFuturesSession):
         return {"closed": True, "pnl": pnl}
 
 
+class WebullFuturesSession(BaseFuturesSession):
+    """REAL Webull PAPER futures — routes to Webull's SANDBOX and places real
+    futures orders there for real fills, simulated money. This replaces the
+    old fake-fill simulator: paper is now the actual broker engine, not a guess.
+
+    Money-safe by construction: the endpoint is fixed to the sandbox host and
+    never changed, so it CANNOT reach a real account — exactly like the options
+    paper side. Needs a SANDBOX api key (a live key won't authenticate on the
+    sandbox, which is the safe way for a mistake to fail).
+
+    Order EXECUTION is real (orders truly hit Webull's sandbox). Position and
+    P&L shown here are the app's estimate from the live price feed — same honest
+    caveat the NinjaTrader route carries — until fill read-back is wired; always
+    confirm fills in Webull. Commission on close is the same $1.24 estimate the
+    backtest uses."""
+
+    # App root -> the product code Webull's instrument lookup wants.
+    PRODUCT = {"MNQ": "MNQ", "MES": "MES"}
+
+    def __init__(self, mode="PAPER"):
+        super().__init__(mode)
+        self.account_id = None
+        self.trade = None
+        self.data = None
+        self._contract = {}     # "MNQ" -> resolved front-month symbol e.g. "MNQZ5"
+
+    def _find(self, obj, *names):
+        """Webull's field names drift, so look for any of them anywhere."""
+        if isinstance(obj, dict):
+            for n in names:
+                if n in obj and obj[n] not in (None, ""):
+                    return obj[n]
+            for v in obj.values():
+                r = self._find(v, *names)
+                if r is not None:
+                    return r
+        elif isinstance(obj, list):
+            for v in obj:
+                r = self._find(v, *names)
+                if r is not None:
+                    return r
+        return None
+
+    def connect(self, app_key, app_secret, account=None, incoming_folder=None):
+        try:
+            from webull.core.client import ApiClient
+            from webull.trade.trade_client import TradeClient
+            from webull.data.data_client import DataClient
+        except Exception as e:                              # noqa: BLE001
+            raise OrderRejected("Webull SDK not installed — run INSTALL.bat, then "
+                                "relaunch. (%s)" % str(e)[:120])
+        if not app_key or not app_secret:
+            raise OrderRejected("Paper needs your Webull SANDBOX api key + secret "
+                                "in the boxes above.")
+        api = ApiClient(app_key.strip(), app_secret.strip(), config.REGION)
+        # SANDBOX ONLY — this is the line that makes real money impossible here.
+        api.add_endpoint(config.REGION, config.SANDBOX_TRADE_ENDPOINT)
+        self._api = api
+        self.trade = TradeClient(api)
+        self.data = DataClient(api)
+        res = self.trade.account_v2.get_account_list()
+        if getattr(res, "status_code", None) != 200:
+            raise OrderRejected(
+                "Paper (sandbox) connect failed: HTTP %s. Paper futures need a "
+                "SANDBOX api key from Webull's developer site — a live key won't "
+                "work here. (Nothing real was touched.)"
+                % getattr(res, "status_code", "?"))
+        data = res.json()
+        accounts = (data if isinstance(data, list)
+                    else (data.get("data") or data.get("accounts")
+                          or data.get("account_list") or []))
+        if isinstance(accounts, dict):
+            accounts = [accounts]
+        suffixes = [str(s).upper() for s in getattr(config, "FUTURES_ACCOUNT_SUFFIXES", [])]
+        acct = None
+        for a in accounts:
+            aid = self._find(a, "account_id", "accountId", "secAccountId",
+                             "sec_account_id", "id")
+            atype = str(self._find(a, "account_type", "accountType",
+                                   "account_category") or "").upper()
+            if aid and ("FUTURE" in atype
+                        or any(str(aid).upper().endswith(sfx) for sfx in suffixes)):
+                acct = aid
+                break
+        if acct is None and accounts:      # sandbox may expose one book — take it
+            acct = self._find(accounts[0], "account_id", "accountId",
+                              "secAccountId", "sec_account_id", "id")
+        if not acct:
+            raise OrderRejected("connected to the sandbox but found no account to trade.")
+        self.account_id = str(acct)
+        self.buying_power = 0.0            # sandbox balance read-back varies; confirm in Webull
+        self.last_event = "Connected to Webull PAPER (sandbox), account %s" % self.account_id
+        return self.state()
+
+    def _resolve(self, root):
+        """MNQ -> the current front-month contract symbol (e.g. MNQZ5)."""
+        if root in self._contract:
+            return self._contract[root]
+        code = self.PRODUCT.get(root, root)
+        try:
+            res = self.data.instrument.get_futures_instrument_by_code(
+                code, "US_FUTURES", "MONTHLY")
+            body = res.json() if getattr(res, "status_code", 200) == 200 else {}
+            sym = self._find(body, "symbol", "contract_symbol", "contractSymbol",
+                             "instrument_symbol", "instrumentSymbol")
+        except Exception:                                   # noqa: BLE001
+            sym = None
+        if not sym:
+            raise OrderRejected("couldn't get the front-month %s contract from "
+                                "Webull just now — try again in a moment." % root)
+        self._contract[root] = str(sym)
+        return self._contract[root]
+
+    def _order(self, contract, side, qty, order_type, limit=None):
+        o = {"combo_type": "NORMAL", "client_order_id": uuid.uuid4().hex,
+             "symbol": contract, "instrument_type": "FUTURES", "market": "US",
+             "order_type": order_type, "quantity": str(int(qty)), "side": side,
+             "time_in_force": "DAY", "entrust_type": "QTY"}
+        if limit is not None:
+            o["limit_price"] = str(limit)
+        return o
+
+    def place(self, symbol, side, qty, limit=None):
+        self._guard_open(qty)
+        if symbol not in FUT:
+            raise OrderRejected("unknown symbol")
+        contract = self._resolve(symbol)
+        o = self._order(contract, "BUY" if side == "LONG" else "SELL", qty,
+                        "LIMIT" if limit is not None else "MARKET", limit)
+        res = self.trade.order_v3.place_order(self.account_id, [o])
+        if getattr(res, "status_code", None) != 200:
+            raise OrderRejected("Webull sandbox rejected the order: HTTP %s %s"
+                                % (getattr(res, "status_code", "?"),
+                                   str(getattr(res, "text", ""))[:150]))
+        px = get_price(symbol)["price"]
+        entry = float(limit) if limit is not None else px
+        self.position = {"symbol": symbol, "side": side, "qty": int(qty),
+                         "entry": round(entry, 2), "mark": px, "contract": contract,
+                         "client_order_id": o["client_order_id"],
+                         "opened_at": dt.datetime.now().strftime("%H:%M")}
+        self._update_trail()
+        self.last_event = "SENT to Webull sandbox: %s %d %s (%s)" % (
+            side, int(qty), symbol, contract)
+        return self.position
+
+    def refresh_mark(self):
+        p = self.position
+        if not p:
+            return None
+        real = get_price(p["symbol"])
+        if real["live"]:
+            p["mark"] = real["price"]
+        pv = FUT[p["symbol"]]["point_value"]
+        p["pnl"] = round(self._points_pnl() * pv * p["qty"], 2)
+        p["points"] = round(self._points_pnl(), 2)
+        self._update_trail()
+        self._maybe_auto_close()
+        return self.position
+
+    def close(self):
+        if not self.position:
+            raise OrderRejected("no open position to close")
+        p = self.position
+        contract = p.get("contract") or self._resolve(p["symbol"])
+        o = self._order(contract, "SELL" if p["side"] == "LONG" else "BUY",
+                        p["qty"], "MARKET")
+        res = self.trade.order_v3.place_order(self.account_id, [o])
+        if getattr(res, "status_code", None) != 200:
+            raise OrderRejected("Webull sandbox rejected the close: HTTP %s. If "
+                                "it's still open, close it in Webull."
+                                % getattr(res, "status_code", "?"))
+        pv = FUT[p["symbol"]]["point_value"]
+        gross = round(self._points_pnl() * pv * p["qty"], 2)
+        fees = round(DEFAULT_COMMISSION * p["qty"], 2)   # estimate; confirm in Webull
+        net = round(gross - fees, 2)
+        self.day_realized += net
+        self.day_fees = round(self.day_fees + fees, 2)
+        self.blotter.append({"time": p["opened_at"],
+                             "desc": f"{p['symbol']} {p['side']} x{p['qty']}",
+                             "move": f"{p['entry']:.2f} -> {p['mark']:.2f}",
+                             "gross": gross, "fees": fees, "pnl": net})
+        self.position = None
+        return {"closed": True, "pnl": net, "gross": gross, "fees": fees}
+
+
 def make_session(mode):
+    # PAPER is REAL Webull sandbox futures now. The old fake-fill simulator is
+    # gone — paper is the actual broker engine, not a guess.
     if mode == "PAPER":
-        return PaperFuturesSession(mode)
+        return WebullFuturesSession(mode)
     if mode == "TRADOVATE":
         return TradovateSession(mode)
     if mode == "TOPSTEP":
