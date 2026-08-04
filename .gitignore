@@ -5,3 +5,4 @@ data/
 my-settings.json
 webull_trade_sdk.log
 *.log
+webull_trade_sdk.log.*
