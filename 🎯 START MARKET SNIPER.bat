@@ -2,9 +2,13 @@
 title MARKET SNIPER
 cd /d "%~dp0"
 
-echo [0/4] Checking GitHub for updates...
-git stash >nul 2>&1
-git pull origin main
+echo [0/4] Updating from GitHub (exact mirror - always lands)...
+rem  fetch + hard reset makes this folder EXACTLY match GitHub, so an update can
+rem  never get stuck on a leftover stash or a merge conflict the way git pull
+rem  could. Your saved setup is safe: my-settings.json, data\ and logs are all
+rem  gitignored, so git never touches them.
+git fetch origin main
+git reset --hard origin/main
 
 echo [1/4] Unblocking files...
 powershell -NoProfile -ExecutionPolicy Bypass -Command "Get-ChildItem -Path '%~dp0' -Recurse | Unblock-File" >nul 2>&1

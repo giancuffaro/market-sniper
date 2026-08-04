@@ -94,6 +94,7 @@
   .top .meta{color:var(--dim);display:flex;gap:8px;align-items:center;flex-wrap:wrap;justify-content:flex-end}
   .modepill{border:1px solid var(--line);border-radius:6px;padding:3px 8px;font-size:11px;letter-spacing:.12em}
   .modepill.LIVE{color:var(--amber);border-color:var(--amber)}
+  .modepill.PAPER{color:var(--green,#3ecf8e);border-color:var(--green,#3ecf8e)}
   .setbtn{border:1px solid var(--line);border-radius:6px;padding:3px 9px;color:var(--dim);font-size:11px;cursor:pointer}
   .quitbtn{border:1px solid var(--red);color:var(--red);background:transparent;border-radius:7px;padding:2px 9px;font-size:14px;font-weight:800;cursor:pointer;line-height:1.3}
   .quitbtn:hover{background:var(--red);color:#fff}
@@ -242,8 +243,8 @@
       <div class="theme-dots" role="group" aria-label="Theme color"><button class="tdot tdot-white" data-set="light" onclick="EZ.setTheme('light')" aria-label="White theme"></button><button class="tdot tdot-gray" data-set="gray" onclick="EZ.setTheme('gray')" aria-label="Gray theme"></button><button class="tdot tdot-black" data-set="dark" onclick="EZ.setTheme('dark')" aria-label="Black theme"></button></div>
     </div>
 
-    <div class="livewarn">● LIVE ACCOUNT — every order here is real money. There is no paper
-    mode for options, on purpose.</div>
+    <div class="livewarn">● LIVE ACCOUNT — every order here is real money, unless you tick
+    PAPER below. PAPER routes to Webull's sandbox and can't touch your real account.</div>
     <div style="text-align:right;margin:-4px 0 10px"><span class="setbtn" style="color:var(--blue,#4aa3e0)" onclick="location.href='http://127.0.0.1:8010'">⇄ SWITCH TO FUTURES</span></div>
 
     <div class="profbox">
@@ -263,6 +264,7 @@
       <input id="appSecret" type="password" autocomplete="off" spellcheck="false" placeholder="paste your secret"></div>
 
     <label class="remember"><input type="checkbox" id="remember" checked> Remember last used account on this device</label>
+    <label class="remember"><input type="checkbox" id="paperMode"> <b style="color:var(--green,#3ecf8e);letter-spacing:.1em">PAPER</b> — Webull sandbox, simulated money (needs a separate sandbox API key)</label>
     <button class="go" id="connectBtn">CONNECT</button>
 
     <!-- shown when one key exposes multiple accounts -->
@@ -276,8 +278,9 @@
 
     <div class="err" id="connectErr"></div>
     <div class="note">Credentials post only to this local app (127.0.0.1). Saved accounts live in
-    this browser on this machine only. Options trades your real Webull account — there is no
-    simulated mode here.</div>
+    this browser on this machine only. Tick PAPER to route to Webull's sandbox (real order
+    plumbing, real quotes, simulated money) — it needs its own sandbox API key and can't reach
+    your real account. Untick it and every order is real money.</div>
   </div>
 
   <!-- DASHBOARD -->
@@ -606,9 +609,10 @@ const EZ = (function(){
     try{ await prefsLoaded; }catch(e){}   // never push stale browser settings over the saved file
     btn.disabled=true; btn.textContent='CONNECTING…';
     try{
-      const r=await api('/api/connect',{app_key:k,app_secret:s});
+      const paper=$('paperMode').checked;
+      const r=await api('/api/connect',{app_key:k,app_secret:s,paper});
       if(r.detail){ $('connectErr').textContent=r.detail; return; }
-      if(r.choose_accounts){ showAccountPicker(r.choose_accounts,k,s); return; }
+      if(r.choose_accounts){ showAccountPicker(r.choose_accounts,k,s,paper); return; }
       startDash(r);
     }catch(e){
       $('connectErr').textContent='could not reach the local app — is the black window still open?';
@@ -616,7 +620,7 @@ const EZ = (function(){
   };
 
   // stacked account rows — full info per account
-  function showAccountPicker(accts,k,s){
+  function showAccountPicker(accts,k,s,paper){
     $('acctPickBox').style.display='';
     $('acctPickList').innerHTML=accts.map(a=>{
       const fut=/FUTURE/i.test(a.type||'');
@@ -626,12 +630,12 @@ const EZ = (function(){
         <div class="t2">Account ID: ${a.id} · Buying power: ${bp}${fut?' · options not tradable here':''}</div>
       </div>`;
     }).join('');
-    window.__pickCreds={k,s};
+    window.__pickCreds={k,s,paper:!!paper};
   }
   async function pickAccount(id){
     const c=window.__pickCreds||{};
     $('connectErr').textContent='';
-    const r=await api('/api/connect',{app_key:c.k,app_secret:c.s,account_id:id});
+    const r=await api('/api/connect',{app_key:c.k,app_secret:c.s,account_id:id,paper:!!c.paper});
     if(r.detail){ $('connectErr').textContent=r.detail; return; }
     if(r.choose_accounts){ $('connectErr').textContent='unexpected: still asking to choose — retry'; return; }
     $('acctPickBox').style.display='none';
@@ -641,8 +645,12 @@ const EZ = (function(){
   function startDash(state){
     $('connectScreen').classList.add('hidden');
     $('dash').classList.remove('hidden');
-    $('modePill').textContent='LIVE'; $('modePill').className='modepill LIVE';
-    $('footMode').textContent='● LIVE — REAL ORDERS ●';
+    // Read the mode the SERVER actually connected to — never the checkbox. If
+    // the server says LIVE, you're on real money no matter what was ticked.
+    const paper=String((state&&state.mode)||'LIVE').toUpperCase()==='PAPER';
+    $('modePill').textContent=paper?'PAPER':'LIVE';
+    $('modePill').className='modepill '+(paper?'PAPER':'LIVE');
+    $('footMode').textContent=paper?'◦ PAPER — WEBULL SANDBOX, SIMULATED MONEY ◦':'● LIVE — REAL ORDERS ●';
     $('footProf').textContent=activeProf||'unsaved keys';
     render(state); refreshQuote(); refreshPrices(); refreshTrend();
     api('/api/settings',settings);

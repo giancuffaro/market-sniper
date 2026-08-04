@@ -329,7 +329,7 @@
     </div>
 
     <div class="blotter">
-      <div class="hd"><span>TODAY</span><span>DAY NET <b class="net" id="dayNet">$0.00</b></span></div>
+      <div class="hd"><span>TODAY <span id="dayFees" class="s" style="color:var(--dim)"></span></span><span>DAY NET <b class="net" id="dayNet">$0.00</b></span></div>
       <div id="blotterRows"></div>
     </div>
     <div class="footer" id="footMode">◦ PAPER — SIMULATED FILLS · LIVE PRICES ◦</div>
@@ -634,10 +634,16 @@ const FZ = (function(){
     $('bp').textContent='$'+Number(st.buying_power||0).toLocaleString(undefined,{minimumFractionDigits:2,maximumFractionDigits:2});
     const dn=Number(st.day_realized||0);
     const el=$('dayNet'); el.textContent=(dn<0?'−$':'$')+Math.abs(dn).toFixed(2); el.className='net'+(dn<0?' neg':'');
+    const df=Number(st.day_fees||0);
+    const dfEl=$('dayFees'); if(dfEl) dfEl.textContent = df>0 ? `· −$${df.toFixed(2)} fees` : '';
     $('blotterRows').innerHTML=(st.blotter||[]).slice().reverse().map(t=>{
       const up=t.pnl>=0;
+      // Newer trades carry gross + fees; older ones only have net (pnl).
+      const sub=(t.fees!==undefined)
+        ? ` <span class="s" style="color:var(--dim)">(${t.gross>=0?'+':'−'}$${Math.abs(t.gross).toFixed(2)} − $${Number(t.fees).toFixed(2)})</span>`
+        : '';
       return `<div class="trow"><span>${t.time}</span><span class="s">&nbsp;${t.desc}</span>
-        <span>${t.move}</span><span class="pl ${up?'up':'dn'}">&nbsp;${up?'+':'−'}$${Math.abs(t.pnl).toFixed(2)}</span></div>`;
+        <span>${t.move}${sub}</span><span class="pl ${up?'up':'dn'}">&nbsp;${up?'+':'−'}$${Math.abs(t.pnl).toFixed(2)}</span></div>`;
     }).join('');
     const pos=st.position, armed=st.armed; inTrade=!!pos;
     lockdown(inTrade, !!armed);

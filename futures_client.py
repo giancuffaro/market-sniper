@@ -536,7 +536,8 @@ class BaseFuturesSession:
         self.account_id = None
         self.buying_power = 0.0
         self.position = None
-        self.day_realized = 0.0
+        self.day_realized = 0.0          # NET of fees — the number that matters
+        self.day_fees = 0.0              # commission paid today, shown separately
         self.blotter = []
         # Start from whatever you had switched on last time (my-settings.json),
         # not from the factory defaults.
@@ -742,9 +743,8 @@ class BaseFuturesSession:
         if not hit:
             return
         try:
-            pnl = round(self._points_pnl() * FUT[self.position["symbol"]]["point_value"]
-                        * self.position["qty"], 2)
-            self.close()
+            result = self.close()
+            pnl = result.get("pnl", 0.0)   # NET of the round-turn commission
             if self.blotter:
                 self.blotter[-1]["desc"] += f"  [{hit}]"
             label = {"TP": "TAKE PROFIT", "SL": "STOP LOSS", "TRAIL": "TRAILING STOP"}[hit]
@@ -769,6 +769,7 @@ class BaseFuturesSession:
                 "buying_power": round(self.buying_power, 2),
                 "position": self.position, "armed": self.armed,
                 "day_realized": round(self.day_realized, 2),
+                "day_fees": round(self.day_fees, 2),
                 "blotter": self.blotter[-20:], "settings": self.settings,
                 "strategies": self.strategies, "event": ev}
 
@@ -781,9 +782,23 @@ class PaperFuturesSession(BaseFuturesSession):
 
     def place(self, symbol, side, qty, limit=None):
         self._guard_open(qty)
+        if symbol not in FUT:
+            raise OrderRejected("unknown symbol")
         px = get_price(symbol)["price"]
+        tick = FUT[symbol]["tick"]
+        if limit is not None:
+            # A resting limit fills AT its level or better — no slippage. This
+            # is the armed round-number entry, and it's honestly a better fill.
+            entry = float(limit)
+        else:
+            # A MARKET order crosses the spread: you buy a tick higher, sell a
+            # tick lower. That single tick is the slippage the backtester also
+            # charges (DEFAULT_SLIPPAGE_TICKS), so paper can never score better
+            # than its own backtest — the one direction a simulator must never
+            # be wrong in.
+            entry = to_tick(symbol, px + tick if side == "LONG" else px - tick)
         self.position = {"symbol": symbol, "side": side, "qty": qty,
-                         "entry": float(limit) if limit else px, "mark": px,
+                         "entry": round(float(entry), 2), "mark": px,
                          "opened_at": dt.datetime.now().strftime("%H:%M")}
         self._update_trail()
         return self.position
@@ -809,14 +824,21 @@ class PaperFuturesSession(BaseFuturesSession):
             raise OrderRejected("no open position to close")
         p = self.position
         pv = FUT[p["symbol"]]["point_value"]
-        pnl = round(self._points_pnl() * pv * p["qty"], 2)
-        self.day_realized += pnl
-        self.buying_power += pnl
+        gross = round(self._points_pnl() * pv * p["qty"], 2)
+        # The round turn is charged HERE, on the close, the same $1.24/contract
+        # the backtester uses — so paper P&L and backtest P&L agree by
+        # construction. Net is what actually moves the account.
+        fees = round(DEFAULT_COMMISSION * p["qty"], 2)
+        net = round(gross - fees, 2)
+        self.day_realized += net
+        self.day_fees = round(self.day_fees + fees, 2)
+        self.buying_power += net
         self.blotter.append({"time": p["opened_at"],
                              "desc": f"{p['symbol']} {p['side']} x{p['qty']}",
-                             "move": f"{p['entry']:.2f} -> {p['mark']:.2f}", "pnl": pnl})
+                             "move": f"{p['entry']:.2f} -> {p['mark']:.2f}",
+                             "gross": gross, "fees": fees, "pnl": net})
         self.position = None
-        return {"closed": True, "pnl": pnl}
+        return {"closed": True, "pnl": net, "gross": gross, "fees": fees}
 
 
 class NinjaTraderSession(BaseFuturesSession):

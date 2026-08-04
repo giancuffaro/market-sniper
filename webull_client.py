@@ -655,6 +655,13 @@ class LiveSession(BaseSession):
         self._endpoint = config.LIVE_TRADE_ENDPOINT
         self._pending_close = None   # a close whose real fill price we're chasing
 
+    def _require_live_env(self):
+        """The real-money safety gate. LIVE requires ALLOW_LIVE=1 (set only by
+        the launcher). PaperSession overrides this to a no-op — the sandbox host
+        can't reach real money, so there's nothing to gate."""
+        if config.REQUIRE_LIVE_ENV_OK and os.environ.get("ALLOW_LIVE") != "1":
+            raise OrderRejected("LIVE blocked: launch with START-MARKET-SNIPER (sets ALLOW_LIVE=1).")
+
     def _balance_for(self, aid):
         try:
             res = self.trade.account_v2.get_account_balance(aid)
@@ -670,8 +677,7 @@ class LiveSession(BaseSession):
         if not SDK_AVAILABLE:
             detail = f" ({SDK_HINT})" if SDK_HINT else ""
             raise OrderRejected("Webull SDK not usable" + detail + " — run 🧰 INSTALL.bat, then relaunch.")
-        if config.REQUIRE_LIVE_ENV_OK and os.environ.get("ALLOW_LIVE") != "1":
-            raise OrderRejected("LIVE blocked: launch with START-MARKET-SNIPER (sets ALLOW_LIVE=1).")
+        self._require_live_env()
         api_client = ApiClient(app_key, app_secret, config.REGION)
         api_client.add_endpoint(config.REGION, self._endpoint)
         self._api_client = api_client
@@ -1077,7 +1083,33 @@ def is_phantom_position(msg):
             or "UNDERLYING SHARES" in up or "CLEAR IT" in up)
 
 
-def make_session():
-    """One kind of session only. This app trades your real Webull account —
-    there is no paper mode for options, on purpose."""
-    return LiveSession()
+class PaperSession(LiveSession):
+    """Options PAPER — routes to Webull's SANDBOX host and CANNOT reach real
+    money. Three locks make that true, not just intended:
+
+      1. the endpoint is the sandbox host, fixed in __init__ and never changed;
+      2. there is NO fallback to the live host — if the sandbox rejects the key
+         it fails loudly instead of quietly connecting to your real account;
+      3. the ALLOW_LIVE gate is skipped only because a sandbox order can't be
+         real in the first place.
+
+    Everything else — account listing, the futures-account refusal, order
+    plumbing — is inherited from LiveSession and rides on the sandbox endpoint.
+    Paper needs its OWN sandbox API key from Webull's developer site; a live key
+    simply won't authenticate here, which is the safe way to fail."""
+
+    def __init__(self, mode="PAPER"):
+        super().__init__(mode)
+        self._endpoint = config.SANDBOX_TRADE_ENDPOINT   # sandbox, always
+
+    def _require_live_env(self):
+        # The sandbox cannot place a real-money order, so there is nothing to
+        # gate. This is the ONLY relaxation vs LiveSession.
+        return
+
+
+def make_session(mode="LIVE"):
+    """LIVE trades your real Webull account. PAPER routes to the sandbox host
+    and can never touch real money (see PaperSession). Default stays LIVE so
+    nothing that calls this without a mode changes behaviour."""
+    return PaperSession() if str(mode).upper() == "PAPER" else LiveSession()

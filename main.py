@@ -30,6 +30,7 @@ class ConnectReq(BaseModel):
     app_key: str = ""
     app_secret: str = ""
     account_id: Optional[str] = None
+    paper: bool = False        # True -> Webull SANDBOX (can't touch real money)
 
 class MirrorReq(BaseModel):
     app_key: str = ""
@@ -101,8 +102,8 @@ def trend(symbol: str = "QQQ"):
 
 @app.post("/api/connect")
 def connect(req: ConnectReq):
-    # Options is live-only: one kind of session, trading your real Webull account.
-    s = wb.make_session()
+    # PAPER routes to Webull's sandbox (no real money possible); otherwise LIVE.
+    s = wb.make_session("PAPER" if req.paper else "LIVE")
     try:
         fut = _EXEC.submit(s.connect, req.app_key.strip(), req.app_secret.strip(),
                            req.account_id)
