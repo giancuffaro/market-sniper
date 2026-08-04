@@ -83,8 +83,8 @@ def prices():
 
 @app.post("/api/connect")
 def connect(req: ConnectReq):
-    if req.mode not in ("PAPER", "LIVE", "TRADOVATE", "TOPSTEP"):
-        raise HTTPException(400, "mode must be PAPER, LIVE, TRADOVATE or TOPSTEP")
+    if req.mode not in ("PAPER", "WEBULL", "LIVE", "TRADOVATE", "TOPSTEP"):
+        raise HTTPException(400, "mode must be PAPER, WEBULL, LIVE, TRADOVATE or TOPSTEP")
     s = fc.make_session(req.mode)
     try:
         if req.mode == "TRADOVATE":
@@ -95,6 +95,7 @@ def connect(req: ConnectReq):
             state = s.connect(req.app_key.strip(), req.app_secret.strip(),
                               req.account.strip(), req.incoming_folder.strip())
         else:
+            # PAPER (sandbox) and WEBULL (live) both take just key + secret.
             state = s.connect(req.app_key.strip(), req.app_secret.strip())
     except fc.OrderRejected as e:
         raise HTTPException(400, str(e))

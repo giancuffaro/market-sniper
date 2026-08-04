@@ -1218,8 +1218,8 @@ class WebullFuturesSession(BaseFuturesSession):
         """Real-money safety gate — LIVE needs ALLOW_LIVE=1 (set by the launcher).
         PAPER skips this: the sandbox host can't touch real money."""
         if self._is_live and config.REQUIRE_LIVE_ENV_OK and os.environ.get("ALLOW_LIVE") != "1":
-            raise OrderRejected("LIVE blocked: launch with START-FUTURES (sets "
-                                "ALLOW_LIVE=1) to arm real-money futures.")
+            raise OrderRejected("LIVE blocked: start the app with '🎯 START MARKET "
+                                "SNIPER' (it sets ALLOW_LIVE=1) to arm real-money futures.")
 
     def _find(self, obj, *names):
         """Webull's field names drift, so look for any of them anywhere."""
@@ -1307,10 +1307,24 @@ class WebullFuturesSession(BaseFuturesSession):
                     "FUTURES_ACCOUNT_SUFFIXES in config.py, then reconnect."
                     % len(accounts))
         self.account_id = str(acct)
-        self.buying_power = 0.0            # balance read-back varies; confirm in Webull
+        self.buying_power = self._read_balance(self.account_id)
         tag = "LIVE (REAL MONEY)" if self._is_live else "PAPER (sandbox)"
         self.last_event = "Connected to Webull %s, account %s" % (tag, self.account_id)
         return self.state()
+
+    def _read_balance(self, aid):
+        """Best-effort buying power. Verified against the live payload: it lives
+        at account_currency_assets[].buying_power. Never fatal — 0.0 if unread."""
+        try:
+            res = self.trade.account_v2.get_account_balance(aid)
+            if getattr(res, "status_code", None) != 200:
+                return 0.0
+            bp = self._find(res.json(), "buying_power", "buyingPower",
+                            "net_liquidation_value", "total_net_liquidation_value",
+                            "cash_balance", "total_cash_balance")
+            return float(bp) if bp not in (None, "") else 0.0
+        except Exception:                                   # noqa: BLE001
+            return 0.0
 
     def _instrument_dicts(self, obj, out):
         """Collect every dict that looks like a futures contract (has a symbol
