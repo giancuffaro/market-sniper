@@ -189,6 +189,7 @@
     </div>
     <div class="modes" id="modes" style="flex-wrap:wrap">
       <button data-m="PAPER" class="on">PAPER</button>
+      <button data-m="WEBULL" style="font-size:12.5px">WEBULL LIVE</button>
       <button data-m="LIVE">NINJA</button>
       <button data-m="TRADOVATE" style="font-size:12.5px">TRADOVATE</button>
       <button data-m="TOPSTEP" style="font-size:12.5px">TOPSTEP</button>
@@ -203,6 +204,18 @@
       <div class="note">Real Webull PAPER — orders fill in your Webull <b>sandbox</b> account: real engine, real
       prices, simulated money. It <b>cannot</b> touch your real account. Needs a <b>separate sandbox API key</b>
       from developer.webull.com — a live key won't authenticate here (that's the safe way to fail).</div>
+    </div>
+
+    <div id="webullConfig" style="display:none">
+      <div class="srow"><label style="min-width:92px">LIVE KEY</label>
+        <input id="wbKey" type="text" autocomplete="off" spellcheck="false" placeholder="Webull LIVE app key" style="font-size:13px"></div>
+      <div class="srow" style="margin-top:8px"><label style="min-width:92px">SECRET</label>
+        <input id="wbSec" type="password" autocomplete="off" spellcheck="false" placeholder="Webull LIVE app secret" style="font-size:13px"></div>
+      <div class="note" style="color:var(--red,#ff5a5a)">⚠ <b>REAL MONEY.</b> WEBULL LIVE places real futures orders
+      in your actual Webull account — same one-tap engine as PAPER, but funded. Uses your <b>production</b> API
+      key from developer.webull.com (a sandbox key won't authenticate). Live is armed only when the app is
+      launched with <b>START-FUTURES</b> (sets ALLOW_LIVE=1); a paper-only launch will refuse to send. Test in
+      PAPER first, keep size small, and confirm every fill in Webull.</div>
     </div>
 
     <div id="tsConfig" style="display:none">
@@ -523,6 +536,7 @@ const FZ = (function(){
     mode=b.dataset.m;
     document.querySelectorAll('#modes button').forEach(x=>x.classList.toggle('on',x===b));
     $('paperConfig').style.display = mode==='PAPER' ? 'block' : 'none';
+    $('webullConfig').style.display = mode==='WEBULL' ? 'block' : 'none';
     $('ntConfig').style.display = mode==='LIVE' ? 'block' : 'none';
     $('tvConfig').style.display = mode==='TRADOVATE' ? 'block' : 'none';
     $('tsConfig').style.display = mode==='TOPSTEP' ? 'block' : 'none';
@@ -537,6 +551,7 @@ const FZ = (function(){
     try{ await prefsLoaded; }catch(e){}   // never push stale browser settings over the saved file
     const body={app_key:'',app_secret:'',mode};
     if(mode==='PAPER'){ body.app_key=$('ppKey').value.trim(); body.app_secret=$('ppSec').value; }
+    if(mode==='WEBULL'){ body.app_key=$('wbKey').value.trim(); body.app_secret=$('wbSec').value; }
     if(mode==='LIVE'){ body.account=$('ntAccount').value.trim()||'Sim101'; body.incoming_folder=$('ntFolder').value.trim(); }
     if(mode==='TRADOVATE'){ body.tv_user=$('tvUser').value.trim(); body.tv_pass=$('tvPass').value;
       body.tv_key=$('tvKey').value.trim(); body.tv_sec=$('tvSec').value.trim(); body.tv_env=$('tvEnv').value; }
@@ -553,8 +568,10 @@ const FZ = (function(){
                tv_pass:$('tvPass').value, tv_key:$('tvKey').value.trim(),
                tv_sec:$('tvSec').value.trim(), ts_key:$('tsKey').value.trim()});
     $('connectScreen').classList.add('hidden'); $('dash').classList.remove('hidden');
-    $('modePill').textContent = mode==='PAPER' ? 'PAPER' : (mode==='TRADOVATE' ? 'TRADOVATE' : (mode==='TOPSTEP' ? 'TOPSTEP' : 'NINJA'));
+    $('modePill').textContent = mode==='PAPER' ? 'PAPER' : (mode==='WEBULL' ? 'WEBULL LIVE'
+      : (mode==='TRADOVATE' ? 'TRADOVATE' : (mode==='TOPSTEP' ? 'TOPSTEP' : 'NINJA')));
     $('footMode').textContent = mode==='PAPER' ? '◦ PAPER — WEBULL SANDBOX, REAL FILLS · SIMULATED MONEY ◦'
+      : mode==='WEBULL' ? ('● WEBULL LIVE '+(r.account_id||'')+' — REAL MONEY ●')
       : ('● '+(r.account_id||mode)+' — REAL ORDERS ●');
     render(r); refreshPrices(); refreshTrend();
     api('/api/settings',settings);

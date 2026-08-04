@@ -1185,20 +1185,20 @@ class TopstepSession(BaseFuturesSession):
 
 
 class WebullFuturesSession(BaseFuturesSession):
-    """REAL Webull PAPER futures — routes to Webull's SANDBOX and places real
-    futures orders there for real fills, simulated money. This replaces the
-    old fake-fill simulator: paper is now the actual broker engine, not a guess.
+    """REAL Webull futures — places real futures orders through Webull's own
+    OpenAPI. Runs in two modes off the SAME engine:
 
-    Money-safe by construction: the endpoint is fixed to the sandbox host and
-    never changed, so it CANNOT reach a real account — exactly like the options
-    paper side. Needs a SANDBOX api key (a live key won't authenticate on the
-    sandbox, which is the safe way for a mistake to fail).
+      PAPER  -> Webull SANDBOX (api.sandbox.webull.com): real fills, simulated
+                money. Money-safe by construction — the sandbox host can't reach
+                a real account, and a live key won't even authenticate there.
+      LIVE   -> Webull PRODUCTION (api.webull.com): REAL MONEY. Gated behind the
+                ALLOW_LIVE=1 env var (set only by the launcher), exactly like the
+                options live side, so it can never fire by accident.
 
-    Order EXECUTION is real (orders truly hit Webull's sandbox). Position and
-    P&L shown here are the app's estimate from the live price feed — same honest
-    caveat the NinjaTrader route carries — until fill read-back is wired; always
-    confirm fills in Webull. Commission on close is the same $1.24 estimate the
-    backtest uses."""
+    Order EXECUTION is real. Position and P&L shown here are the app's estimate
+    from the live price feed — same honest caveat the NinjaTrader route carries —
+    until fill read-back is wired; always confirm fills in Webull. Commission on
+    close is the same $1.24 estimate the backtest uses."""
 
     # App root -> the product code Webull's instrument lookup wants.
     PRODUCT = {"MNQ": "MNQ", "MES": "MES"}
@@ -1209,6 +1209,17 @@ class WebullFuturesSession(BaseFuturesSession):
         self.trade = None
         self.data = None
         self._contract = {}     # "MNQ" -> resolved front-month symbol e.g. "MNQZ5"
+
+    @property
+    def _is_live(self):
+        return self.mode == "LIVE"
+
+    def _require_live_env(self):
+        """Real-money safety gate — LIVE needs ALLOW_LIVE=1 (set by the launcher).
+        PAPER skips this: the sandbox host can't touch real money."""
+        if self._is_live and config.REQUIRE_LIVE_ENV_OK and os.environ.get("ALLOW_LIVE") != "1":
+            raise OrderRejected("LIVE blocked: launch with START-FUTURES (sets "
+                                "ALLOW_LIVE=1) to arm real-money futures.")
 
     def _find(self, obj, *names):
         """Webull's field names drift, so look for any of them anywhere."""
@@ -1235,22 +1246,27 @@ class WebullFuturesSession(BaseFuturesSession):
         except Exception as e:                              # noqa: BLE001
             raise OrderRejected("Webull SDK not installed — run INSTALL.bat, then "
                                 "relaunch. (%s)" % str(e)[:120])
+        self._require_live_env()                # real-money gate (no-op for PAPER)
+        where = "your LIVE Webull" if self._is_live else "your Webull SANDBOX"
         if not app_key or not app_secret:
-            raise OrderRejected("Paper needs your Webull SANDBOX api key + secret "
-                                "in the boxes above.")
+            raise OrderRejected("Needs %s api key + secret in the boxes above." % where)
+        endpoint = (config.LIVE_TRADE_ENDPOINT if self._is_live
+                    else config.SANDBOX_TRADE_ENDPOINT)
         api = ApiClient(app_key.strip(), app_secret.strip(), config.REGION)
-        # SANDBOX ONLY — this is the line that makes real money impossible here.
-        api.add_endpoint(config.REGION, config.SANDBOX_TRADE_ENDPOINT)
+        # This endpoint choice is the ONLY thing separating paper from real money.
+        api.add_endpoint(config.REGION, endpoint)
         self._api = api
         self.trade = TradeClient(api)
         self.data = DataClient(api)
         res = self.trade.account_v2.get_account_list()
         if getattr(res, "status_code", None) != 200:
             raise OrderRejected(
-                "Paper (sandbox) connect failed: HTTP %s. Paper futures need a "
-                "SANDBOX api key from Webull's developer site — a live key won't "
-                "work here. (Nothing real was touched.)"
-                % getattr(res, "status_code", "?"))
+                "%s connect failed: HTTP %s. Check the api key + secret match the "
+                "environment (a %s key only works on %s). (Nothing was touched.)"
+                % ("LIVE" if self._is_live else "Paper (sandbox)",
+                   getattr(res, "status_code", "?"),
+                   "live" if self._is_live else "sandbox",
+                   "production" if self._is_live else "the sandbox"))
         data = res.json()
         accounts = (data if isinstance(data, list)
                     else (data.get("data") or data.get("accounts")
@@ -1258,42 +1274,104 @@ class WebullFuturesSession(BaseFuturesSession):
         if isinstance(accounts, dict):
             accounts = [accounts]
         suffixes = [str(s).upper() for s in getattr(config, "FUTURES_ACCOUNT_SUFFIXES", [])]
+        # Webull marks a futures book with account_class="FUTURES" (its
+        # account_type is just "MARGIN"), so we must read account_class/label,
+        # not account_type. Verified against the live account payload.
         acct = None
+        first_id = None
         for a in accounts:
             aid = self._find(a, "account_id", "accountId", "secAccountId",
                              "sec_account_id", "id")
-            atype = str(self._find(a, "account_type", "accountType",
-                                   "account_category") or "").upper()
-            if aid and ("FUTURE" in atype
+            if aid and first_id is None:
+                first_id = aid
+            marker = " ".join(str(self._find(a, f) or "") for f in (
+                "account_class", "accountClass", "account_type", "accountType",
+                "account_category", "account_label", "accountLabel")).upper()
+            if aid and ("FUTURE" in marker
                         or any(str(aid).upper().endswith(sfx) for sfx in suffixes)):
                 acct = aid
                 break
-        if acct is None and accounts:      # sandbox may expose one book — take it
-            acct = self._find(accounts[0], "account_id", "accountId",
-                              "secAccountId", "sec_account_id", "id")
-        if not acct:
-            raise OrderRejected("connected to the sandbox but found no account to trade.")
+        if acct is None:
+            # No clearly-futures account. On the sandbox with a single book it's
+            # safe to just use it; on LIVE we NEVER guess — refuse instead of
+            # risking an order on the wrong real account.
+            if first_id is not None and len(accounts) == 1 and not self._is_live:
+                acct = first_id
+                self.last_event = ("Using the only sandbox account found — if a "
+                                   "futures order is rejected, this book may not be "
+                                   "futures-enabled.")
+            else:
+                raise OrderRejected(
+                    "Connected but couldn't identify your FUTURES account among %d "
+                    "books. Add the last characters of your futures account id to "
+                    "FUTURES_ACCOUNT_SUFFIXES in config.py, then reconnect."
+                    % len(accounts))
         self.account_id = str(acct)
-        self.buying_power = 0.0            # sandbox balance read-back varies; confirm in Webull
-        self.last_event = "Connected to Webull PAPER (sandbox), account %s" % self.account_id
+        self.buying_power = 0.0            # balance read-back varies; confirm in Webull
+        tag = "LIVE (REAL MONEY)" if self._is_live else "PAPER (sandbox)"
+        self.last_event = "Connected to Webull %s, account %s" % (tag, self.account_id)
         return self.state()
 
+    def _instrument_dicts(self, obj, out):
+        """Collect every dict that looks like a futures contract (has a symbol
+        and a contract_month/min_tick) from an arbitrarily-nested response."""
+        if isinstance(obj, dict):
+            if obj.get("symbol") and (obj.get("contract_month") or obj.get("min_tick")
+                                      or obj.get("instrument_id")):
+                out.append(obj)
+            for v in obj.values():
+                self._instrument_dicts(v, out)
+        elif isinstance(obj, list):
+            for v in obj:
+                self._instrument_dicts(v, out)
+        return out
+
+    def _local_frontmonth(self, root):
+        """Compute the front-month symbol locally as a fallback when the API
+        lookup is unavailable. MNQ/MES are QUARTERLY (Mar/Jun/Sep/Dec ->
+        H/M/U/Z), rolling a few days before the 3rd-Friday expiry. Verified:
+        Aug 2026 -> MNQU6, matching Webull's own front month."""
+        MCODE = {3: "H", 6: "M", 9: "U", 12: "Z"}
+
+        def third_friday(y, m):
+            d = dt.date(y, m, 1)
+            return d + dt.timedelta(days=(4 - d.weekday()) % 7 + 14)
+
+        today = dt.date.today()
+        y, m = today.year, today.month
+        for _ in range(12):
+            if m in MCODE and third_friday(y, m) - dt.timedelta(days=5) >= today:
+                return "%s%s%d" % (self.PRODUCT.get(root, root), MCODE[m], y % 10)
+            m += 1
+            if m > 12:
+                m, y = 1, y + 1
+        return None
+
     def _resolve(self, root):
-        """MNQ -> the current front-month contract symbol (e.g. MNQZ5)."""
+        """MNQ -> the current front-month contract symbol (e.g. MNQU6): the
+        tradable contract with the nearest expiry. Uses Webull's instrument
+        lookup, and falls back to a local calc if that host is unavailable."""
         if root in self._contract:
             return self._contract[root]
         code = self.PRODUCT.get(root, root)
+        sym = None
         try:
             res = self.data.instrument.get_futures_instrument_by_code(
                 code, "US_FUTURES", "MONTHLY")
-            body = res.json() if getattr(res, "status_code", 200) == 200 else {}
-            sym = self._find(body, "symbol", "contract_symbol", "contractSymbol",
-                             "instrument_symbol", "instrumentSymbol")
+            if getattr(res, "status_code", None) == 200:
+                contracts = self._instrument_dicts(res.json(), [])
+                tradable = [c for c in contracts
+                            if str(c.get("status", "OC")).upper() in ("OC", "")] or contracts
+                tradable.sort(key=lambda c: str(c.get("contract_month")
+                                                or c.get("settlement_date") or "99999999"))
+                if tradable:
+                    sym = tradable[0].get("symbol")
         except Exception:                                   # noqa: BLE001
             sym = None
+        if not sym:                       # API host unavailable (common on sandbox)
+            sym = self._local_frontmonth(root)
         if not sym:
-            raise OrderRejected("couldn't get the front-month %s contract from "
-                                "Webull just now — try again in a moment." % root)
+            raise OrderRejected("couldn't determine the front-month %s contract." % root)
         self._contract[root] = str(sym)
         return self._contract[root]
 
@@ -1325,8 +1403,8 @@ class WebullFuturesSession(BaseFuturesSession):
                          "client_order_id": o["client_order_id"],
                          "opened_at": dt.datetime.now().strftime("%H:%M")}
         self._update_trail()
-        self.last_event = "SENT to Webull sandbox: %s %d %s (%s)" % (
-            side, int(qty), symbol, contract)
+        self.last_event = "SENT to Webull %s: %s %d %s (%s)" % (
+            "LIVE" if self._is_live else "sandbox", side, int(qty), symbol, contract)
         return self.position
 
     def refresh_mark(self):
@@ -1370,10 +1448,13 @@ class WebullFuturesSession(BaseFuturesSession):
 
 
 def make_session(mode):
-    # PAPER is REAL Webull sandbox futures now. The old fake-fill simulator is
-    # gone — paper is the actual broker engine, not a guess.
+    # Both Webull futures modes run the SAME real engine — only the endpoint
+    # differs. PAPER -> sandbox (sim money); WEBULL -> production (REAL money,
+    # ALLOW_LIVE-gated). The old fake-fill simulator is gone.
     if mode == "PAPER":
-        return WebullFuturesSession(mode)
+        return WebullFuturesSession("PAPER")
+    if mode == "WEBULL":
+        return WebullFuturesSession("LIVE")
     if mode == "TRADOVATE":
         return TradovateSession(mode)
     if mode == "TOPSTEP":

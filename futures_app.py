@@ -6,11 +6,21 @@ Run via START-FUTURES.bat, or:  python -m uvicorn futures_app:app --port 8010
 
 import os
 import pathlib
+import traceback
 from typing import Optional
 
 from fastapi import FastAPI, HTTPException
 from fastapi.responses import HTMLResponse, JSONResponse
 from pydantic import BaseModel
+
+
+def _fail(where, e):
+    """Never let a real broker error hide behind a blank 500 — log the full
+    traceback to the terminal and hand the screen a readable reason."""
+    traceback.print_exc()
+    return JSONResponse({"ok": False, "rejected": True,
+                         "reason": "%s: %s" % (type(e).__name__, str(e)[:400]),
+                         "where": where})
 
 import futures_client as fc
 import user_config as uc
@@ -106,6 +116,8 @@ def place(req: OrderReq):
         return {"ok": True, "position": pos}
     except fc.OrderRejected as e:
         return JSONResponse({"ok": False, "rejected": True, "reason": str(e)})
+    except Exception as e:                                   # noqa: BLE001
+        return _fail("place", e)
 
 @app.post("/api/order/arm")
 def arm(req: OrderReq):
@@ -115,6 +127,8 @@ def arm(req: OrderReq):
         return {"ok": True, "armed": _sess().arm(req.symbol, req.side, int(req.qty))}
     except fc.OrderRejected as e:
         return JSONResponse({"ok": False, "rejected": True, "reason": str(e)})
+    except Exception as e:                                   # noqa: BLE001
+        return _fail("arm", e)
 
 @app.post("/api/order/disarm")
 def disarm():
@@ -122,6 +136,8 @@ def disarm():
         return {"ok": True, **_sess().disarm()}
     except fc.OrderRejected as e:
         return JSONResponse({"ok": False, "rejected": True, "reason": str(e)})
+    except Exception as e:                                   # noqa: BLE001
+        return _fail("disarm", e)
 
 @app.post("/api/order/close")
 def close():
@@ -129,6 +145,8 @@ def close():
         return {"ok": True, **_sess().close()}
     except fc.OrderRejected as e:
         return JSONResponse({"ok": False, "rejected": True, "reason": str(e)})
+    except Exception as e:                                   # noqa: BLE001
+        return _fail("close", e)
 
 # ---- Remembered setup (survives restarts AND updates) ----------------------
 # Plain identifiers are always remembered. Passwords / API secrets are ONLY
