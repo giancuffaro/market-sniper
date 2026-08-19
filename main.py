@@ -16,6 +16,10 @@ try:
     import quotes
 except Exception:
     quotes = None
+try:
+    import tape
+except Exception:
+    tape = None
 
 _EXEC = ThreadPoolExecutor(max_workers=3)
 CONNECT_TIMEOUT_S = 25
@@ -30,7 +34,9 @@ class ConnectReq(BaseModel):
     app_key: str = ""
     app_secret: str = ""
     account_id: Optional[str] = None
-    paper: bool = False        # True -> Webull SANDBOX (can't touch real money)
+    # `paper` was removed in v3.6 (no more Webull sandbox). It is still accepted
+    # and ignored so a stale browser tab or saved profile can't 422 on connect.
+    paper: bool = False
 
 class MirrorReq(BaseModel):
     app_key: str = ""
@@ -100,10 +106,41 @@ def trend(symbol: str = "QQQ"):
         return {"symbol": symbol, "trend": {}, "error": str(e)[:120]}
 
 
+@app.get("/api/tape")
+def tape_speed(symbol: str = "QQQ"):
+    """Market velocity — how fast this is moving vs the last half hour.
+
+    Read-only and broker-free: it reads the same public bar feed as the price
+    chips, so it works before you connect and can't affect an order."""
+    if tape is None:
+        return {"symbol": symbol, "ok": False, "reason": "tape module unavailable"}
+    if symbol not in config.SYMBOLS:
+        raise HTTPException(400, f"{symbol} isn't one of the tradable symbols.")
+    ysym = quotes.YSYM.get(symbol, symbol) if quotes else symbol
+    return {"symbol": symbol, **tape.velocity(ysym)}
+
+
+@app.get("/api/preview")
+def preview(symbol: str = "QQQ", side: str = "CALLS"):
+    """Where an armed entry would trigger, and which strike you'd end up with.
+
+    Read-only — it computes, it does not arm. Nothing reaches Webull."""
+    if symbol not in config.SYMBOLS:
+        raise HTTPException(400, f"{symbol} isn't one of the tradable symbols.")
+    if side not in ("CALLS", "PUTS"):
+        raise HTTPException(400, "side must be CALLS or PUTS")
+    try:
+        return _sess().preview_entry(symbol, side)
+    except HTTPException:
+        raise
+    except Exception as e:
+        return {"ok": False, "reason": str(e)[:140]}
+
+
 @app.post("/api/connect")
 def connect(req: ConnectReq):
-    # PAPER routes to Webull's sandbox (no real money possible); otherwise LIVE.
-    s = wb.make_session("PAPER" if req.paper else "LIVE")
+    # LIVE only since v3.6 — every order this app sends is real money.
+    s = wb.make_session("LIVE")
     try:
         fut = _EXEC.submit(s.connect, req.app_key.strip(), req.app_secret.strip(),
                            req.account_id)

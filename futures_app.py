@@ -24,6 +24,10 @@ def _fail(where, e):
 
 import futures_client as fc
 import user_config as uc
+try:
+    import tape
+except Exception:
+    tape = None
 
 app = FastAPI(title="MARKET SNIPER FUTURES")
 SESSION = {"s": None}
@@ -34,14 +38,9 @@ FUT_VERSION = "1.0"
 class ConnectReq(BaseModel):
     app_key: str = ""
     app_secret: str = ""
-    mode: str = "PAPER"
+    mode: str = "WEBULL"
     account: str = ""
     incoming_folder: str = ""
-    tv_user: str = ""
-    tv_pass: str = ""
-    tv_key: str = ""
-    tv_sec: str = ""
-    tv_env: str = "demo"
     ts_user: str = ""
     ts_key: str = ""
     ts_acct: str = ""
@@ -83,19 +82,20 @@ def prices():
 
 @app.post("/api/connect")
 def connect(req: ConnectReq):
-    if req.mode not in ("PAPER", "WEBULL", "LIVE", "TRADOVATE", "TOPSTEP"):
-        raise HTTPException(400, "mode must be PAPER, WEBULL, LIVE, TRADOVATE or TOPSTEP")
-    s = fc.make_session(req.mode)
+    # normalize_mode also maps the pre-v3.6 name "LIVE" onto NINJA, so a saved
+    # pref from an older build still logs in instead of erroring.
+    mode = fc.normalize_mode(req.mode)
+    if mode is None:
+        raise HTTPException(400, "mode must be WEBULL, NINJA or TOPSTEP "
+                                 "(PAPER and Tradovate were removed in v3.6)")
+    s = fc.make_session(mode)
     try:
-        if req.mode == "TRADOVATE":
-            state = s.connect(req.tv_user, req.tv_pass, req.tv_key, req.tv_sec, req.tv_env)
-        elif req.mode == "TOPSTEP":
+        if mode == "TOPSTEP":
             state = s.connect(req.ts_user, req.ts_key, req.ts_acct)
-        elif req.mode == "LIVE":
+        elif mode == "NINJA":
             state = s.connect(req.app_key.strip(), req.app_secret.strip(),
                               req.account.strip(), req.incoming_folder.strip())
-        else:
-            # PAPER (sandbox) and WEBULL (live) both take just key + secret.
+        else:   # WEBULL — production key + secret
             state = s.connect(req.app_key.strip(), req.app_secret.strip())
     except fc.OrderRejected as e:
         raise HTTPException(400, str(e))
@@ -153,8 +153,8 @@ def close():
 # Plain identifiers are always remembered. Passwords / API secrets are ONLY
 # written to disk if you tick "Remember my login on this PC".
 PREF_KEYS = ("theme", "mode", "symbol", "qty", "bt_commission", "bt_slippage",
-             "nt_account", "nt_folder", "tv_user", "tv_env", "ts_user", "ts_acct")
-SECRET_KEYS = ("tv_pass", "tv_key", "tv_sec", "ts_key")
+             "nt_account", "nt_folder", "ts_user", "ts_acct")
+SECRET_KEYS = ("ts_key",)
 
 
 @app.get("/api/prefs")
@@ -240,6 +240,19 @@ def trend(symbol: str = "MNQ"):
     if symbol not in fc.FUT:
         raise HTTPException(400, "unknown symbol")
     return {"symbol": symbol, "trend": fc.trend(symbol)}
+
+
+@app.get("/api/tape")
+def tape_speed(symbol: str = "MNQ"):
+    """Market velocity — how fast this is moving vs the last half hour.
+
+    Read-only and broker-free: same public bar feed as the price chips, so it
+    works before you connect and can't affect an order."""
+    if tape is None:
+        return {"symbol": symbol, "ok": False, "reason": "tape module unavailable"}
+    if symbol not in fc.FUT:
+        raise HTTPException(400, "unknown symbol")
+    return {"symbol": symbol, **tape.velocity(fc.FUT[symbol]["yahoo"])}
 
 @app.get("/api/strategies")
 def get_strategies():
