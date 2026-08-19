@@ -5,9 +5,13 @@ COMPLETELY SEPARATE from the options app. Nothing here imports the options code.
   MNQ (Micro Nasdaq): tick 0.25 = $0.50  ->  $2 per point
   MES (Micro S&P):    tick 0.25 = $1.25  ->  $5 per point
 
-  WebullFuturesSession — REAL Webull PAPER (sandbox): real orders, real fills,
-                         simulated money. Replaced the old fake-fill sim.
-  NinjaTrader / Tradovate / Topstep — real-broker routes for live futures.
+Three real broker routes, all live (v3.6 removed PAPER and Tradovate):
+
+  WEBULL  — WebullFuturesSession: Webull production OpenAPI, REAL MONEY,
+            gated behind ALLOW_LIVE=1.
+  NINJA   — NinjaTraderSession: order instruction files to NinjaTrader 8.
+            Was called "LIVE" before v3.6; the old name still resolves.
+  TOPSTEP — TopstepSession: TopstepX / ProjectX REST.
 """
 
 import os
@@ -560,7 +564,7 @@ class BaseFuturesSession:
         SHORT -> sell limit at the level ABOVE price  (never sells for less)
         Because the limit sits at or better than the market it can only fill at
         that price or better — no slippage. On live routes the order is working
-        at the broker; in PAPER it is simulated.
+        at the broker.
         """
         qty = int(qty)
         self._guard_open(qty)
@@ -881,12 +885,13 @@ class NinjaTraderSession(BaseFuturesSession):
         return {"closed": True, "pnl": pnl}
 
 
-_TV_BASE = {"demo": "https://demo.tradovateapi.com/v1",
-            "live": "https://live.tradovateapi.com/v1"}
 _MONTH_CODE = {3: "H", 6: "M", 9: "U", 12: "Z"}
 
 def _tv_front_symbol(sym):
-    """Nearest quarterly contract in Tradovate style, e.g. MNQM6 (June 2026)."""
+    """Nearest quarterly contract, e.g. MNQM6 (June 2026).
+
+    Named _tv_* for historical reasons (it arrived with the Tradovate route,
+    removed in v3.6). Topstep uses the identical convention, so it stays."""
     today = dt.date.today()
     y, m = today.year, today.month
     for qm in (3, 6, 9, 12):
@@ -897,137 +902,6 @@ def _tv_front_symbol(sym):
 def _fmt_px(v):
     """Trim trailing zeros so 28700.0 goes out as 28700, 23150.25 stays 23150.25."""
     return ("%.4f" % float(v)).rstrip("0").rstrip(".")
-
-def _tv_req(env, path, token=None, body=None, method="GET"):
-    url = _TV_BASE[env] + path
-    data = json.dumps(body).encode() if body is not None else None
-    headers = {"Content-Type": "application/json", "Accept": "application/json"}
-    if token:
-        headers["Authorization"] = "Bearer " + token
-    req = urllib.request.Request(url, data=data, headers=headers, method=method)
-    with urllib.request.urlopen(req, timeout=15) as r:
-        return json.load(r)
-
-
-class TradovateSession(BaseFuturesSession):
-    """Real order routing to Tradovate over its REST API (demo or live)."""
-
-    def __init__(self, mode="TRADOVATE"):
-        super().__init__(mode)
-        self.env = "demo"; self.token = None
-        self.acct_id = None; self.acct_spec = None
-
-    def connect(self, name, password, cid, sec, env="demo"):
-        self.env = "live" if env == "live" else "demo"
-        body = {"name": (name or "").strip(), "password": password or "",
-                "appId": "MarketSniper", "appVersion": "1.0",
-                "cid": (cid or "").strip(), "sec": (sec or "").strip()}
-        try:
-            res = _tv_req(self.env, "/auth/accesstokenrequest", body=body, method="POST")
-        except urllib.error.HTTPError as e:
-            raise OrderRejected("Tradovate login failed (%s). Check username/password and that "
-                                "your API Key + Secret are correct." % e.code)
-        except Exception as e:
-            raise OrderRejected("Couldn't reach Tradovate: " + str(e)[:120])
-        if not res.get("accessToken"):
-            raise OrderRejected("Tradovate login rejected: " +
-                                str(res.get("errorText") or "check your credentials / API access")[:150])
-        self.token = res["accessToken"]
-        try:
-            accts = _tv_req(self.env, "/account/list", token=self.token)
-        except Exception:
-            accts = []
-        if not accts:
-            raise OrderRejected("Logged in, but no Tradovate accounts were returned. Make sure your "
-                                "account is funded/approved and API access is enabled.")
-        a = accts[0]
-        self.acct_id = a.get("id")
-        self.acct_spec = a.get("name") or a.get("nickname")
-        self.account_id = "TV:%s (%s)" % (self.acct_spec, self.env)
-        self.buying_power = 0.0
-        return self.state()
-
-    def _order(self, symbol, action, qty, limit=None):
-        body = {"accountSpec": self.acct_spec, "accountId": self.acct_id,
-                "action": action, "symbol": _tv_front_symbol(symbol),
-                "orderQty": int(qty), "orderType": "Market", "isAutomated": True}
-        if limit is not None:
-            body["orderType"] = "Limit"
-            body["price"] = to_tick(symbol, limit)
-            body["timeInForce"] = "Day"
-        try:
-            res = _tv_req(self.env, "/order/placeorder", token=self.token, body=body, method="POST")
-        except urllib.error.HTTPError as e:
-            raise OrderRejected("Tradovate order rejected (%s)." % e.code)
-        except Exception as e:
-            raise OrderRejected("Tradovate order failed: " + str(e)[:120])
-        if res.get("failureReason") or res.get("failureText"):
-            raise OrderRejected("Tradovate: " + str(res.get("failureText") or res.get("failureReason")))
-        return body["symbol"], res.get("orderId") or res.get("id")
-
-    def place(self, symbol, side, qty, limit=None):
-        self._guard_open(qty)
-        if symbol not in FUT:
-            raise OrderRejected("unknown symbol")
-        contract, _ = self._order(symbol, "Buy" if side == "LONG" else "Sell", qty, limit)
-        px = float(limit) if limit else get_price(symbol)["price"]
-        self.position = {"symbol": symbol, "side": side, "qty": int(qty), "entry": px,
-                         "mark": get_price(symbol)["price"],
-                         "opened_at": dt.datetime.now().strftime("%H:%M"), "contract": contract}
-        self._update_trail()
-        self.last_event = "Tradovate (%s): %s %d %s %s" % (
-            self.env, "BUY" if side == "LONG" else "SELL", int(qty), contract,
-            ("LIMIT %s" % _fmt_px(px)) if limit else "MARKET")
-        return self.position
-
-    # --- working limit for round-number entry ---
-    def place_limit(self, symbol, side, qty, price):
-        self._guard_open(qty)
-        if symbol not in FUT:
-            raise OrderRejected("unknown symbol")
-        contract, oid = self._order(symbol, "Buy" if side == "LONG" else "Sell", qty, price)
-        if not oid:
-            raise OrderRejected("Tradovate accepted the limit but returned no order id — "
-                                "check the order in Tradovate before continuing.")
-        self.last_event = "Tradovate (%s): working %s LIMIT %d %s @ %s" % (
-            self.env, "BUY" if side == "LONG" else "SELL", int(qty), contract, _fmt_px(price))
-        return str(oid)
-
-    def cancel_limit(self, order_id):
-        try:
-            _tv_req(self.env, "/order/cancelorder", token=self.token,
-                    body={"orderId": int(order_id)}, method="POST")
-        except Exception as e:
-            raise OrderRejected("Tradovate cancel failed: " + str(e)[:120])
-        return True
-
-    def refresh_mark(self):
-        self._eval_strategies()
-        p = self.position
-        if not p:
-            return None
-        p["mark"] = get_price(p["symbol"])["price"]
-        pv = FUT[p["symbol"]]["point_value"]
-        p["pnl"] = round(self._points_pnl() * pv * p["qty"], 2)
-        p["points"] = round(self._points_pnl(), 2)
-        self._update_trail()
-        self._maybe_auto_close()
-        return self.position
-
-    def close(self):
-        if not self.position:
-            raise OrderRejected("no open position to close")
-        p = self.position
-        self._order(p["symbol"], "Sell" if p["side"] == "LONG" else "Buy", p["qty"])
-        pv = FUT[p["symbol"]]["point_value"]
-        pnl = round(self._points_pnl() * pv * p["qty"], 2)
-        self.day_realized += pnl; self.buying_power += pnl
-        self.blotter.append({"time": p["opened_at"],
-                             "desc": "%s %s x%d (TV)" % (p["symbol"], p["side"], p["qty"]),
-                             "move": "%.2f -> %.2f" % (p["entry"], p["mark"]), "pnl": pnl})
-        self.position = None
-        self.last_event = "Tradovate: CLOSE " + p["symbol"]
-        return {"closed": True, "pnl": pnl}
 
 
 _TS_BASE = "https://api.topstepx.com"
@@ -1186,14 +1060,11 @@ class TopstepSession(BaseFuturesSession):
 
 class WebullFuturesSession(BaseFuturesSession):
     """REAL Webull futures — places real futures orders through Webull's own
-    OpenAPI. Runs in two modes off the SAME engine:
+    OpenAPI against production (api.webull.com). REAL MONEY.
 
-      PAPER  -> Webull SANDBOX (api.sandbox.webull.com): real fills, simulated
-                money. Money-safe by construction — the sandbox host can't reach
-                a real account, and a live key won't even authenticate there.
-      LIVE   -> Webull PRODUCTION (api.webull.com): REAL MONEY. Gated behind the
-                ALLOW_LIVE=1 env var (set only by the launcher), exactly like the
-                options live side, so it can never fire by accident.
+    v3.6 removed the PAPER/sandbox mode, so this is now live-only and the
+    ALLOW_LIVE=1 gate (set only by the launcher) applies on every order with no
+    path around it — exactly like the options live side.
 
     Order EXECUTION is real. Position and P&L shown here are the app's estimate
     from the live price feed — same honest caveat the NinjaTrader route carries —
@@ -1203,7 +1074,7 @@ class WebullFuturesSession(BaseFuturesSession):
     # App root -> the product code Webull's instrument lookup wants.
     PRODUCT = {"MNQ": "MNQ", "MES": "MES"}
 
-    def __init__(self, mode="PAPER"):
+    def __init__(self, mode="LIVE"):
         super().__init__(mode)
         self.account_id = None
         self.trade = None
@@ -1212,12 +1083,12 @@ class WebullFuturesSession(BaseFuturesSession):
 
     @property
     def _is_live(self):
-        return self.mode == "LIVE"
+        return True          # sandbox removed in v3.6 — this route is always real
 
     def _require_live_env(self):
-        """Real-money safety gate — LIVE needs ALLOW_LIVE=1 (set by the launcher).
-        PAPER skips this: the sandbox host can't touch real money."""
-        if self._is_live and config.REQUIRE_LIVE_ENV_OK and os.environ.get("ALLOW_LIVE") != "1":
+        """Real-money safety gate — needs ALLOW_LIVE=1, set by the launcher.
+        Since the sandbox is gone there is no mode that skips this."""
+        if config.REQUIRE_LIVE_ENV_OK and os.environ.get("ALLOW_LIVE") != "1":
             raise OrderRejected("LIVE blocked: start the app with '🎯 START MARKET "
                                 "SNIPER' (it sets ALLOW_LIVE=1) to arm real-money futures.")
 
@@ -1246,27 +1117,21 @@ class WebullFuturesSession(BaseFuturesSession):
         except Exception as e:                              # noqa: BLE001
             raise OrderRejected("Webull SDK not installed — run INSTALL.bat, then "
                                 "relaunch. (%s)" % str(e)[:120])
-        self._require_live_env()                # real-money gate (no-op for PAPER)
-        where = "your LIVE Webull" if self._is_live else "your Webull SANDBOX"
+        self._require_live_env()                # real-money gate, no way around it
         if not app_key or not app_secret:
-            raise OrderRejected("Needs %s api key + secret in the boxes above." % where)
-        endpoint = (config.LIVE_TRADE_ENDPOINT if self._is_live
-                    else config.SANDBOX_TRADE_ENDPOINT)
+            raise OrderRejected("Needs your LIVE Webull api key + secret in the "
+                                "boxes above.")
         api = ApiClient(app_key.strip(), app_secret.strip(), config.REGION)
-        # This endpoint choice is the ONLY thing separating paper from real money.
-        api.add_endpoint(config.REGION, endpoint)
+        api.add_endpoint(config.REGION, config.LIVE_TRADE_ENDPOINT)   # production
         self._api = api
         self.trade = TradeClient(api)
         self.data = DataClient(api)
         res = self.trade.account_v2.get_account_list()
         if getattr(res, "status_code", None) != 200:
             raise OrderRejected(
-                "%s connect failed: HTTP %s. Check the api key + secret match the "
-                "environment (a %s key only works on %s). (Nothing was touched.)"
-                % ("LIVE" if self._is_live else "Paper (sandbox)",
-                   getattr(res, "status_code", "?"),
-                   "live" if self._is_live else "sandbox",
-                   "production" if self._is_live else "the sandbox"))
+                "LIVE connect failed: HTTP %s. Check the api key + secret are your "
+                "production Webull keys. (Nothing was touched.)"
+                % getattr(res, "status_code", "?"))
         data = res.json()
         accounts = (data if isinstance(data, list)
                     else (data.get("data") or data.get("accounts")
@@ -1292,24 +1157,17 @@ class WebullFuturesSession(BaseFuturesSession):
                 acct = aid
                 break
         if acct is None:
-            # No clearly-futures account. On the sandbox with a single book it's
-            # safe to just use it; on LIVE we NEVER guess — refuse instead of
-            # risking an order on the wrong real account.
-            if first_id is not None and len(accounts) == 1 and not self._is_live:
-                acct = first_id
-                self.last_event = ("Using the only sandbox account found — if a "
-                                   "futures order is rejected, this book may not be "
-                                   "futures-enabled.")
-            else:
-                raise OrderRejected(
-                    "Connected but couldn't identify your FUTURES account among %d "
-                    "books. Add the last characters of your futures account id to "
-                    "FUTURES_ACCOUNT_SUFFIXES in config.py, then reconnect."
-                    % len(accounts))
+            # No clearly-futures account. This route is real money only, so we
+            # NEVER guess — refuse rather than risk an order on the wrong book.
+            raise OrderRejected(
+                "Connected but couldn't identify your FUTURES account among %d "
+                "books. Add the last characters of your futures account id to "
+                "FUTURES_ACCOUNT_SUFFIXES in config.py, then reconnect."
+                % len(accounts))
         self.account_id = str(acct)
         self.buying_power = self._read_balance(self.account_id)
-        tag = "LIVE (REAL MONEY)" if self._is_live else "PAPER (sandbox)"
-        self.last_event = "Connected to Webull %s, account %s" % (tag, self.account_id)
+        self.last_event = ("Connected to Webull LIVE (REAL MONEY), account %s"
+                           % self.account_id)
         return self.state()
 
     def _read_balance(self, aid):
@@ -1382,7 +1240,7 @@ class WebullFuturesSession(BaseFuturesSession):
                     sym = tradable[0].get("symbol")
         except Exception:                                   # noqa: BLE001
             sym = None
-        if not sym:                       # API host unavailable (common on sandbox)
+        if not sym:                       # instrument lookup unavailable
             sym = self._local_frontmonth(root)
         if not sym:
             raise OrderRejected("couldn't determine the front-month %s contract." % root)
@@ -1407,7 +1265,7 @@ class WebullFuturesSession(BaseFuturesSession):
                         "LIMIT" if limit is not None else "MARKET", limit)
         res = self.trade.order_v3.place_order(self.account_id, [o])
         if getattr(res, "status_code", None) != 200:
-            raise OrderRejected("Webull sandbox rejected the order: HTTP %s %s"
+            raise OrderRejected("Webull rejected the order: HTTP %s %s"
                                 % (getattr(res, "status_code", "?"),
                                    str(getattr(res, "text", ""))[:150]))
         px = get_price(symbol)["price"]
@@ -1418,7 +1276,7 @@ class WebullFuturesSession(BaseFuturesSession):
                          "opened_at": dt.datetime.now().strftime("%H:%M")}
         self._update_trail()
         self.last_event = "SENT to Webull %s: %s %d %s (%s)" % (
-            "LIVE" if self._is_live else "sandbox", side, int(qty), symbol, contract)
+            "LIVE", side, int(qty), symbol, contract)
         return self.position
 
     def refresh_mark(self):
@@ -1444,7 +1302,7 @@ class WebullFuturesSession(BaseFuturesSession):
                         p["qty"], "MARKET")
         res = self.trade.order_v3.place_order(self.account_id, [o])
         if getattr(res, "status_code", None) != 200:
-            raise OrderRejected("Webull sandbox rejected the close: HTTP %s. If "
+            raise OrderRejected("Webull rejected the close: HTTP %s. If "
                                 "it's still open, close it in Webull."
                                 % getattr(res, "status_code", "?"))
         pv = FUT[p["symbol"]]["point_value"]
@@ -1461,16 +1319,29 @@ class WebullFuturesSession(BaseFuturesSession):
         return {"closed": True, "pnl": net, "gross": gross, "fees": fees}
 
 
+# v3.6 removed PAPER (Webull sandbox) and Tradovate. Three real routes remain.
+# "LIVE" used to mean NinjaTrader while "WEBULL" meant Webull-live, which read
+# backwards every time. NINJA is the name now; LIVE still maps to it so a saved
+# pref from an older version logs in instead of erroring.
+MODES = ("WEBULL", "NINJA", "TOPSTEP")
+_MODE_ALIASES = {"LIVE": "NINJA"}        # pre-v3.6 saved prefs
+
+
+def normalize_mode(mode):
+    """Canonical mode name, or None if it is not one we still support."""
+    m = str(mode or "").upper()
+    m = _MODE_ALIASES.get(m, m)
+    return m if m in MODES else None
+
+
 def make_session(mode):
-    # Both Webull futures modes run the SAME real engine — only the endpoint
-    # differs. PAPER -> sandbox (sim money); WEBULL -> production (REAL money,
-    # ALLOW_LIVE-gated). The old fake-fill simulator is gone.
-    if mode == "PAPER":
-        return WebullFuturesSession("PAPER")
-    if mode == "WEBULL":
-        return WebullFuturesSession("LIVE")
-    if mode == "TRADOVATE":
-        return TradovateSession(mode)
-    if mode == "TOPSTEP":
-        return TopstepSession(mode)
-    return NinjaTraderSession(mode)
+    m = normalize_mode(mode)
+    if m == "WEBULL":
+        return WebullFuturesSession("LIVE")     # Webull production, ALLOW_LIVE-gated
+    if m == "TOPSTEP":
+        return TopstepSession("TOPSTEP")
+    if m == "NINJA":
+        return NinjaTraderSession("NINJA")
+    raise OrderRejected(
+        "unknown mode %r — this build routes to WEBULL, NINJA or TOPSTEP. "
+        "PAPER and Tradovate were removed in v3.6." % (mode,))

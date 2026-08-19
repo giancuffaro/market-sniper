@@ -1,18 +1,14 @@
 """MARKET SNIPER — central config. v3.1"""
 
-APP_VERSION = "3.5"
+APP_VERSION = "3.6"
 APP_NAME = "MARKET SNIPER"
 REGION = "us"
 
-# Hosts per Webull's own OpenAPI docs (developer.webull.com). The TEST/sandbox
-# environment is the *.sandbox.webull.com family — the old *.uat.webullbroker.com
-# hosts were internal and don't authenticate. Paper (sandbox) is a FULLY
-# ISOLATED environment: it needs its own SANDBOX api key/secret — a live key
-# won't work there, which is the safe way for a mis-ticked PAPER to fail.
-LIVE_TRADE_ENDPOINT    = "api.webull.com"
-SANDBOX_TRADE_ENDPOINT = "api.sandbox.webull.com"
-LIVE_EVENTS_ENDPOINT    = "events-api.webull.com"
-SANDBOX_EVENTS_ENDPOINT = "events-api.sandbox.webull.com"
+# Hosts per Webull's own OpenAPI docs (developer.webull.com).
+# v3.6 removed PAPER from both apps, so the sandbox hosts are gone with it —
+# every order either app can send now goes to production, behind ALLOW_LIVE=1.
+LIVE_TRADE_ENDPOINT  = "api.webull.com"
+LIVE_EVENTS_ENDPOINT = "events-api.webull.com"
 
 PREFERRED_ACCOUNT_TYPE = None   # "MARGIN"/"CASH" to skip the login picker
 
