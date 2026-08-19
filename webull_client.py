@@ -439,6 +439,47 @@ class BaseSession:
         except Exception:
             return None
 
+    @staticmethod
+    def entry_target(spot):
+        """The underlying level a MY CONFIG entry fires at: nearest whole dollar.
+
+        Single source of truth. arm() uses it to set the real trigger and
+        preview_entry() uses it to show you that trigger beforehand, so the
+        number on screen can never drift away from the number that fires.
+        """
+        return float(round(spot))
+
+    def preview_entry(self, symbol, side):
+        """What an armed entry WOULD do at the current price. Sends nothing.
+
+        Answers the question you ask before pressing ARM: at what level does
+        this actually trigger, how far away is that, and which strike do I end
+        up holding when it does?
+        """
+        spot = self._underlying(symbol)
+        if spot is None:
+            return {"ok": False, "reason": "no underlying price available"}
+
+        target = self.entry_target(spot)
+        step = config.SYMBOLS.get(symbol, {}).get("strike_step", 1.0)
+        mode = self.settings.get("strike_mode", "OTM1")
+
+        # Strike is resolved AT THE TRIGGER LEVEL, not at the current price —
+        # that's the contract you'd actually be filled on when it fires.
+        strike = pick_strike(target, side, step, mode)
+
+        distance = round(target - spot, 2)
+        return {
+            "ok": True, "symbol": symbol, "side": side,
+            "spot": round(spot, 2),
+            "target": target,
+            "distance": distance,
+            "direction": "above" if distance > 0 else ("below" if distance < 0 else "at"),
+            "strike": strike,
+            "strike_mode": mode,
+            "option_type": "CALL" if side == "CALLS" else "PUT",
+        }
+
     def arm(self, symbol, side, qty):
         """Arm a MY CONFIG entry: wait for the underlying to reach the nearest
         whole dollar, then buy the ask. Auto-sets +$1 (next-whole) TP and 10% SL."""
@@ -447,7 +488,7 @@ class BaseSession:
         spot = self._underlying(symbol)
         if spot is None:
             raise OrderRejected("no underlying price available to arm the entry")
-        target = float(round(spot))         # closest round number
+        target = self.entry_target(spot)    # closest round number
         s = self.settings
         s["my_enabled"] = True
         s["tp_enabled"] = True; s["tp_unit"] = "whole"
@@ -656,9 +697,9 @@ class LiveSession(BaseSession):
         self._pending_close = None   # a close whose real fill price we're chasing
 
     def _require_live_env(self):
-        """The real-money safety gate. LIVE requires ALLOW_LIVE=1 (set only by
-        the launcher). PaperSession overrides this to a no-op — the sandbox host
-        can't reach real money, so there's nothing to gate."""
+        """The real-money safety gate. Requires ALLOW_LIVE=1, set only by the
+        launcher. Since v3.6 removed PAPER there is no session that skips this,
+        so it is the single gate on every order the app can send."""
         if config.REQUIRE_LIVE_ENV_OK and os.environ.get("ALLOW_LIVE") != "1":
             raise OrderRejected("LIVE blocked: launch with START-MARKET-SNIPER (sets ALLOW_LIVE=1).")
 
@@ -715,6 +756,17 @@ class LiveSession(BaseSession):
         if not parsed:
             raise OrderRejected(f"couldn't find any account id in: {str(accounts)[:150]}")
 
+        # Futures accounts never appear in the options picker. This app trades
+        # SPY/QQQ options, so a futures row here can only ever be a mis-click.
+        # They stay in `parsed` on purpose: if one is asked for BY ID further
+        # down, it still gets the proper explanation instead of "not found".
+        tradable = [p for p in parsed if not p[2]]
+        if not tradable:
+            raise OrderRejected(
+                "this API key only sees your FUTURES account — this app trades "
+                "options (SPY/QQQ). For MNQ/MES use the futures app on "
+                "http://127.0.0.1:8010.")
+
         if account_id:
             match = [p for p in parsed if str(p[0]) == str(account_id)]
             if not match:
@@ -724,15 +776,15 @@ class LiveSession(BaseSession):
             pref = (config.PREFERRED_ACCOUNT_TYPE or "").upper()
             chosen = None
             if pref:
-                for aid, at, fut in parsed:
-                    if pref in at and not fut:
+                for aid, at, fut in tradable:
+                    if pref in at:
                         chosen = (aid, at, fut)
                         break
             if chosen is None:
-                if len(parsed) == 1:
-                    chosen = parsed[0]
+                if len(tradable) == 1:
+                    chosen = tradable[0]
                 else:
-                    enriched = [(aid, at, self._balance_for(aid)) for aid, at, _ in parsed]
+                    enriched = [(aid, at, self._balance_for(aid)) for aid, at, _ in tradable]
                     raise ChooseAccounts(enriched)
 
         if chosen[2]:
@@ -1083,33 +1135,15 @@ def is_phantom_position(msg):
             or "UNDERLYING SHARES" in up or "CLEAR IT" in up)
 
 
-class PaperSession(LiveSession):
-    """Options PAPER — routes to Webull's SANDBOX host and CANNOT reach real
-    money. Three locks make that true, not just intended:
-
-      1. the endpoint is the sandbox host, fixed in __init__ and never changed;
-      2. there is NO fallback to the live host — if the sandbox rejects the key
-         it fails loudly instead of quietly connecting to your real account;
-      3. the ALLOW_LIVE gate is skipped only because a sandbox order can't be
-         real in the first place.
-
-    Everything else — account listing, the futures-account refusal, order
-    plumbing — is inherited from LiveSession and rides on the sandbox endpoint.
-    Paper needs its OWN sandbox API key from Webull's developer site; a live key
-    simply won't authenticate here, which is the safe way to fail."""
-
-    def __init__(self, mode="PAPER"):
-        super().__init__(mode)
-        self._endpoint = config.SANDBOX_TRADE_ENDPOINT   # sandbox, always
-
-    def _require_live_env(self):
-        # The sandbox cannot place a real-money order, so there is nothing to
-        # gate. This is the ONLY relaxation vs LiveSession.
-        return
-
-
 def make_session(mode="LIVE"):
-    """LIVE trades your real Webull account. PAPER routes to the sandbox host
-    and can never touch real money (see PaperSession). Default stays LIVE so
-    nothing that calls this without a mode changes behaviour."""
-    return PaperSession() if str(mode).upper() == "PAPER" else LiveSession()
+    """Always a LIVE session against your real Webull account.
+
+    PAPER (the Webull sandbox) was removed in v3.6 — it needed its own separate
+    sandbox API key, and simulated fills were teaching the wrong lessons about
+    a strategy whose whole edge is real fills. `mode` is still accepted so
+    existing callers don't break, but every value maps to LIVE.
+
+    That makes ALLOW_LIVE=1 the only thing standing between this app and a real
+    order, so it is now enforced on every session with no exceptions — see
+    LiveSession._require_live_env. The launcher sets it; nothing else does."""
+    return LiveSession()
