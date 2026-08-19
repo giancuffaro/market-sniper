@@ -85,6 +85,22 @@
   .tcell.up{border-color:var(--green)} .tcell.up .tarr{color:var(--green)} .tcell.up .ttf{color:var(--green)}
   .tcell.dn{border-color:var(--red)} .tcell.dn .tarr{color:var(--red)} .tcell.dn .ttf{color:var(--red)}
   .tcell.flat .tarr{color:var(--amber)} .tcell.flat .ttf{color:var(--amber)}
+  /* VELOCITY — how fast the tape is printing vs the last half hour */
+  .velrow{display:flex;align-items:center;gap:9px;margin-top:9px;
+          border-top:1px solid var(--line);padding-top:9px}
+  .velrow .vlbl{color:var(--dim);font-size:10px;letter-spacing:.12em;flex:0 0 auto}
+  .velbar{flex:1 1 auto;height:6px;border-radius:4px;background:var(--panel2);
+          border:1px solid var(--line);overflow:hidden;position:relative}
+  .velbar i{display:block;height:100%;width:0;transition:width .5s ease,background .5s ease;
+            background:var(--dimmer)}
+  .velbar::after{content:"";position:absolute;left:50%;top:0;bottom:0;width:1px;
+                 background:var(--line)}   /* the 50 = normal mark */
+  .velval{flex:0 0 auto;font-size:11px;font-weight:700;letter-spacing:.08em;color:var(--dimmer);min-width:98px;text-align:right}
+  .velrow.calm    .velbar i{background:var(--dimmer)} .velrow.calm .velval{color:var(--dim)}
+  .velrow.normal  .velbar i{background:var(--green)}  .velrow.normal .velval{color:var(--green)}
+  .velrow.fast    .velbar i{background:var(--amber)}  .velrow.fast .velval{color:var(--amber)}
+  .velrow.violent .velbar i{background:var(--red)}    .velrow.violent .velval{color:var(--red)}
+  .velrow.stale{opacity:.45}
   .hero{border:1px solid var(--line);border-radius:14px;background:var(--panel);padding:22px;text-align:center;margin-bottom:14px}
   .hero .big{font-size:46px;font-weight:800;letter-spacing:.08em;color:var(--dim)}
   .hero .sub{color:var(--dim);font-size:12.5px;letter-spacing:.16em;margin-top:10px;text-transform:uppercase}
@@ -188,34 +204,21 @@
       <div class="theme-dots" role="group" aria-label="Theme color"><button class="tdot tdot-white" data-set="light" onclick="FZ.setTheme('light')" aria-label="White theme"></button><button class="tdot tdot-gray" data-set="gray" onclick="FZ.setTheme('gray')" aria-label="Gray theme"></button><button class="tdot tdot-black" data-set="dark" onclick="FZ.setTheme('dark')" aria-label="Black theme"></button></div>
     </div>
     <div class="modes" id="modes" style="flex-wrap:wrap">
-      <button data-m="PAPER" class="on">PAPER</button>
-      <button data-m="WEBULL" style="font-size:12.5px">WEBULL LIVE</button>
-      <button data-m="LIVE">NINJA</button>
-      <button data-m="TRADOVATE" style="font-size:12.5px">TRADOVATE</button>
+      <button data-m="WEBULL" class="on" style="font-size:12.5px">WEBULL LIVE</button>
+      <button data-m="NINJA">NINJA</button>
       <button data-m="TOPSTEP" style="font-size:12.5px">TOPSTEP</button>
     </div>
     <div style="text-align:right;margin:-4px 0 10px"><span class="setbtn" style="color:var(--green)" onclick="location.href='http://127.0.0.1:8000'">⇄ SWITCH TO OPTIONS</span></div>
 
-    <div id="paperConfig" style="display:block">
-      <div class="srow"><label style="min-width:92px">SANDBOX KEY</label>
-        <input id="ppKey" type="text" autocomplete="off" spellcheck="false" placeholder="Webull SANDBOX app key" style="font-size:13px"></div>
-      <div class="srow" style="margin-top:8px"><label style="min-width:92px">SECRET</label>
-        <input id="ppSec" type="password" autocomplete="off" spellcheck="false" placeholder="Webull SANDBOX app secret" style="font-size:13px"></div>
-      <div class="note">Real Webull PAPER — orders fill in your Webull <b>sandbox</b> account: real engine, real
-      prices, simulated money. It <b>cannot</b> touch your real account. Needs a <b>separate sandbox API key</b>
-      from developer.webull.com — a live key won't authenticate here (that's the safe way to fail).</div>
-    </div>
-
-    <div id="webullConfig" style="display:none">
+    <div id="webullConfig" style="display:block">
       <div class="srow"><label style="min-width:92px">LIVE KEY</label>
         <input id="wbKey" type="text" autocomplete="off" spellcheck="false" placeholder="Webull LIVE app key" style="font-size:13px"></div>
       <div class="srow" style="margin-top:8px"><label style="min-width:92px">SECRET</label>
         <input id="wbSec" type="password" autocomplete="off" spellcheck="false" placeholder="Webull LIVE app secret" style="font-size:13px"></div>
       <div class="note" style="color:var(--red,#ff5a5a)">⚠ <b>REAL MONEY.</b> WEBULL LIVE places real futures orders
-      in your actual Webull account — same one-tap engine as PAPER, but funded. Uses your <b>production</b> API
-      key from developer.webull.com (a sandbox key won't authenticate). Live is armed only when the app is
-      launched with <b>🎯 START MARKET SNIPER</b> (sets ALLOW_LIVE=1); a paper-only launch will refuse to send.
-      Test in PAPER first, keep size small, and confirm every fill in Webull.</div>
+      in your actual Webull account. Uses your <b>production</b> API key from developer.webull.com. Orders are
+      armed only when the app is launched with <b>🎯 START MARKET SNIPER</b> (sets ALLOW_LIVE=1). There is no
+      paper mode any more — keep size small and confirm every fill in Webull.</div>
     </div>
 
     <div id="tsConfig" style="display:none">
@@ -228,24 +231,6 @@
       <div class="note" style="color:var(--amber)">⚠ Needs the ProjectX <b>API subscription</b> (TopstepX →
       Settings → API tab; $29/mo, code <b>topstep</b> = 50% off). Orders hit your eval/funded account for real.
       Leave ACCOUNT blank to use your first active one. Mind Topstep's automation rules — stay at the controls.</div>
-    </div>
-
-    <div id="tvConfig" style="display:none">
-      <div class="srow"><label style="min-width:82px">USERNAME</label>
-        <input id="tvUser" type="text" placeholder="Tradovate username" style="font-size:14px"></div>
-      <div class="srow" style="margin-top:8px"><label style="min-width:82px">PASSWORD</label>
-        <input id="tvPass" type="password" placeholder="Tradovate password" style="font-size:14px"></div>
-      <div class="srow" style="margin-top:8px"><label style="min-width:82px">API KEY</label>
-        <input id="tvKey" type="text" placeholder="API Key (cid)" style="font-size:13px"></div>
-      <div class="srow" style="margin-top:8px"><label style="min-width:82px">API SECRET</label>
-        <input id="tvSec" type="password" placeholder="API Secret" style="font-size:13px"></div>
-      <div class="srow" style="margin-top:8px"><label style="min-width:82px">MODE</label>
-        <select id="tvEnv" style="flex:1;background:var(--panel2);border:1px solid var(--line);border-radius:8px;color:var(--txt);font-family:var(--ui);font-size:14px;padding:9px">
-          <option value="demo">DEMO (paper — safe)</option>
-          <option value="live">LIVE (real money)</option>
-        </select></div>
-      <div class="note" style="color:var(--amber)">⚠ Needs Tradovate <b>API access</b> enabled + an API Key/Secret
-      (from Tradovate's API management). Start on <b>DEMO</b>. LIVE = real orders, filled instantly.</div>
     </div>
 
     <div id="ntConfig" style="display:none">
@@ -271,8 +256,8 @@
 
     <button class="go" id="connectBtn">START</button>
     <div class="err" id="connectErr"></div>
-    <div class="note" id="ntNote">PAPER futures is fully working with live prices — no keys needed, just hit START.
-    NINJATRADER routes real orders to your NinjaTrader platform over its ATI (start on Sim101).
+    <div class="note" id="ntNote">Every route here is real (paper was removed in v3.6).
+    NINJA routes real orders to your NinjaTrader platform over its ATI — start on Sim101 to rehearse safely.
     Separate from the options app (runs on its own port, 8010).</div>
   </div>
 
@@ -283,7 +268,7 @@
         <span class="dot"></span>FUTURES
       </div>
       <div class="meta">
-        <span class="pill" id="modePill">PAPER</span>
+        <span class="pill" id="modePill">WEBULL LIVE</span>
         <span>BAL <b id="bp">$0.00</b></span>
         <span class="setbtn" style="color:var(--green);border-color:var(--green)" onclick="location.href='http://127.0.0.1:8000'">⇄ OPTIONS</span>
         <span class="setbtn" onclick="FZ.openSettings()">CONFIGURATION</span>
@@ -301,6 +286,11 @@
     <div class="trendbar" id="trendBar">
       <div class="tlbl">TREND <b id="trendSym">MNQ</b> <span class="tmeta">· multi-timeframe · live</span></div>
       <div id="trendCells" class="tcells"></div>
+      <div class="velrow" id="velRow" title="Volume and range per minute over the last 5 minutes, versus the previous half hour. 50 = moving exactly as fast as it has been.">
+        <span class="vlbl">VELOCITY</span>
+        <span class="velbar"><i id="velFill"></i></span>
+        <span class="velval" id="velVal">—</span>
+      </div>
     </div>
 
     <div id="hero" class="hero">
@@ -355,7 +345,7 @@
       <div class="hd"><span>TODAY <span id="dayFees" class="s" style="color:var(--dim)"></span></span><span>DAY NET <b class="net" id="dayNet">$0.00</b></span></div>
       <div id="blotterRows"></div>
     </div>
-    <div class="footer" id="footMode">◦ PAPER — SIMULATED FILLS · LIVE PRICES ◦</div>
+    <div class="footer" id="footMode">● LIVE — REAL ORDERS ●</div>
   </div>
 
   <!-- CONFIGURATION -->
@@ -382,7 +372,7 @@
         of firing at market. <b>LONG</b> buys the level <b>below</b> price, <b>SHORT</b> sells the level
         <b>above</b> — so the order can only fill at that price <b>or better. No slippage.</b>
         Ex: LONG MNQ at <b>28,716</b> on a 50-pt grid rests a buy limit at <b>28,700</b>; SHORT there
-        rests a sell limit at <b>28,750</b>. On NinjaTrader / Tradovate / Topstep the order is really
+        rests a sell limit at <b>28,750</b>. On NinjaTrader / Topstep / Webull the order is really
         working at the broker (CANCEL on the amber bar pulls it). Trade-off vs a market order: if
         price never comes back to the level, <b>you don't get filled</b>. Your Take Profit / Stop /
         Trailing below still apply once it fills.</div>
@@ -444,7 +434,7 @@
 
         <div class="shint">Enable any of these and they run automatically while the futures app is
         open — each opens ONE trade per signal and manages it with your Take-Profit / Stop /
-        Trailing stop above. You can run more than one at a time. Test in PAPER first.</div>
+        Trailing stop above. You can run more than one at a time. Start on NinjaTrader Sim101 to rehearse.</div>
       </div>
 
       <div class="sactions">
@@ -469,7 +459,7 @@
 <script>
 const FZ = (function(){
   const LSS="ezfut_settings", LST="ezexec_theme", LSST="ezfut_strategies";
-  let mode="PAPER", sym="MNQ", qty=1, inTrade=false, poll=null, priceTimer=null, trendTimer=null;
+  let mode="WEBULL", sym="MNQ", qty=1, inTrade=false, poll=null, priceTimer=null, trendTimer=null, velTimer=null;
   let settings={tp_enabled:false,tp_points:10,sl_enabled:false,sl_points:5,trail_enabled:false,trail_points:5,
                 round_enabled:false,round_step:50};
   let prefs={}, prefsReady=false, prefsLoaded=null;
@@ -512,18 +502,17 @@ const FZ = (function(){
       if(prefs.bt_slippage!=null)   $('btSlip').value=prefs.bt_slippage;
       if(prefs.nt_account) $('ntAccount').value=prefs.nt_account;
       if(prefs.nt_folder)  $('ntFolder').value=prefs.nt_folder;
-      if(prefs.tv_user)    $('tvUser').value=prefs.tv_user;
-      if(prefs.tv_env)     $('tvEnv').value=prefs.tv_env;
       if(prefs.ts_user)    $('tsUser').value=prefs.ts_user;
       if(prefs.ts_acct)    $('tsAcct').value=prefs.ts_acct;
       $('rememberLogin').checked=!!prefs.remember_login;
       if(prefs.remember_login){
-        if(prefs.tv_pass) $('tvPass').value=prefs.tv_pass;
-        if(prefs.tv_key)  $('tvKey').value=prefs.tv_key;
-        if(prefs.tv_sec)  $('tvSec').value=prefs.tv_sec;
         if(prefs.ts_key)  $('tsKey').value=prefs.ts_key;
       }
-      if(prefs.mode&&prefs.mode!=='PAPER') selectMode(prefs.mode);
+      // Saved prefs from before v3.6 may say PAPER (gone) or LIVE (now NINJA).
+      if(prefs.mode){
+        const m = prefs.mode==='LIVE' ? 'NINJA' : prefs.mode;
+        if(['WEBULL','NINJA','TOPSTEP'].includes(m)) selectMode(m);
+      }
     }
     prefsReady=true;
     renderStrategies();
@@ -535,13 +524,11 @@ const FZ = (function(){
   document.querySelectorAll('#modes button').forEach(b=>b.onclick=()=>{
     mode=b.dataset.m;
     document.querySelectorAll('#modes button').forEach(x=>x.classList.toggle('on',x===b));
-    $('paperConfig').style.display = mode==='PAPER' ? 'block' : 'none';
     $('webullConfig').style.display = mode==='WEBULL' ? 'block' : 'none';
-    $('ntConfig').style.display = mode==='LIVE' ? 'block' : 'none';
-    $('tvConfig').style.display = mode==='TRADOVATE' ? 'block' : 'none';
+    $('ntConfig').style.display = mode==='NINJA' ? 'block' : 'none';
     $('tsConfig').style.display = mode==='TOPSTEP' ? 'block' : 'none';
-    // Only broker modes have a secret worth offering to remember.
-    $('rememberRow').style.display = (mode==='TRADOVATE'||mode==='TOPSTEP') ? 'block' : 'none';
+    // Only Topstep has a secret worth offering to remember.
+    $('rememberRow').style.display = mode==='TOPSTEP' ? 'block' : 'none';
     savePrefs({mode});
   });
   $('rememberLogin').onchange=()=>savePrefs({remember_login:$('rememberLogin').checked});
@@ -550,11 +537,8 @@ const FZ = (function(){
     $('connectErr').textContent='';
     try{ await prefsLoaded; }catch(e){}   // never push stale browser settings over the saved file
     const body={app_key:'',app_secret:'',mode};
-    if(mode==='PAPER'){ body.app_key=$('ppKey').value.trim(); body.app_secret=$('ppSec').value; }
     if(mode==='WEBULL'){ body.app_key=$('wbKey').value.trim(); body.app_secret=$('wbSec').value; }
-    if(mode==='LIVE'){ body.account=$('ntAccount').value.trim()||'Sim101'; body.incoming_folder=$('ntFolder').value.trim(); }
-    if(mode==='TRADOVATE'){ body.tv_user=$('tvUser').value.trim(); body.tv_pass=$('tvPass').value;
-      body.tv_key=$('tvKey').value.trim(); body.tv_sec=$('tvSec').value.trim(); body.tv_env=$('tvEnv').value; }
+    if(mode==='NINJA'){ body.account=$('ntAccount').value.trim()||'Sim101'; body.incoming_folder=$('ntFolder').value.trim(); }
     if(mode==='TOPSTEP'){ body.ts_user=$('tsUser').value.trim(); body.ts_key=$('tsKey').value.trim(); body.ts_acct=$('tsAcct').value.trim(); }
     $('connectBtn').textContent='CONNECTING…';
     const r=await api('/api/connect',body);
@@ -563,22 +547,22 @@ const FZ = (function(){
     // Remember how you connected so the next launch is already set up.
     savePrefs({mode, remember_login:$('rememberLogin').checked,
                nt_account:$('ntAccount').value.trim(), nt_folder:$('ntFolder').value.trim(),
-               tv_user:$('tvUser').value.trim(), tv_env:$('tvEnv').value,
                ts_user:$('tsUser').value.trim(), ts_acct:$('tsAcct').value.trim(),
-               tv_pass:$('tvPass').value, tv_key:$('tvKey').value.trim(),
-               tv_sec:$('tvSec').value.trim(), ts_key:$('tsKey').value.trim()});
+               ts_key:$('tsKey').value.trim()});
     $('connectScreen').classList.add('hidden'); $('dash').classList.remove('hidden');
-    $('modePill').textContent = mode==='PAPER' ? 'PAPER' : (mode==='WEBULL' ? 'WEBULL LIVE'
-      : (mode==='TRADOVATE' ? 'TRADOVATE' : (mode==='TOPSTEP' ? 'TOPSTEP' : 'NINJA')));
-    $('footMode').textContent = mode==='PAPER' ? '◦ PAPER — WEBULL SANDBOX, REAL FILLS · SIMULATED MONEY ◦'
-      : mode==='WEBULL' ? ('● WEBULL LIVE '+(r.account_id||'')+' — REAL MONEY ●')
+    $('modePill').textContent = mode==='WEBULL' ? 'WEBULL LIVE' : mode;
+    $('footMode').textContent = mode==='WEBULL'
+      ? ('● WEBULL LIVE '+(r.account_id||'')+' — REAL MONEY ●')
       : ('● '+(r.account_id||mode)+' — REAL ORDERS ●');
-    render(r); refreshPrices(); refreshTrend();
+    render(r); refreshPrices(); refreshTrend(); refreshVel();
     api('/api/settings',settings);
     syncStrategies();
     poll=setInterval(tick,1000);
     priceTimer=setInterval(refreshPrices,5000);
     trendTimer=setInterval(refreshTrend,20000);
+    // Bars only close once a minute, so polling faster than this just burns
+    // requests for a number that cannot have changed.
+    velTimer=setInterval(refreshVel,15000);
   };
 
   const TF_LIST=[['1m','1m'],['5m','5m'],['10m','10m'],['15m','15m'],
@@ -599,6 +583,33 @@ const FZ = (function(){
     }catch(e){}
   }
   renderTrend(null);
+
+  // ---- VELOCITY ----------------------------------------------------------
+  // Bar fills to the score: 50 = moving exactly as fast as the last half hour,
+  // 100 = twice as fast. Colour is the state, so you can read it without
+  // reading the number. This is BAR velocity, not trades-per-second — the
+  // data source is 1-minute bars. See tape.py for why.
+  function renderVel(v){
+    const row=$('velRow'), fill=$('velFill'), val=$('velVal');
+    if(!row) return;
+    if(!v||!v.ok){
+      row.className='velrow'; fill.style.width='0%'; val.textContent='—';
+      row.title=(v&&v.reason)?v.reason:'velocity unavailable';
+      return;
+    }
+    const arrow={up:'↑',down:'↓',flat:'→'}[v.direction]||'';
+    row.className='velrow '+(v.state||'')+(v.stale?' stale':'');
+    fill.style.width=Math.max(2,Math.min(100,v.score))+'%';
+    val.textContent=(v.state||'').toUpperCase()+' '+arrow+' '+Math.round(v.score);
+    row.title=v.note||('Volume '+v.vol_ratio+'x and range '+v.range_ratio+
+      'x the previous half hour. Newest minute '+
+      (v.accel_pct>=0?'+':'')+v.accel_pct+'% vs the last five.'+
+      (v.stale?' — STALE, last good reading.':''));
+  }
+  async function refreshVel(){
+    try{ renderVel(await api('/api/tape?symbol='+sym)); }catch(e){}
+  }
+  renderVel(null);
 
   async function refreshPrices(){
     const d=await api('/api/prices');
@@ -625,7 +636,7 @@ const FZ = (function(){
   document.querySelectorAll('#seg button').forEach(b=>b.onclick=()=>{
     if(inTrade) return;
     document.querySelectorAll('#seg button').forEach(x=>x.classList.remove('on'));
-    b.classList.add('on'); sym=b.dataset.s; savePrefs({symbol:sym}); refreshPrices(); refreshTrend();
+    b.classList.add('on'); sym=b.dataset.s; savePrefs({symbol:sym}); refreshPrices(); refreshTrend(); refreshVel();
   });
   function step(d){ if(inTrade)return; qty=Math.max(1,qty+d); $('qty').textContent=qty; savePrefs({qty}); }
 
@@ -793,7 +804,7 @@ const FZ = (function(){
   async function quitApp(){
     if(inTrade && !confirm('You have an OPEN position. Shut the app down anyway?')) return;
     if(!inTrade && !confirm('Shut the app down completely?')) return;
-    try{ clearInterval(poll); clearInterval(priceTimer); clearInterval(trendTimer); }catch(e){}
+    try{ clearInterval(poll); clearInterval(priceTimer); clearInterval(trendTimer); clearInterval(velTimer); }catch(e){}
     try{ await fetch('/api/shutdown',{method:'POST'}); }catch(e){}
     // also stop the sibling app (options on 8000) so everything closes
     try{ await fetch('http://127.0.0.1:8000/api/shutdown',{method:'POST'}); }catch(e){}
@@ -930,7 +941,7 @@ const FZ = (function(){
 
   async function back(){
     if(inTrade && !confirm('You have an OPEN position. Leave anyway?')) return;
-    await api('/api/disconnect',{}); clearInterval(poll); clearInterval(priceTimer); clearInterval(trendTimer); location.reload();
+    await api('/api/disconnect',{}); clearInterval(poll); clearInterval(priceTimer); clearInterval(trendTimer); clearInterval(velTimer); location.reload();
   }
 
   return {step,open,close,disarm,back,toggleTheme,setTheme,openSettings,closeSettings,saveSettings,hideEvent,hideReject,
