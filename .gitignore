@@ -6,3 +6,6 @@ my-settings.json
 webull_trade_sdk.log
 *.log
 webull_trade_sdk.log.*
+# rotated SDK logs (both apps)
+webull_data_sdk.log.*
+*.log.*

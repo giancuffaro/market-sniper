@@ -46,13 +46,13 @@
 
   <div class="callout danger"><b>Read first.</b> This tool places <b>real orders with real money</b> in
   LIVE mode. Running it LIVE requires a <b>$4.99/month OPRA market-data subscription</b> from Webull
-  (Part 3). PAPER mode is free and simulated. Nothing here is financial advice.</div>
+  (Part 3). Every order this app sends is real money — there is no paper mode. Nothing here is financial advice.</div>
 
   <h2>Part 1 — The folder</h2>
   <div class="filelist">
     <b>🧰 INSTALL.bat</b> — run ONCE on a new computer (installs everything)<br>
     <b>START-MARKET-SNIPER.bat</b> — daily double-click: unblocks files, starts the app, opens the dashboard<br>
-    <b>START-FUTURES.bat</b> — the separate futures app (MNQ/MES, paper)<br>
+    <b>START-FUTURES.bat</b> — the separate futures app (MNQ/MES, live)<br>
     Market-Sniper.html — browser shortcut to a running dashboard<br>
     CHECK-SETUP.bat — health report if something's wrong<br>
     TUTORIAL.html — this guide · README.md — quick reference<br>
@@ -101,7 +101,7 @@
       <rect x="22" y="64" width="106" height="30" rx="8" fill="#161a18" stroke="#e0b64a"/>
       <text x="75" y="83" fill="#e0b64a" font-family="monospace" font-size="10" font-weight="bold" text-anchor="middle">LIVE</text>
       <rect x="140" y="64" width="106" height="30" rx="8" fill="#111413" stroke="#242a27"/>
-      <text x="193" y="83" fill="#7f8a84" font-family="monospace" font-size="10" font-weight="bold" text-anchor="middle">PAPER</text>
+      <text x="193" y="83" fill="#7f8a84" font-family="monospace" font-size="10" font-weight="bold" text-anchor="middle">LIVE</text>
       <circle cx="252" cy="79" r="10" fill="#1a8f57"/><text x="252" y="83" fill="#fff" font-size="11" font-weight="bold" text-anchor="middle">1</text>
       <rect x="22" y="106" width="224" height="52" rx="10" fill="#111413" stroke="#242a27"/>
       <text x="32" y="122" fill="#7f8a84" font-family="monospace" font-size="7">SAVED ACCOUNTS</text>
@@ -122,7 +122,7 @@
       <circle cx="252" cy="301" r="10" fill="#1a8f57"/><text x="252" y="305" fill="#fff" font-size="11" font-weight="bold" text-anchor="middle">4</text>
     </svg>
     <div class="legend">
-      <div class="item"><div class="num">1</div><div><b>LIVE / PAPER.</b> LIVE is the default and places real orders. PAPER simulates fills — with a saved account selected it uses your real market data (SIM · REAL DATA).</div></div>
+      <div class="item"><div class="num">1</div><div><b>LIVE only.</b> v3.6 removed paper mode from both apps. Every order placed here is real money in your real account, gated behind ALLOW_LIVE=1 which only the launcher sets.</div></div>
       <div class="item"><div class="num">2</div><div><b>SAVED ACCOUNTS.</b> Save each key pair once under a name; from then on it's tap → CONNECT. ✕ deletes.</div></div>
       <div class="item"><div class="num">3</div><div><b>API KEY / SECRET.</b> Paste from Part 2. They only ever travel to the app running on your own machine.</div></div>
       <div class="item"><div class="num">4</div><div><b>CONNECT.</b> If your key sees several accounts, they appear stacked with full details — next mock.</div></div>
@@ -188,7 +188,7 @@
   <h2>Part 8 — Futures (separate app)</h2>
   <p><code>START-FUTURES.bat</code> opens a second app at <code>127.0.0.1:8010</code>: MNQ / MES, one-tap
   LONG or SHORT, TP/SL in points (MNQ $2/pt, MES $5/pt), and a trailing stop. It's fully working in
-  <b>paper with live prices</b>. Futures LIVE additionally needs: futures approval on your Webull
+  <b>live prices</b>. Futures trading additionally needs: futures approval on your Webull
   account, the CME data subscription ($228/mo), and the futures order wiring — ask Claude when ready.</p>
 
   <h2>Part 9 — Troubleshooting</h2>
