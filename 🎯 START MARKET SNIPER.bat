@@ -21,16 +21,27 @@ if exist ".git\_p2"           del /f /q ".git\_p2"           >nul 2>&1
 echo [1/6] Preparing dependencies...
 if not exist ".venv" ( python -m venv .venv )
 call .venv\Scripts\activate
-pip install -q -r requirements.txt
 
-rem  Tray icon deps, installed ONCE and only if actually missing. Kept out of
-rem  requirements.txt on purpose so this file, which runs on every launch, does
-rem  not reinstall or re-check them every single time.
-.venv\Scripts\python.exe -c "import pystray, PIL" >nul 2>&1
+rem  Always call pip through the venv's OWN python. Relying on `activate` to put
+rem  the venv first on PATH is not dependable - on this machine bare `pip` was
+rem  resolving to the system Python 3.14 install, so packages went there while
+rem  the app kept running from .venv and never saw them.
+set "VPY=%~dp0.venv\Scripts\python.exe"
+"%VPY%" -m pip install -q -r requirements.txt
+
+rem  Tray icon deps: installed ONCE, and only when actually missing. Kept out of
+rem  requirements.txt so this file, which runs every launch, does not re-check
+rem  them every time.
+"%VPY%" -c "import pystray, PIL" >nul 2>&1
 if errorlevel 1 (
   echo       First run: installing the tray icon, one moment...
-  pip install -q pystray pillow
-  if errorlevel 1 echo       Tray icon unavailable - app still works fine.
+  "%VPY%" -m pip install -q pystray pillow
+  "%VPY%" -c "import pystray, PIL" >nul 2>&1
+  if errorlevel 1 (
+    echo       Tray icon unavailable - app still works fine without it.
+  ) else (
+    echo       Tray icon installed.
+  )
 )
 
 set ALLOW_LIVE=1
@@ -39,7 +50,7 @@ echo [2/6] Saving your local changes to GitHub FIRST...
 rem  This must happen BEFORE the update below. The update mirrors GitHub onto
 rem  this folder, so anything sitting here uncommitted would be destroyed by it.
 rem  Committing and pushing first means the mirror has nothing left to destroy.
-.venv\Scripts\python.exe auto_sync.py --once
+"%VPY%" auto_sync.py --once
 
 echo [3/6] Updating from GitHub...
 git fetch origin main
@@ -96,4 +107,4 @@ start "" /b cmd /c "timeout /t 5 >nul & start "" http://127.0.0.1:8000"
 
 rem  Runs in the foreground on purpose: its output IS this window, and closing
 rem  this window takes the servers with it. No orphaned background consoles.
-.venv\Scripts\python.exe run_all.py
+"%VPY%" run_all.py
