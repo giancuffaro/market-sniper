@@ -1219,14 +1219,18 @@ const EZ = (function(){
   // the stale tab stops talking to your broker.
   (function(){
     try{
+      var MY_BORN = Date.now();
+      var MY_ID = MY_BORN + '-' + Math.random();
       var CH = new BroadcastChannel('market_sniper_options');
-      var MY_ID = Date.now() + '-' + Math.random();
       CH.onmessage = function(e){
         if(!e.data || e.data.type !== 'hello' || e.data.id === MY_ID) return;
-        if(e.data.born < MY_BORN) return;        // older tab talking; ignore
+        // Only stand down for a genuinely NEWER tab. Identical timestamps are
+        // possible within one millisecond, so the id breaks the tie - without
+        // it both tabs would kill each other and you would be left with none.
+        if(e.data.born < MY_BORN) return;
+        if(e.data.born === MY_BORN && e.data.id < MY_ID) return;
         standDown();
       };
-      var MY_BORN = Date.now();
       CH.postMessage({type:'hello', id:MY_ID, born:MY_BORN});
 
       function standDown(){
