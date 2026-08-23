@@ -399,8 +399,10 @@ try:
               "MARKET CLOSED" in src)
     check(17,"options: skips quoting a shut market",
           "if(marketClosed){" in opt and "callSub" in opt.split("if(marketClosed){",1)[1][:300])
-    check(17,"futures: refuses to SEND into a shut market",
-          "No order was sent" in fut)
+    check(17,"futures: warns before sending into a shut market",
+          "marketClosed && !confirm(" in fut)
+    check(17,"futures: you can still overrule the guess",
+          "send anyway" in fut.lower())
     check(17,"futures: buttons repaint when velocity lands",
           "paintMarketState" in fut.split("async function refreshVel",1)[1][:400])
     check(17,"options: velocity awaited before the first quote",
@@ -433,8 +435,12 @@ try:
     check(18,"a closed guess WARNS, it does not silently refuse",
           "confirm(" in fut.split("marketClosed &&",1)[1][:400])
     check(18,"and says it is a guess, not a calendar", "not a " in fut and "calendar" in fut)
-    check(18,"no market calendar hardcoded anywhere",
-          "18:00" not in io.open(os.path.join(HERE,"tape.py"),encoding="utf-8").read().split("WHY 25")[0])
+    # The whole point of the bar-age design is that no hours are hardcoded.
+    # Strip comments, then make sure no clock arithmetic snuck into the logic.
+    _tp = io.open(os.path.join(HERE,"tape.py"),encoding="utf-8").read()
+    _code = "\n".join(l for l in _tp.splitlines() if not l.strip().startswith("#"))
+    check(18,"tape.py makes no calendar/clock decisions",
+          ".hour" not in _code and "weekday" not in _code and "localtime" not in _code)
 
 finally:
     for p_ in (OPT,FUT):
