@@ -541,6 +541,7 @@
 <script>
 const EZ = (function(){
   const LSK="ezexec_creds", LSS="ezexec_settings", LSP="ezexec_profiles", LSPA="ezexec_active_profile", LST="ezexec_theme", LSA="ezexec_autolock", LSST="ezexec_strategies";
+  let connected=false, marketClosed=false;
   let sym="QQQ", side="CALLS", qty=1, inTrade=false, poll=null, priceTimer=null, trendTimer=null, velTimer=null;
   let profiles=[], activeProf=null, mirrorOn=false;
   let settings={strike_mode:"ITM3",tp_enabled:false,tp_value:30,tp_unit:"cents",
@@ -706,6 +707,7 @@ const EZ = (function(){
   }
 
   function startDash(state){
+    connected = true;
     $('connectScreen').classList.add('hidden');
     $('dash').classList.remove('hidden');
     // Read the mode the SERVER actually connected to — never the checkbox. If
@@ -845,6 +847,7 @@ const EZ = (function(){
     const row=$('velRow'), fill=$('velFill'), val=$('velVal');
     if(!row) return;
     if(!v||!v.ok){
+      marketClosed = false;                 // unknown is not the same as closed
       row.className='velrow'; fill.style.width='0%';
       val.textContent=(v&&v.reason)?'—':'—';
       row.title=(v&&v.reason)?v.reason:'velocity unavailable';
@@ -852,6 +855,7 @@ const EZ = (function(){
     }
     // Market shut is its own state, not a low score. Before this, the closing
     // auction's volume spike froze the strip on VIOLENT 100 all weekend.
+    marketClosed = (v.state==='closed');
     if(v.state==='closed'){
       row.className='velrow closed';
       fill.style.width='0%';
@@ -915,6 +919,16 @@ const EZ = (function(){
   const fmtCost=ask=>'$'+Math.round(Number(ask)*100*qty).toLocaleString();
 
   async function refreshQuote(){
+    // Two things make a quote pointless: no session, and no market. Asking
+    // anyway just produced a 400 every 5s and an unreadable Webull error on
+    // the buy buttons. Say the real reason instead.
+    if(!connected) return;
+    if(marketClosed){
+      $('callSub').textContent = 'MARKET CLOSED';
+      $('putSub').textContent  = 'MARKET CLOSED';
+      const pl=$('previewLine'); if(pl) pl.innerHTML='';
+      return;
+    }
     try{
       const c=await api('/api/quote',{symbol:sym,side:'CALLS'});
       if(c.detail){ $('callSub').textContent=c.detail; $('putSub').textContent=c.detail; return; }
@@ -937,6 +951,7 @@ const EZ = (function(){
   // holding when it triggers. Read-only: nothing is sent to Webull.
   async function refreshPreview(){
     const el=$('previewLine'); if(!el) return;
+    if(!connected || marketClosed){ el.innerHTML=''; return; }
     if(!settings.my_enabled){          // plain market entries fill at the ask now
       el.innerHTML=''; return;
     }
@@ -1004,6 +1019,7 @@ const EZ = (function(){
     const st = await api('/api/state');
     if(st && st.detail){                       // 400: this session is gone
       if(++lostCount >= 2){                    // one blip is not a disconnect
+        connected = false;
         clearInterval(poll); clearInterval(priceTimer);
         clearInterval(trendTimer); clearInterval(velTimer);
         $('dash').classList.add('hidden');
