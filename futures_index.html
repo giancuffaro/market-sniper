@@ -494,6 +494,7 @@
 <script>
 const FZ = (function(){
   const LSS="ezfut_settings", LST="ezexec_theme", LSST="ezfut_strategies";
+  let marketClosed=false;
   let mode="WEBULL", sym="MNQ", qty=1, inTrade=false, poll=null, priceTimer=null, trendTimer=null, velTimer=null;
   let settings={tp_enabled:false,tp_points:10,sl_enabled:false,sl_points:5,trail_enabled:false,trail_points:5,
                 round_enabled:false,round_step:50};
@@ -753,12 +754,14 @@ const FZ = (function(){
     const row=$('velRow'), fill=$('velFill'), val=$('velVal');
     if(!row) return;
     if(!v||!v.ok){
+      marketClosed = false;                 // unknown is not the same as closed
       row.className='velrow'; fill.style.width='0%'; val.textContent='—';
       row.title=(v&&v.reason)?v.reason:'velocity unavailable';
       return;
     }
     // Market shut is its own state, not a low score. Before this, the closing
     // auction's volume spike froze the strip on VIOLENT 100 all weekend.
+    marketClosed = (v.state==='closed');
     if(v.state==='closed'){
       row.className='velrow closed';
       fill.style.width='0%';
@@ -817,6 +820,13 @@ const FZ = (function(){
                 +"order this app will send is a CLOSE.");
       return;
     }
+    // Futures are shut on weekends and through the daily maintenance break.
+    // Sending anyway just earns a broker rejection, so say the real reason.
+    if(marketClosed){
+      showReject("The market is closed - nothing is printing right now. "
+                +"No order was sent.");
+      return;
+    }
     const path = settings.round_enabled ? '/api/order/arm' : '/api/order/place';
     const r=await api(path,{symbol:sym,side,qty});
     if(!r.ok && r.rejected){ showReject(r.reason); return; }
@@ -856,8 +866,20 @@ const FZ = (function(){
     render(st);
   }
 
+  function paintMarketState(){
+    const l=$('longSub'), sh=$('shortSub');
+    if(marketClosed){
+      if(l)  l.textContent  = 'MARKET CLOSED';
+      if(sh) sh.textContent = 'MARKET CLOSED';
+    }else{
+      if(l && l.textContent==='MARKET CLOSED')  l.textContent='—';
+      if(sh && sh.textContent==='MARKET CLOSED') sh.textContent='—';
+    }
+  }
+
   function render(st){
     if(!st) return;
+    paintMarketState();
     // Every poll carries the full broker roster, so the strip and the green
     // dots stay honest even if a position opens or closes on an inactive one.
     if(st.sessions) applySessions(st.sessions, st.active_mode);
