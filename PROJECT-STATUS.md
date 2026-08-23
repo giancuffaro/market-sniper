@@ -57,7 +57,20 @@ requirements.txt, which the launcher runs on every start.
 JavaScript; a stray bracket would blank the page with the error only in the
 browser console. `node --check` now parses every script block.
 
-Suite: 149 checks across 16 scenarios.
+**Futures hours handled without a calendar.** The closed-market check asks the
+data - "has a bar printed recently?" - so Sunday 18:00 ET, the overnight
+session, holidays and the CME maintenance break all work with nothing hardcoded.
+Measured against 5 days of real MNQ/MES bars: there is an ~11 min quiet gap
+every night near 23:58 ET (Yahoo daily rollover, market WIDE OPEN) and a ~62 min
+gap at 17:00 ET (genuine maintenance break). The threshold was 10 min, i.e.
+BELOW the rollover gap - every night around midnight the app would have declared
+futures closed mid-session. Now 25 min: zero false closes across 5 days, all
+maintenance breaks still caught.
+The futures "market closed" guard WARNS rather than blocks - it is a guess from
+a data feed, and a wrong guess that silently refuses a live order is worse than
+one extra click.
+
+Suite: 169 checks across 18 scenarios.
 
 ## v3.8 changes
 
