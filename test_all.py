@@ -386,6 +386,26 @@ try:
     check(16,"tray install verified after installing",
           lb.count('import pystray, PIL') >= 2)
 
+    print("\n[17] CLOSED MARKET IS HONEST ON BOTH APPS")
+    opt = io.open(os.path.join(HERE,"index.html"),encoding="utf-8").read()
+    fut = io.open(os.path.join(HERE,"futures_index.html"),encoding="utf-8").read()
+    for name, src in (("options",opt),("futures",fut)):
+        check(17,f"{name}: tracks marketClosed", "marketClosed" in src)
+        check(17,f"{name}: set from the velocity reading",
+              "marketClosed = (v.state==='closed')" in src)
+        check(17,f"{name}: 'unknown' is not treated as closed",
+              "marketClosed = false;" in src)
+        check(17,f"{name}: says MARKET CLOSED on the trade buttons",
+              "MARKET CLOSED" in src)
+    check(17,"options: skips quoting a shut market",
+          "if(marketClosed){" in opt and "callSub" in opt.split("if(marketClosed){",1)[1][:300])
+    check(17,"futures: refuses to SEND into a shut market",
+          "No order was sent" in fut)
+    check(17,"futures: buttons repaint when velocity lands",
+          "paintMarketState" in fut.split("async function refreshVel",1)[1][:400])
+    check(17,"options: velocity awaited before the first quote",
+          "refreshVel().then(refreshQuote)" in opt)
+
 finally:
     for p_ in (OPT,FUT):
         if p_:
@@ -399,7 +419,7 @@ print("\n"+"="*68)
 by={}
 for sc,name,ok,_ in results:
     by.setdefault(sc,[0,0]); by[sc][0]+=1; by[sc][1]+= (1 if ok else 0)
-T={16:"Restart leaves no spinner",15:"One tab only",14:"Git lock self-heal",13:"Broker tabs + tray",12:"Velocity honest when shut",11:"Multi-broker sessions",1:"Futures login survives restart",2:"remember_login default",3:"Options profiles to disk",
+T={17:"Closed market honest",16:"Restart leaves no spinner",15:"One tab only",14:"Git lock self-heal",13:"Broker tabs + tray",12:"Velocity honest when shut",11:"Multi-broker sessions",1:"Futures login survives restart",2:"remember_login default",3:"Options profiles to disk",
    4:"Browser autofill guard",5:"ITM3 strike math",6:"Preview == Arm",7:"Live-only / dead modes",
    8:"Auto-sync safety",9:"Endpoints alive",10:"UI integrity"}
 for sc in sorted(by):
