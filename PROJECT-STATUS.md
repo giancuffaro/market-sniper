@@ -1,5 +1,5 @@
 # MARKET SNIPER — Project Status
-Current version **v3.6** (renamed from EZEXECUTION → Option Sniper → Market Sniper)
+Current version **v3.7** (renamed from EZEXECUTION → Option Sniper → Market Sniper)
 
 ## Proven with real money
 - LIVE connect, multi-account picker (stacked rows w/ full ID + buying power)
@@ -12,6 +12,71 @@ Current version **v3.6** (renamed from EZEXECUTION → Option Sniper → Market 
 - Entry preview: shows the underlying trigger level + resolved strike before you ARM
 - VELOCITY strip on both apps (tape.py)
 - Futures app (MNQ/MES, trailing stop) — separate, port 8010
+
+## v3.7 changes
+
+**Saved logins actually save now (both apps).** Three separate bugs made the
+apps forget everything between sessions:
+
+1. `wb_key` / `wb_sec` were in NO save list at all — the Webull futures key
+   could never persist, no matter what you ticked.
+2. `remember_login` defaulted to FALSE when absent, so every write ran the
+   "forget my secrets" branch and DELETED saved keys. Absent meant "never
+   chosen", not "no". It now defaults to remember; only an explicit untick wipes.
+3. The remember checkbox only rendered in TOPSTEP mode, so in WEBULL and NINJA
+   there was no way to opt in and the default did the wiping.
+
+Also: fields saved only on a SUCCESSFUL connect, so a failed login threw away
+what you had just typed — and you retyped it to try again. Every field now
+saves as you type, 500ms debounced.
+
+**Options key profiles moved from browser to disk.** They lived only in
+localStorage, so clearing the browser or opening a different one lost every
+account. They are in `my-settings.json` now, with localStorage kept in step as a
+first-paint fallback. Existing browser profiles migrate to disk automatically on
+first load.
+
+**Show keys instead of dots.** Both apps, on by default, remembered per app.
+Secrets are plain text in `my-settings.json` — gitignored, never leaves the PC.
+
+**Buy buttons show what the trade costs.** `STRIKE 711 - $3.00 - $3,000`.
+ITM3 contracts run ~3x an OTM1, so contract count stopped being a useful proxy
+for what you are about to spend.
+
+**Fixed: strike display truncated.** The buttons used `strike|0`, which showed
+TSLA's 332.5 strike as "332" — a strike that does not exist. Orders were always
+correct; only the display lied, on the screen you press. SPY/QQQ hid it because
+their steps are whole dollars.
+
+## v3.7 changes (earlier)
+
+**Execute button now buys 3 strikes IN the money.** `pick_strike` is generalised
+to any ITM/OTM depth (`ITM1..ITM20`, `OTM1..OTM20`); default is `ITM3`.
+Depth counts STRIKES, not dollars — 3 deep is $3 on SPY/QQQ (step 1.0) but
+$7.50 on TSLA (step 2.5). QQQ at 724: CALLS take the 721, PUTS take the 727.
+The ARM trigger is UNCHANGED — still the nearest whole dollar. Only the
+contract bought when it fires has moved.
+`my-settings.json` was migrated from OTM1, otherwise the saved file would have
+silently overridden the new default and nothing would have changed.
+
+**Auto-sync (`auto_sync.py`).** Watches the folder, and every change is
+committed and pushed on its own. No push, no UPDATE.bat, no git. Guards:
+- refuses to push anything that does not compile (syntax-checks every .py first)
+- never stages `my-settings.json` — gitignored AND explicitly unstaged, because
+  one of those being wrong would publish API keys
+- sweeps stray `webull_*.log` files off the root into `logs/` each cycle
+- 4s debounce, so saving five files is one commit
+- on push failure, work stays committed locally and it retries every 60s
+
+**Launcher no longer destroys unpushed work.** It used to `git reset --hard`
+unconditionally, which would discard any commit auto-sync had made but not yet
+pushed (offline, GitHub down, expired credentials). It now pushes first, and
+skips the reset entirely if that push fails.
+
+**Folder cleaned.** All SDK logs moved to `logs/`. `PLAN-v3.6.md`,
+`PUSH v3.6.bat`, `UPDATE.bat` and `Market-Sniper.html` retired to `_archive/`
+(gitignored — kept locally as a safety copy, delete whenever).
+`CHECK-SETUP.bat` and `INSTALL.bat` kept: both are diagnostics, not one-offs.
 
 ## v3.6 changes — LIVE-ONLY BUILD
 **No paper mode anywhere.** Removed Webull sandbox from both apps and Tradovate

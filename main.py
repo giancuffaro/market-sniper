@@ -281,7 +281,14 @@ def close():
 # ---- Remembered setup (survives restarts AND updates) ----------------------
 # Kept in my-settings.json next to the app so it isn't lost when the browser
 # forgets, and isn't lost when UPDATE.bat pulls a new version.
-OPT_PREF_KEYS = ("theme", "mode", "symbol", "qty", "autolock")
+# v3.7: saved key profiles used to live ONLY in browser localStorage, so
+# clearing the browser, switching browser, or a new machine lost every account.
+# They are written to my-settings.json now — same disk file the futures app
+# uses, gitignored, never leaves this computer.
+OPT_PREF_KEYS = ("theme", "mode", "symbol", "qty", "autolock",
+                 "show_secrets", "active_profile")
+OPT_SECRET_KEYS = ("profiles",)          # [{name, k, s}, ...]
+REMEMBER_BY_DEFAULT = True
 
 
 @app.get("/api/prefs")
@@ -291,7 +298,9 @@ def get_prefs():
     saved = uc.load("options_settings", {})
     settings = dict(config.DEFAULT_SETTINGS)
     settings.update({k: v for k, v in saved.items() if k in config.DEFAULT_SETTINGS})
-    return {"prefs": uc.load("options_prefs", {}),
+    prefs = dict(uc.load("options_prefs", {}))
+    prefs.setdefault("remember_login", REMEMBER_BY_DEFAULT)
+    return {"prefs": prefs,
             "settings": settings,
             "strategies": wb._restore_strategies(uc.load("options_strategies", None)),
             "saved_to": uc.where()}
@@ -303,6 +312,17 @@ def set_prefs(req: dict):
     for k in OPT_PREF_KEYS:
         if k in req and req[k] is not None:
             p[k] = req[k]
+    if "remember_login" in req:
+        p["remember_login"] = bool(req["remember_login"])
+
+    # Absent means "never chosen" -> remember. Only an explicit false is a no.
+    if p.get("remember_login", REMEMBER_BY_DEFAULT):
+        for k in OPT_SECRET_KEYS:
+            if k in req and req[k] is not None:
+                p[k] = req[k]
+    else:
+        for k in OPT_SECRET_KEYS:
+            p.pop(k, None)
     uc.save("options_prefs", p)
     return {"ok": True, "prefs": p}
 

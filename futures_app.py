@@ -150,18 +150,26 @@ def close():
         return _fail("close", e)
 
 # ---- Remembered setup (survives restarts AND updates) ----------------------
-# Plain identifiers are always remembered. Passwords / API secrets are ONLY
-# written to disk if you tick "Remember my login on this PC".
+# Plain identifiers are always remembered. API keys/secrets are remembered too
+# unless you untick "Remember my login on this PC".
+#
+# v3.7 fix: wb_key/wb_sec were in NO list at all, so the Webull futures key was
+# never saved and had to be retyped every single time. remember_login also
+# defaulted to FALSE when absent, which actively DELETED secrets on every save
+# for anyone who had never seen the checkbox — and the checkbox only appeared
+# in TOPSTEP mode, so most people never did.
 PREF_KEYS = ("theme", "mode", "symbol", "qty", "bt_commission", "bt_slippage",
-             "nt_account", "nt_folder", "ts_user", "ts_acct")
-SECRET_KEYS = ("ts_key",)
+             "nt_account", "nt_folder", "ts_user", "ts_acct", "show_secrets")
+SECRET_KEYS = ("ts_key", "wb_key", "wb_sec")
+REMEMBER_BY_DEFAULT = True
 
 
 @app.get("/api/prefs")
 def get_prefs():
     """Everything the app should remember, in one call — read before you connect
     so the setup screen and CONFIGURATION open already filled in."""
-    p = uc.load("futures_prefs", {})
+    p = dict(uc.load("futures_prefs", {}))
+    p.setdefault("remember_login", REMEMBER_BY_DEFAULT)
     saved = uc.load("futures_settings", {})
     settings = dict(fc.DEFAULT_SETTINGS)
     settings.update({k: v for k, v in saved.items() if k in fc.DEFAULT_SETTINGS})
@@ -179,7 +187,10 @@ def set_prefs(req: dict):
             p[k] = req[k]
     if "remember_login" in req:
         p["remember_login"] = bool(req["remember_login"])
-    if p.get("remember_login"):
+
+    # Absent means "never chosen", which must NOT read as "no". Defaulting this
+    # to False is what silently wiped saved keys on every write.
+    if p.get("remember_login", REMEMBER_BY_DEFAULT):
         for k in SECRET_KEYS:
             if k in req and req[k] is not None:
                 p[k] = req[k]

@@ -1,6 +1,6 @@
 """MARKET SNIPER — central config. v3.1"""
 
-APP_VERSION = "3.6"
+APP_VERSION = "3.7"
 APP_NAME = "MARKET SNIPER"
 REGION = "us"
 
@@ -59,7 +59,10 @@ ENTRY_CUTOFF       = (15, 40)
 MARKET_CLOSE_HARD  = (16, 0)
 
 DEFAULT_SETTINGS = {
-    "strike_mode": "OTM1",
+    # v3.7: the execute button buys 3 strikes IN the money by default.
+    # Depth counts STRIKES, not dollars — 3 deep is $3 on SPY/QQQ (step 1.0)
+    # and $7.50 on TSLA (step 2.5). Format is ITM<n> / OTM<n>, n up to 20.
+    "strike_mode": "ITM3",
     "tp_enabled": False, "tp_value": 30.0, "tp_unit": "cents",
     "sl_enabled": False, "sl_value": 20.0, "sl_unit": "cents",
     # MY CONFIG — round-number armed entry, +$1 whole-number TP, 10% stop.

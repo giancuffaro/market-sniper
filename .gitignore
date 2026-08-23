@@ -1,11 +1,15 @@
 __pycache__/
 *.pyc
 data/
-# Your saved setup — stays on your computer, survives every UPDATE.bat.
+
+# Your saved setup — API keys live in here. Never leaves your computer.
+# auto_sync.py refuses to stage this file even if this line were removed.
 my-settings.json
-webull_trade_sdk.log
+
+# All logs live in logs/ now. auto_sync sweeps stray ones off the root.
+logs/
 *.log
-webull_trade_sdk.log.*
-# rotated SDK logs (both apps)
-webull_data_sdk.log.*
 *.log.*
+
+# Retired one-time files, kept locally as a safety copy. Not part of the app.
+_archive/

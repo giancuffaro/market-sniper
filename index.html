@@ -283,7 +283,8 @@
     <div class="field"><label>SECRET</label>
       <input id="appSecret" type="password" autocomplete="off" spellcheck="false" placeholder="paste your secret"></div>
 
-    <label class="remember"><input type="checkbox" id="remember" checked> Remember last used account on this device</label>
+    <label class="remember"><input type="checkbox" id="remember" checked> Remember my accounts and keys on this PC</label>
+    <label class="remember"><input type="checkbox" id="showSecrets" checked> Show keys instead of dots</label>
     <button class="go" id="connectBtn">CONNECT</button>
 
     <!-- shown when one key exposes multiple accounts -->
@@ -429,9 +430,13 @@
         <div class="strikeopts">
           <button id="smOTM" onclick="EZ.setStrikeMode('OTM1')">1 STRIKE<br>OUT OF THE MONEY<br><span class="risk hi">MORE RISK</span></button>
           <button id="smITM" onclick="EZ.setStrikeMode('ITM1')">1 STRIKE<br>IN THE MONEY<br><span class="risk lo">LESS RISK</span></button>
+          <button id="smITM3" onclick="EZ.setStrikeMode('ITM3')">3 STRIKES<br>IN THE MONEY<br><span class="risk lo">LEAST RISK</span></button>
         </div>
-        <div class="shint">QQQ at 755 buying a CALL: OTM picks the <b>756</b>; ITM picks the
-        <b>754</b> (costs more, already has value). PUTS mirror this.</div>
+        <div class="shint">QQQ at 724 buying a CALL: OTM1 picks the <b>725</b>, ITM1 the
+        <b>723</b>, ITM3 the <b>721</b>. PUTS mirror it — ITM3 picks the <b>727</b>.
+        Deeper in the money costs more per contract and moves closer to
+        dollar-for-dollar with the stock. Depth counts <b>strikes</b>, so on TSLA
+        (2.50 steps) 3 deep is $7.50, not $3.</div>
       </div>
 
       <div class="sgroup">
@@ -534,7 +539,7 @@ const EZ = (function(){
   const LSK="ezexec_creds", LSS="ezexec_settings", LSP="ezexec_profiles", LSPA="ezexec_active_profile", LST="ezexec_theme", LSA="ezexec_autolock", LSST="ezexec_strategies";
   let sym="QQQ", side="CALLS", qty=1, inTrade=false, poll=null, priceTimer=null, trendTimer=null, velTimer=null;
   let profiles=[], activeProf=null, mirrorOn=false;
-  let settings={strike_mode:"OTM1",tp_enabled:false,tp_value:30,tp_unit:"cents",
+  let settings={strike_mode:"ITM3",tp_enabled:false,tp_value:30,tp_unit:"cents",
                 sl_enabled:false,sl_value:20,sl_unit:"cents",my_enabled:false};
   let autolock={enabled:false,minutes:10}, lastActivity=Date.now();
   let prefs={}, prefsReady=false, prefsLoaded=null;
@@ -575,6 +580,9 @@ const EZ = (function(){
       document.querySelectorAll('#seg button').forEach(b=>b.classList.toggle('on',b.dataset.s===sym));
     }
     prefsReady=true;
+    // Re-run with the disk copy now that it has landed. The earlier call ran
+    // off localStorage so the screen was not blank while this request flew.
+    loadProfiles(prefs);
     try{ renderStrategies(); }catch(e){}
   }
 
@@ -582,19 +590,43 @@ const EZ = (function(){
     .then(h=>{$('appVer').textContent='v'+(h.version||'old');})
     .catch(()=>{$('appVer').textContent='server not running';});
 
-  function loadProfiles(){
-    try{ profiles=JSON.parse(localStorage.getItem(LSP)||"[]"); }catch(e){ profiles=[]; }
-    try{
-      const old=JSON.parse(localStorage.getItem(LSK)||"null");
-      if(old && old.k && !profiles.length){ profiles.push({name:"Account 1",k:old.k,s:old.s});
-        localStorage.removeItem(LSK); persistProfiles(); }
-    }catch(e){}
-    activeProf=localStorage.getItem(LSPA)||null;
+  // Disk is the source of truth (my-settings.json, gitignored). localStorage is
+  // kept in step purely as a fallback for the first paint before /api/prefs
+  // answers. Before v3.7 the browser WAS the only copy, so clearing it — or
+  // simply opening a different browser — lost every saved account.
+  function loadProfiles(fromDisk){
+    let disk = fromDisk && Array.isArray(fromDisk.profiles) ? fromDisk.profiles : null;
+    if(disk && disk.length){
+      profiles = disk;
+    }else{
+      try{ profiles=JSON.parse(localStorage.getItem(LSP)||"[]"); }catch(e){ profiles=[]; }
+      try{
+        const old=JSON.parse(localStorage.getItem(LSK)||"null");
+        if(old && old.k && !profiles.length){ profiles.push({name:"Account 1",k:old.k,s:old.s});
+          localStorage.removeItem(LSK); }
+      }catch(e){}
+      if(profiles.length) persistProfiles();     // migrate browser -> disk, once
+    }
+    activeProf = (fromDisk && fromDisk.active_profile) || localStorage.getItem(LSPA) || null;
+    if(fromDisk){
+      $('remember').checked     = (fromDisk.remember_login!==false);
+      $('showSecrets').checked  = (fromDisk.show_secrets!==false);
+      applySecretVisibility();
+    }
     renderProfiles();
     const p=profiles.find(x=>x.name===activeProf);
     if(p && $('remember').checked){ $('appKey').value=p.k; $('appSecret').value=p.s; }
   }
-  function persistProfiles(){ localStorage.setItem(LSP,JSON.stringify(profiles)); }
+  function persistProfiles(){
+    localStorage.setItem(LSP,JSON.stringify(profiles));
+    savePrefs({profiles, active_profile:activeProf, remember_login:$('remember').checked});
+  }
+  // Secrets sit in plain text in my-settings.json. That file is gitignored and
+  // never leaves this machine; showing them on screen is your call.
+  function applySecretVisibility(){
+    const show=$('showSecrets').checked;
+    const el=$('appSecret'); if(el) el.type = show?'text':'password';
+  }
   function renderProfiles(){
     $('profList').innerHTML=profiles.map(p=>
       `<span class="prof${p.name===activeProf?' on':''}" onclick="EZ.selectProfile('${p.name.replace(/'/g,"\\'")}')">
@@ -604,6 +636,7 @@ const EZ = (function(){
     const p=profiles.find(x=>x.name===name); if(!p) return;
     activeProf=name; localStorage.setItem(LSPA,name);
     $('appKey').value=p.k; $('appSecret').value=p.s;
+    savePrefs({active_profile:name});
     renderProfiles();
   }
   function saveProfile(){
@@ -615,6 +648,7 @@ const EZ = (function(){
     if(i>=0) profiles[i]={name,k,s}; else profiles.push({name,k,s});
     activeProf=name; localStorage.setItem(LSPA,name);
     persistProfiles(); renderProfiles(); $('profName').value='';
+    $('connectErr').textContent='';
   }
   function deleteProfile(name){
     profiles=profiles.filter(x=>x.name!==name);
@@ -622,6 +656,9 @@ const EZ = (function(){
     persistProfiles(); renderProfiles();
   }
   loadProfiles();
+  $('showSecrets').onchange=()=>{ applySecretVisibility(); savePrefs({show_secrets:$('showSecrets').checked}); };
+  $('remember').onchange=()=>savePrefs({remember_login:$('remember').checked});
+  applySecretVisibility();
 
   $('connectBtn').onclick=async()=>{
     const btn=$('connectBtn');
@@ -700,8 +737,7 @@ const EZ = (function(){
 
   function openSettings(){
     showTab('config'); cancelStrategyEdit(); renderStrategies();
-    $('smOTM').classList.toggle('on',settings.strike_mode==='OTM1');
-    $('smITM').classList.toggle('on',settings.strike_mode==='ITM1');
+    paintStrikeMode(settings.strike_mode);
     $('myEnabled').checked=!!settings.my_enabled;
     $('tpEnabled').checked=settings.tp_enabled; $('tpValue').value=settings.tp_value; $('tpUnit').value=settings.tp_unit;
     $('slEnabled').checked=settings.sl_enabled; $('slValue').value=settings.sl_value; $('slUnit').value=settings.sl_unit;
@@ -717,10 +753,17 @@ const EZ = (function(){
     const whole=$('tpUnit').value==='whole';
     $('tpValue').disabled=whole; $('tpValue').style.opacity=whole?0.35:1;
   }
-  function setStrikeMode(m){
-    settings.strike_mode=m;
+  // One place decides which strike button is lit, so adding a depth later
+  // can't leave two of them highlighted at once.
+  function paintStrikeMode(m){
     $('smOTM').classList.toggle('on',m==='OTM1');
     $('smITM').classList.toggle('on',m==='ITM1');
+    $('smITM3').classList.toggle('on',m==='ITM3');
+  }
+  function setStrikeMode(m){
+    settings.strike_mode=m;
+    paintStrikeMode(m);
+    refreshQuote();          // the preview line and button subtitles follow it
   }
   function closeSettings(){ $('setScrim').classList.remove('show'); }
   async function saveSettings(){
@@ -847,15 +890,28 @@ const EZ = (function(){
     const btn=[...document.querySelectorAll('#seg button')].find(b=>b.dataset.s===want);
     if(btn){ e.preventDefault(); btn.click(); }
   });
-  function step(d){ if(inTrade)return; qty=Math.max(1,qty+d); $('qty').textContent=qty; savePrefs({qty}); }
+  function step(d){
+    if(inTrade)return;
+    qty=Math.max(1,qty+d); $('qty').textContent=qty; savePrefs({qty});
+    refreshQuote();          // cost on the buttons is per-qty, so it must follow
+  }
+
+  // 720.0 -> "720", but TSLA's 2.50 step must keep its half: 332.5 -> "332.5"
+  const fmtStrike=v=>(v==null?'—':(Number(v)%1===0?String(Math.round(v)):Number(v).toFixed(1)));
+  // What this trade actually costs: one contract controls 100 shares.
+  const fmtCost=ask=>'$'+Math.round(Number(ask)*100*qty).toLocaleString();
 
   async function refreshQuote(){
     try{
       const c=await api('/api/quote',{symbol:sym,side:'CALLS'});
       if(c.detail){ $('callSub').textContent=c.detail; $('putSub').textContent=c.detail; return; }
       const p=await api('/api/quote',{symbol:sym,side:'PUTS'});
-      $('callSub').textContent=`STRIKE ${c.strike|0} · $${c.ask.toFixed(2)}`;
-      $('putSub').textContent =`STRIKE ${p.strike|0} · $${p.ask.toFixed(2)}`;
+      // `strike|0` truncated to an integer, which silently showed TSLA's 332.5
+      // strike as "332" — a strike that does not exist. fmtStrike keeps the half.
+      // Cost is shown because ITM3 contracts run 3x an OTM1, so the number of
+      // contracts no longer tells you what you are about to spend.
+      $('callSub').textContent=`STRIKE ${fmtStrike(c.strike)} · $${c.ask.toFixed(2)} · ${fmtCost(c.ask)}`;
+      $('putSub').textContent =`STRIKE ${fmtStrike(p.strike)} · $${p.ask.toFixed(2)} · ${fmtCost(p.ask)}`;
       $('tickerRow').innerHTML=`<b>${sym}</b> SPOT ${c.spot.toFixed(2)} &nbsp; 0DTE · EXP <b>TODAY</b>`;
     }catch(e){}
     refreshPreview();
@@ -878,7 +934,6 @@ const EZ = (function(){
       ]);
       if(!c||!c.ok){ el.innerHTML=''; return; }
       // 720.0 -> "720", but TSLA's 2.5 step must keep its half: 332.5 -> "332.5"
-      const kstrike=v=>(v==null?'—':(Number(v)%1===0?String(Number(v)|0):Number(v).toFixed(1)));
       const away=Math.abs(c.distance).toFixed(2);
       const where=c.direction==='at' ? 'right here'
                 : away+' '+(c.direction==='above'?'above':'below');
@@ -887,8 +942,8 @@ const EZ = (function(){
       el.innerHTML=
         `<span class="${far.trim()}">${sym} <b>${c.spot.toFixed(2)}</b> → triggers at `
         +`<b>${c.target.toFixed(2)}</b> <span class="pv-far">(${where})</span></span><br>`
-        +`<span class="pv-c">CALLS ${kstrike(c.strike)}C</span> · `
-        +`<span class="pv-p">PUTS ${p&&p.ok?kstrike(p.strike):'—'}P</span>`;
+        +`<span class="pv-c">CALLS ${fmtStrike(c.strike)}C</span> · `
+        +`<span class="pv-p">PUTS ${p&&p.ok?fmtStrike(p.strike):'—'}P</span>`;
     }catch(e){ el.innerHTML=''; }
   }
 

@@ -244,9 +244,12 @@
       (watch NinjaTrader to confirm fills).</div>
     </div>
 
-    <div id="rememberRow" style="display:none;margin:2px 0 10px">
+    <div id="rememberRow" style="display:block;margin:2px 0 10px">
       <label style="display:flex;align-items:center;gap:8px;color:var(--dim);font-size:12px;cursor:pointer">
-        <input type="checkbox" id="rememberLogin"> Remember my login on this PC
+        <input type="checkbox" id="rememberLogin" checked> Remember my login on this PC
+      </label>
+      <label style="display:flex;align-items:center;gap:8px;color:var(--dim);font-size:12px;cursor:pointer;margin-top:6px">
+        <input type="checkbox" id="showSecrets" checked> Show keys instead of dots
       </label>
       <div class="note" style="margin-top:6px">Your username, account and folder are always remembered.
       Tick this to also save the <b>password / API key</b> — stored in plain text in
@@ -504,10 +507,13 @@ const FZ = (function(){
       if(prefs.nt_folder)  $('ntFolder').value=prefs.nt_folder;
       if(prefs.ts_user)    $('tsUser').value=prefs.ts_user;
       if(prefs.ts_acct)    $('tsAcct').value=prefs.ts_acct;
-      $('rememberLogin').checked=!!prefs.remember_login;
-      if(prefs.remember_login){
-        if(prefs.ts_key)  $('tsKey').value=prefs.ts_key;
-      }
+      if(prefs.wb_key)     $('wbKey').value=prefs.wb_key;
+      if(prefs.wb_sec)     $('wbSec').value=prefs.wb_sec;
+      // Absent means "never chosen" -> remember. Only an explicit false is a no.
+      $('rememberLogin').checked = (prefs.remember_login!==false);
+      $('showSecrets').checked   = (prefs.show_secrets!==false);
+      if($('rememberLogin').checked && prefs.ts_key) $('tsKey').value=prefs.ts_key;
+      applySecretVisibility();
       // Saved prefs from before v3.6 may say PAPER (gone) or LIVE (now NINJA).
       if(prefs.mode){
         const m = prefs.mode==='LIVE' ? 'NINJA' : prefs.mode;
@@ -527,11 +533,37 @@ const FZ = (function(){
     $('webullConfig').style.display = mode==='WEBULL' ? 'block' : 'none';
     $('ntConfig').style.display = mode==='NINJA' ? 'block' : 'none';
     $('tsConfig').style.display = mode==='TOPSTEP' ? 'block' : 'none';
-    // Only Topstep has a secret worth offering to remember.
-    $('rememberRow').style.display = mode==='TOPSTEP' ? 'block' : 'none';
+    // Every mode has something worth remembering (NINJA has account + folder),
+    // so this row is always shown. Hiding it in WEBULL mode is why the Webull
+    // key looked unsaveable.
+    $('rememberRow').style.display = 'block';
     savePrefs({mode});
   });
   $('rememberLogin').onchange=()=>savePrefs({remember_login:$('rememberLogin').checked});
+
+  // Secrets are stored in plain text in my-settings.json, which is gitignored
+  // and never leaves this machine. Showing them is a screen-privacy choice.
+  function applySecretVisibility(){
+    const show=$('showSecrets').checked;
+    ['wbSec','tsKey'].forEach(id=>{ const el=$(id); if(el) el.type = show?'text':'password'; });
+  }
+  $('showSecrets').onchange=()=>{ applySecretVisibility(); savePrefs({show_secrets:$('showSecrets').checked}); };
+
+  // The old build only persisted these on a SUCCESSFUL connect, so a failed
+  // login threw away everything you had just typed — and you retyped it to try
+  // again. Saving on input means a field survives whatever happens next.
+  function rememberField(id, key){
+    const el=$(id); if(!el) return;
+    let t=null;
+    el.addEventListener('input',()=>{
+      clearTimeout(t);
+      t=setTimeout(()=>savePrefs({[key]:el.value.trim()}),500);
+    });
+  }
+  rememberField('ntAccount','nt_account'); rememberField('ntFolder','nt_folder');
+  rememberField('tsUser','ts_user');       rememberField('tsAcct','ts_acct');
+  rememberField('tsKey','ts_key');
+  rememberField('wbKey','wb_key');         rememberField('wbSec','wb_sec');
 
   $('connectBtn').onclick=async()=>{
     $('connectErr').textContent='';
@@ -546,9 +578,11 @@ const FZ = (function(){
     if(r.detail){ $('connectErr').textContent=r.detail; return; }
     // Remember how you connected so the next launch is already set up.
     savePrefs({mode, remember_login:$('rememberLogin').checked,
+               show_secrets:$('showSecrets').checked,
                nt_account:$('ntAccount').value.trim(), nt_folder:$('ntFolder').value.trim(),
                ts_user:$('tsUser').value.trim(), ts_acct:$('tsAcct').value.trim(),
-               ts_key:$('tsKey').value.trim()});
+               ts_key:$('tsKey').value.trim(),
+               wb_key:$('wbKey').value.trim(), wb_sec:$('wbSec').value.trim()});
     $('connectScreen').classList.add('hidden'); $('dash').classList.remove('hidden');
     $('modePill').textContent = mode==='WEBULL' ? 'WEBULL LIVE' : mode;
     $('footMode').textContent = mode==='WEBULL'

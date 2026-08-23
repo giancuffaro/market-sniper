@@ -81,12 +81,37 @@ def first_otm_strike(spot, side, step):
         return math.floor(spot / step) * step + step
     return math.ceil(spot / step) * step - step
 
+def parse_strike_mode(mode):
+    """'ITM3' -> ('ITM', 3). Anything unreadable falls back to ('OTM', 1)."""
+    m = str(mode or "OTM1").upper().strip()
+    kind = "ITM" if m.startswith("ITM") else "OTM"
+    try:
+        depth = int(m[3:] or 1)
+    except ValueError:
+        depth = 1
+    return kind, max(1, min(depth, 20))     # 20 strikes is already absurd
+
+
 def pick_strike(spot, side, step, mode="OTM1"):
-    if mode == "ITM1":
+    """The strike an order will actually use, `depth` strikes in or out.
+
+    IN the money means the strike the underlying has already passed: BELOW spot
+    for calls, ABOVE spot for puts. Out of the money is the mirror. Depth counts
+    STRIKES, not dollars, so it respects each symbol's strike_step — 3 deep is
+    $3 on QQQ (step 1.0) but $7.50 on TSLA (step 2.5).
+
+    Worked example, QQQ at 724 with ITM3:
+        CALLS -> ceil(724) - 3  = 721   (below spot, already in the money)
+        PUTS  -> floor(724) + 3 = 727   (above spot, already in the money)
+    """
+    kind, depth = parse_strike_mode(mode)
+    if kind == "ITM":
         if side == "CALLS":
-            return math.ceil(spot / step) * step - step
-        return math.floor(spot / step) * step + step
-    return first_otm_strike(spot, side, step)
+            return math.ceil(spot / step) * step - depth * step
+        return math.floor(spot / step) * step + depth * step
+    if side == "CALLS":
+        return math.floor(spot / step) * step + depth * step
+    return math.ceil(spot / step) * step - depth * step
 
 def next_whole(spot, side):
     return math.floor(spot) + 1 if side == "CALLS" else math.ceil(spot) - 1
@@ -358,8 +383,11 @@ class BaseSession:
 
     def update_settings(self, new):
         s = self.settings
-        if "strike_mode" in new and new["strike_mode"] in ("OTM1", "ITM1"):
-            s["strike_mode"] = new["strike_mode"]
+        if "strike_mode" in new:
+            # Accept any ITM/OTM depth (ITM1..ITM20, OTM1..OTM20). Rebuilt from
+            # the parsed pair so a typo can't reach the order path as-is.
+            kind, depth = parse_strike_mode(new["strike_mode"])
+            s["strike_mode"] = "%s%d" % (kind, depth)
         if "tp_enabled" in new: s["tp_enabled"] = bool(new["tp_enabled"])
         if "sl_enabled" in new: s["sl_enabled"] = bool(new["sl_enabled"])
         if "my_enabled" in new: s["my_enabled"] = bool(new["my_enabled"])
