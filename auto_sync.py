@@ -80,9 +80,16 @@ def log(msg):
 
 
 def git(*args, timeout=120):
-    """Run a git command. Returns (ok, combined_output)."""
+    """Run a git command. Returns (ok, combined_output).
+
+    core.quotePath=false stops git octal-escaping non-ASCII filenames. The
+    launcher is called "<rocket> START MARKET SNIPER.bat", and without this the
+    emoji came back as \\360\\237\\216\\257, which turned the commit subject
+    into 'auto: 257 START MARKET SNIPER.bat"'.
+    """
     try:
-        p = subprocess.run(("git",) + args, cwd=HERE, timeout=timeout,
+        p = subprocess.run(("git", "-c", "core.quotePath=false") + args,
+                           cwd=HERE, timeout=timeout,
                            stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
         return p.returncode == 0, p.stdout.decode("utf-8", "replace").strip()
     except subprocess.TimeoutExpired:
@@ -185,7 +192,7 @@ def unstage_secrets():
 
 def describe(staged_names):
     """A commit subject that says what actually changed."""
-    names = [os.path.basename(n) for n in staged_names if n.strip()]
+    names = [os.path.basename(n.strip().strip('"')) for n in staged_names if n.strip()]
     stamp = dt.datetime.now().strftime("%Y-%m-%d %H:%M")
     if not names:
         return "auto: sync %s" % stamp

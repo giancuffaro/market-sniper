@@ -17,7 +17,12 @@ echo Flushing any unsaved work to GitHub...
 if exist ".venv\Scripts\python.exe" (
     .venv\Scripts\python.exe auto_sync.py --once
 )
-taskkill /F /FI "WINDOWTITLE eq SNIPER-AUTOSYNC*" >nul 2>&1
+rem  v3.7 runs everything under one run_all.py supervisor, so killing that
+rem  takes the servers and auto-sync with it. The old per-window titles are
+rem  still swept in case an older copy is somehow still running.
+taskkill /F /IM python.exe /FI "WINDOWTITLE eq MARKET SNIPER*" >nul 2>&1
+wmic process where "name='python.exe' and commandline like '%%run_all.py%%'" delete >nul 2>&1
+taskkill /F /FI "WINDOWTITLE eq SNIPER-*" >nul 2>&1
 
 if "%FOUND%"=="1" (
     echo   Done - everything is shut down.
