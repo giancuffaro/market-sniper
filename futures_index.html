@@ -1140,6 +1140,48 @@ const FZ = (function(){
     }catch(e){}
   }
 
+
+  // ---- ONE TAB ONLY ------------------------------------------------------
+  // Every launch opens a fresh tab, so they used to pile up - and an old tab
+  // keeps polling a live trading account, which is worse than untidy. When a
+  // newer tab announces itself, older ones stand down: stop polling, then try
+  // to close. Chrome refuses close() on tabs it did not open by script, so if
+  // that is blocked we blank the page instead and say so plainly. Either way
+  // the stale tab stops talking to your broker.
+  (function(){
+    try{
+      var CH = new BroadcastChannel('market_sniper_futures');
+      var MY_ID = Date.now() + '-' + Math.random();
+      CH.onmessage = function(e){
+        if(!e.data || e.data.type !== 'hello' || e.data.id === MY_ID) return;
+        if(e.data.born < MY_BORN) return;        // older tab talking; ignore
+        standDown();
+      };
+      var MY_BORN = Date.now();
+      CH.postMessage({type:'hello', id:MY_ID, born:MY_BORN});
+
+      function standDown(){
+        try{ clearInterval(poll); }catch(e){}
+        try{ clearInterval(priceTimer); }catch(e){}
+        try{ clearInterval(trendTimer); }catch(e){}
+        try{ clearInterval(velTimer); }catch(e){}
+        try{ window.close(); }catch(e){}
+        setTimeout(function(){
+          document.title = 'Market Sniper - old tab';
+          document.body.innerHTML =
+            '<div style="min-height:100vh;display:flex;align-items:center;'
+            + 'justify-content:center;background:#0c0e0d;color:#7f8a84;'
+            + 'font-family:ui-monospace,Consolas,monospace;text-align:center;padding:24px">'
+            + '<div><div style="color:#3ecf8e;letter-spacing:.2em;font-size:15px;'
+            + 'font-weight:700">MARKET SNIPER</div>'
+            + '<p style="font-size:13px;line-height:1.7;margin-top:14px">'
+            + 'A newer window took over.<br>This old tab has stopped and is safe to close.'
+            + '</p></div></div>';
+        }, 200);
+      }
+    }catch(e){ /* no BroadcastChannel - harmless, tabs just do not auto-close */ }
+  })();
+
   return {step,open,close,disarm,back,lockAll,pickBroker,refreshSessions,toggleTheme,setTheme,openSettings,closeSettings,saveSettings,hideEvent,hideReject,
           showTab,toggleStrategy,setStrategyField,backtestStrategy,closeBacktest,uploadData,quitApp};
 })();
