@@ -169,6 +169,24 @@ try:
         ids = set(re.findall(r'id="([\w-]+)"',src)); used = set(re.findall(r"\$\('([\w-]+)'\)",src))
         check(10,f"{page}: every referenced id exists", not (used-ids), str(sorted(used-ids)))
         check(10,f"{page}: no PAPER remnants", "paperMode" not in src and "paperConfig" not in src)
+    # Real JS parse, not a brace count. These files hold ~40KB of hand-edited
+    # JavaScript; a stray bracket would leave the page blank with the error
+    # only visible in the browser console, which nobody has open while trading.
+    import subprocess as _sp, shutil as _sh
+    if _sh.which("node"):
+        for page in ("index.html","futures_index.html"):
+            src_ = io.open(os.path.join(HERE,page),encoding="utf-8").read()
+            blocks = re.findall(r"<script>(.*?)</script>", src_, re.S)
+            check(10,f"{page}: has script blocks", len(blocks)>0)
+            for i,js in enumerate(blocks):
+                f_=f"/tmp/_chk_{page}_{i}.js"
+                io.open(f_,"w",encoding="utf-8").write(js)
+                r_=_sp.run(["node","--check",f_],capture_output=True,text=True)
+                check(10,f"{page}: script block {i} parses",
+                      r_.returncode==0, (r_.stderr or "").strip().split(chr(10))[0][:90])
+    else:
+        check(10,"node available for JS syntax check", False, "node not installed")
+
     idx = io.open(os.path.join(HERE,"index.html"),encoding="utf-8").read()
     import re as _re
     _code = _re.sub(r"//[^\n]*", "", idx)      # strip comments before searching
