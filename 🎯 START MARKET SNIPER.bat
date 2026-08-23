@@ -22,6 +22,17 @@ echo [1/6] Preparing dependencies...
 if not exist ".venv" ( python -m venv .venv )
 call .venv\Scripts\activate
 pip install -q -r requirements.txt
+
+rem  Tray icon deps, installed ONCE and only if actually missing. Kept out of
+rem  requirements.txt on purpose so this file, which runs on every launch, does
+rem  not reinstall or re-check them every single time.
+.venv\Scripts\python.exe -c "import pystray, PIL" >nul 2>&1
+if errorlevel 1 (
+  echo       First run: installing the tray icon, one moment...
+  pip install -q pystray pillow
+  if errorlevel 1 echo       Tray icon unavailable - app still works fine.
+)
+
 set ALLOW_LIVE=1
 
 echo [2/6] Saving your local changes to GitHub FIRST...
