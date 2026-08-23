@@ -223,11 +223,11 @@
 
     <div id="tsConfig" style="display:none">
       <div class="srow"><label style="min-width:82px">USERNAME</label>
-        <input id="tsUser" type="text" placeholder="TopstepX username" style="font-size:14px"></div>
+        <input id="tsUser" type="text" name="ts-acctname-x" autocomplete="off" spellcheck="false" data-lpignore="true" data-form-type="other" placeholder="TopstepX username" style="font-size:14px"></div>
       <div class="srow" style="margin-top:8px"><label style="min-width:82px">API KEY</label>
-        <input id="tsKey" type="password" placeholder="ProjectX API key" style="font-size:13px"></div>
+        <input id="tsKey" type="password" name="ts-secret-x" autocomplete="new-password" spellcheck="false" data-lpignore="true" data-form-type="other" placeholder="ProjectX API key" style="font-size:13px"></div>
       <div class="srow" style="margin-top:8px"><label style="min-width:82px">ACCOUNT</label>
-        <input id="tsAcct" type="text" placeholder="optional — part of the account name" style="font-size:13px"></div>
+        <input id="tsAcct" type="text" name="ts-book-x" autocomplete="off" spellcheck="false" data-lpignore="true" data-form-type="other" placeholder="optional — part of the account name" style="font-size:13px"></div>
       <div class="note" style="color:var(--amber)">⚠ Needs the ProjectX <b>API subscription</b> (TopstepX →
       Settings → API tab; $29/mo, code <b>topstep</b> = 50% off). Orders hit your eval/funded account for real.
       Leave ACCOUNT blank to use your first active one. Mind Topstep's automation rules — stay at the controls.</div>
@@ -235,9 +235,9 @@
 
     <div id="ntConfig" style="display:none">
       <div class="srow"><label style="min-width:78px">ACCOUNT</label>
-        <input id="ntAccount" type="text" value="Sim101" placeholder="Sim101" style="font-size:14px"></div>
+        <input id="ntAccount" type="text" name="nt-book-x" autocomplete="off" spellcheck="false" data-lpignore="true" data-form-type="other" placeholder="Sim101" style="font-size:14px"></div>
       <div class="srow" style="margin-top:8px"><label style="min-width:78px">INCOMING</label>
-        <input id="ntFolder" type="text" placeholder="leave blank = Documents\NinjaTrader 8\incoming" style="font-size:12px"></div>
+        <input id="ntFolder" type="text" name="nt-path-x" autocomplete="off" spellcheck="false" data-lpignore="true" data-form-type="other" placeholder="leave blank = Documents\NinjaTrader 8\incoming" style="font-size:12px"></div>
       <div class="note" style="color:var(--amber)">⚠ NinjaTrader mode sends REAL orders via its ATI. Start with
       <b>Sim101</b> (NinjaTrader's built-in simulator) to test safely — switch to your live account name only
       once you trust it. NinjaTrader must be running with the ATI enabled, and orders are fire-and-forget
