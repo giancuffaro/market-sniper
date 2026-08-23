@@ -13,3 +13,6 @@ logs/
 
 # Retired one-time files, kept locally as a safety copy. Not part of the app.
 _archive/
+
+# One-shot throwaway that deletes itself after a successful start.
+*CLEAN RESTART*.bat
