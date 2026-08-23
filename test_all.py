@@ -406,6 +406,36 @@ try:
     check(17,"options: velocity awaited before the first quote",
           "refreshVel().then(refreshQuote)" in opt)
 
+    print("\n[18] FUTURES HOURS - overnight must NOT read as closed")
+    import tape as _t, time as _tm
+    def _bar(t,v=500,rng=5.0,c=20000.0): return {"t":t,"o":c,"h":c+rng,"l":c-rng,"c":c,"v":v}
+    now_=int(_tm.time())
+    check(18,"threshold clears the 11-min midnight rollover gap",
+          _t.STALE_SECONDS/60 > 11, f"{_t.STALE_SECONDS/60:.0f} min")
+    check(18,"threshold still detects the 62-min maintenance break",
+          _t.STALE_SECONDS/60 < 62, f"{_t.STALE_SECONDS/60:.0f} min")
+
+    # 11-min quiet patch mid-session: MUST stay open
+    bars=[_bar(now_-(60-i)*60) for i in range(35)]
+    bars.append(_bar(now_-11*60))
+    _t._CACHE.clear(); _t._bars = lambda y, b=bars: b
+    v=_t.velocity("FUT_OVERNIGHT")
+    check(18,"11-min gap overnight still reads OPEN", v["state"]!="closed", v["state"])
+
+    # 40 min of nothing: maintenance break / weekend
+    bars2=[_bar(now_-(120-i)*60) for i in range(35)]
+    bars2.append(_bar(now_-40*60))
+    _t._CACHE.clear(); _t._bars = lambda y, b=bars2: b
+    v2=_t.velocity("FUT_BREAK")
+    check(18,"40-min silence reads CLOSED", v2["state"]=="closed", v2["state"])
+
+    fut = io.open(os.path.join(HERE,"futures_index.html"),encoding="utf-8").read()
+    check(18,"a closed guess WARNS, it does not silently refuse",
+          "confirm(" in fut.split("marketClosed &&",1)[1][:400])
+    check(18,"and says it is a guess, not a calendar", "not a " in fut and "calendar" in fut)
+    check(18,"no market calendar hardcoded anywhere",
+          "18:00" not in io.open(os.path.join(HERE,"tape.py"),encoding="utf-8").read().split("WHY 25")[0])
+
 finally:
     for p_ in (OPT,FUT):
         if p_:
@@ -419,7 +449,7 @@ print("\n"+"="*68)
 by={}
 for sc,name,ok,_ in results:
     by.setdefault(sc,[0,0]); by[sc][0]+=1; by[sc][1]+= (1 if ok else 0)
-T={17:"Closed market honest",16:"Restart leaves no spinner",15:"One tab only",14:"Git lock self-heal",13:"Broker tabs + tray",12:"Velocity honest when shut",11:"Multi-broker sessions",1:"Futures login survives restart",2:"remember_login default",3:"Options profiles to disk",
+T={18:"Futures hours",17:"Closed market honest",16:"Restart leaves no spinner",15:"One tab only",14:"Git lock self-heal",13:"Broker tabs + tray",12:"Velocity honest when shut",11:"Multi-broker sessions",1:"Futures login survives restart",2:"remember_login default",3:"Options profiles to disk",
    4:"Browser autofill guard",5:"ITM3 strike math",6:"Preview == Arm",7:"Live-only / dead modes",
    8:"Auto-sync safety",9:"Endpoints alive",10:"UI integrity"}
 for sc in sorted(by):
