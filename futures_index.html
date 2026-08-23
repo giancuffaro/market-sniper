@@ -834,7 +834,27 @@ const FZ = (function(){
     if(!r.ok && r.rejected){ showReject(r.reason); return; }
     inTrade=false; await tick();
   }
-  async function tick(){ render(await api('/api/state')); }
+  // If the server restarted underneath us, /api/state answers "not connected"
+  // forever and the old code just kept polling it every second - which is how a
+  // stale tab produced a wall of 400s while showing a dashboard that was no
+  // longer real. Stop, and send the screen back to login where it belongs.
+  let lostCount = 0;
+  async function tick(){
+    const st = await api('/api/state');
+    if(st && st.detail){                       // 400: this session is gone
+      if(++lostCount >= 2){                    // one blip is not a disconnect
+        clearInterval(poll); clearInterval(priceTimer);
+        clearInterval(trendTimer); clearInterval(velTimer);
+        $('dash').classList.add('hidden');
+        $('connectScreen').classList.remove('hidden');
+        const e=$('connectErr'); if(e) e.textContent='The app restarted - connect again.';
+        try{ refreshSessions(); }catch(_){}
+      }
+      return;
+    }
+    lostCount = 0;
+    render(st);
+  }
 
   function render(st){
     if(!st) return;

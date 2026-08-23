@@ -350,6 +350,24 @@ try:
     check(15,"launcher installs the tray only when missing",
           "import pystray, PIL" in lb and "pip install -q pystray pillow" in lb)
 
+    print("\n[16] SERVER RESTART DOES NOT LEAVE A TAB SPINNING ON 400s")
+    for page in ("index.html","futures_index.html"):
+        src = io.open(os.path.join(HERE,page),encoding="utf-8").read()
+        check(16,f"{page}: tick() checks for a lost session", "st.detail" in src)
+        check(16,f"{page}: stops all four timers", 
+              all(t in src.split("lostCount",1)[1][:600] for t in
+                  ("clearInterval(poll)","clearInterval(priceTimer)",
+                   "clearInterval(trendTimer)","clearInterval(velTimer)")))
+        check(16,f"{page}: returns to the login screen",
+              "connectScreen').classList.remove('hidden')" in src)
+        check(16,f"{page}: one blip is not treated as a disconnect", "lostCount >= 2" in src)
+    _lb = [f for f in os.listdir(HERE) if f.endswith("START MARKET SNIPER.bat")]
+    lb = io.open(os.path.join(HERE,_lb[0]),encoding="utf-8").read() if _lb else ""
+    check(16,"launcher never calls bare pip", "\npip install" not in lb and "  pip install" not in lb)
+    check(16,"launcher pins python to the venv", "VPY=" in lb)
+    check(16,"tray install verified after installing",
+          lb.count('import pystray, PIL') >= 2)
+
 finally:
     for p_ in (OPT,FUT):
         if p_:
@@ -363,7 +381,7 @@ print("\n"+"="*68)
 by={}
 for sc,name,ok,_ in results:
     by.setdefault(sc,[0,0]); by[sc][0]+=1; by[sc][1]+= (1 if ok else 0)
-T={15:"One tab only",14:"Git lock self-heal",13:"Broker tabs + tray",12:"Velocity honest when shut",11:"Multi-broker sessions",1:"Futures login survives restart",2:"remember_login default",3:"Options profiles to disk",
+T={16:"Restart leaves no spinner",15:"One tab only",14:"Git lock self-heal",13:"Broker tabs + tray",12:"Velocity honest when shut",11:"Multi-broker sessions",1:"Futures login survives restart",2:"remember_login default",3:"Options profiles to disk",
    4:"Browser autofill guard",5:"ITM3 strike math",6:"Preview == Arm",7:"Live-only / dead modes",
    8:"Auto-sync safety",9:"Endpoints alive",10:"UI integrity"}
 for sc in sorted(by):
