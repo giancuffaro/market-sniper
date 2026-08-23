@@ -716,7 +716,11 @@ const EZ = (function(){
     $('modePill').className='modepill LIVE';
     $('footMode').textContent='● LIVE — REAL ORDERS ●';
     $('footProf').textContent=activeProf||'unsaved keys';
-    render(state); refreshQuote(); refreshPrices(); refreshTrend(); refreshVel();
+    // Velocity FIRST and awaited: it is what tells us the market is shut, and
+    // refreshQuote checks that flag. Fire them the other way round and the very
+    // first quote still goes out to a closed market.
+    render(state); refreshPrices(); refreshTrend();
+    refreshVel().then(refreshQuote);
     api('/api/settings',settings);
     syncStrategies();
     poll=setInterval(tick,1000);
