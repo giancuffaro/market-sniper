@@ -824,13 +824,16 @@ const FZ = (function(){
                 +"order this app will send is a CLOSE.");
       return;
     }
-    // Futures are shut on weekends and through the daily maintenance break.
-    // Sending anyway just earns a broker rejection, so say the real reason.
-    if(marketClosed){
-      showReject("The market is closed - nothing is printing right now. "
-                +"No order was sent.");
+    // Futures are shut on weekends and through the 17:00 ET maintenance break,
+    // and sending then just earns a broker rejection. But this is a GUESS made
+    // from how long ago the last bar printed, and a wrong guess that silently
+    // refuses a real order is far worse than one extra click. So: warn, and let
+    // you overrule it.
+    if(marketClosed && !confirm(
+        "The tape looks dead - no prints for a while, so the market is "
+        + "probably closed.\n\nThis is a guess based on the data feed, not a "
+        + "calendar. If you know it is open, press OK to send anyway."))
       return;
-    }
     const path = settings.round_enabled ? '/api/order/arm' : '/api/order/place';
     const r=await api(path,{symbol:sym,side,qty});
     if(!r.ok && r.rejected){ showReject(r.reason); return; }
