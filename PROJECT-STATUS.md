@@ -1,5 +1,5 @@
 # MARKET SNIPER — Project Status
-Current version **v3.8** (renamed from EZEXECUTION → Option Sniper → Market Sniper)
+Current version **v3.9** (renamed from EZEXECUTION → Option Sniper → Market Sniper)
 
 ## Proven with real money
 - LIVE connect, multi-account picker (stacked rows w/ full ID + buying power)
@@ -12,6 +12,52 @@ Current version **v3.8** (renamed from EZEXECUTION → Option Sniper → Market 
 - Entry preview: shows the underlying trigger level + resolved strike before you ARM
 - VELOCITY strip on both apps (tape.py)
 - Futures app (MNQ/MES, trailing stop) — separate, port 8010
+
+## v3.9 changes
+
+**One tab only.** Every launch opened a new tab and the old ones piled up - and a
+stale tab keeps polling a live trading account, which is worse than untidy. A new
+tab announces itself on a BroadcastChannel; older ones stop their timers first,
+then close. Chrome refuses `close()` on tabs it did not open by script, so if
+that is blocked the old tab blanks itself and says "safe to close". Either way it
+stops talking to the broker. Timestamps are tie-broken by id, otherwise two tabs
+opened in the same millisecond would kill each other and leave none.
+
+**A restarted server no longer leaves a tab spinning.** `/api/state` answers
+"not connected" after a restart, and the old code polled it once a second
+forever - that was the wall of 400s. Two consecutive misses now stop the timers
+and return to the login screen.
+
+**No more quoting a closed market.** On a Saturday the options app asked Webull
+for a 0DTE chain every 5s and got a 400 each time. `refreshQuote` now checks the
+velocity reading first (which already knows the tape is dead) and shows
+MARKET CLOSED on the buy buttons instead. Velocity is fetched and awaited before
+the first quote, or the opening request still went out.
+
+**pip was installing into the WRONG Python.** `call .venv\Scripts\activate` did
+not reliably put the venv first on PATH, so bare `pip` resolved to the system
+Python 3.14 - pystray installed successfully into a Python the app never uses,
+which is why the tray kept reporting itself missing. Every pip/python call in the
+launcher now goes through `.venv\Scripts\python.exe` explicitly, and the tray
+install is verified by import rather than trusted by exit code.
+
+**Auto-sync heals stale git locks.** A crashed git leaves HEAD.lock behind and
+every later command fails identically forever; the old code logged the same error
+every 60s and never tried to clear it. If a command fails with a lock error the
+lock is stale by definition - our own git just failed because of it - so it is
+removed and the command retried once. Locks under 30s old are left alone so a
+genuinely running git is never stomped.
+
+**Tray icon + hidden launcher.** `run_all.py` optionally shows a system-tray
+crosshair (open either app, view log, quit). `START HIDDEN (tray only).vbs` runs
+the whole thing with no window. Tray deps are optional and kept OUT of
+requirements.txt, which the launcher runs on every start.
+
+**JS syntax gate in the suite.** These pages hold ~40KB of hand-edited
+JavaScript; a stray bracket would blank the page with the error only in the
+browser console. `node --check` now parses every script block.
+
+Suite: 149 checks across 16 scenarios.
 
 ## v3.8 changes
 
