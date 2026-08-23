@@ -779,7 +779,11 @@ const FZ = (function(){
       (v.stale?' — STALE, last good reading.':''));
   }
   async function refreshVel(){
+    // Velocity is what tells us the market is shut, so repaint the trade
+    // buttons the moment it lands. Doing it here rather than at each call site
+    // means every path - connect, switch, symbol change - stays correct.
     try{ renderVel(await api('/api/tape?symbol='+sym)); }catch(e){}
+    try{ paintMarketState(); }catch(e){}
   }
   renderVel(null);
 
