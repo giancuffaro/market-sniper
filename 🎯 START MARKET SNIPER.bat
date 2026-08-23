@@ -59,12 +59,7 @@ for /f "tokens=5" %%a in ('netstat -aon ^| findstr :8000 ^| findstr LISTENING') 
 for /f "tokens=5" %%a in ('netstat -aon ^| findstr :8010 ^| findstr LISTENING') do taskkill /F /PID %%a >nul 2>&1
 taskkill /F /FI "WINDOWTITLE eq SNIPER-AUTOSYNC*" >nul 2>&1
 
-echo [6/6] Starting auto-sync + BOTH apps (options 8000 + futures 8010)...
-start "SNIPER-AUTOSYNC" /min cmd /c ".venv\Scripts\python.exe auto_sync.py"
-start "SNIPER-OPTIONS"  /min cmd /c ".venv\Scripts\python.exe -m uvicorn main:app --host 127.0.0.1 --port 8000"
-start "SNIPER-FUTURES"  /min cmd /c ".venv\Scripts\python.exe -m uvicorn futures_app:app --host 127.0.0.1 --port 8010"
-timeout /t 4 >nul
-start "" http://127.0.0.1:8000
+echo [6/6] Starting everything in THIS window...
 echo ==============================================================
 echo   Options: http://127.0.0.1:8000    Futures: http://127.0.0.1:8010
 echo   Switch between them with the buttons inside the app.
@@ -74,5 +69,13 @@ echo   Auto-sync is running. Every change to this folder is committed
 echo   and pushed on its own - no git, no UPDATE.bat, no push.
 echo   It refuses to push code that does not compile, and never
 echo   commits my-settings.json. Log: logs\auto-sync.log
+echo.
+echo   THIS is the only window now. Closing it stops everything.
 echo ==============================================================
-timeout /t 8 >nul
+
+rem  Open the browser after a beat, without blocking the console below.
+start "" /b cmd /c "timeout /t 5 >nul & start "" http://127.0.0.1:8000"
+
+rem  Runs in the foreground on purpose: its output IS this window, and closing
+rem  this window takes the servers with it. No orphaned background consoles.
+.venv\Scripts\python.exe run_all.py
