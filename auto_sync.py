@@ -79,16 +79,49 @@ def log(msg):
         pass          # logging must never be the thing that breaks the sync
 
 
-def git(*args, timeout=120):
-    """Run a git command. Returns (ok, combined_output).
+# git's own words when a leftover lock is in the way.
+_LOCK_ERRORS = ("cannot lock ref", "unable to create", "index.lock",
+                "another git process", "file exists")
 
-    core.quotePath=false stops git octal-escaping non-ASCII filenames. The
-    launcher is called "<rocket> START MARKET SNIPER.bat", and without this the
-    emoji came back as \\360\\237\\216\\257, which turned the commit subject
-    into 'auto: 257 START MARKET SNIPER.bat"'.
-    """
+# On a lock error we clear locks older than this. Our command JUST failed
+# because the lock was already there, so anything even seconds old is stale;
+# 30s is well beyond how long a healthy git holds one, so this cannot stomp on
+# a genuinely running command.
+LOCK_STALE_ON_ERROR = 30
+
+
+def _looks_like_lock_error(out):
+    low = (out or "").lower()
+    return any(w in low for w in _LOCK_ERRORS)
+
+
+def _force_clear_locks(min_age=LOCK_STALE_ON_ERROR):
+    """Delete leftover *.lock files under .git. Returns what it removed."""
+    gitdir = os.path.join(HERE, ".git")
+    cleared = []
     try:
-        p = subprocess.run(("git", "-c", "core.quotePath=false") + args,
+        for root, dirs, files in os.walk(gitdir):
+            if os.path.basename(root) in ("objects", "modules", "lfs"):
+                dirs[:] = []
+                continue
+            for fn in files:
+                if not fn.endswith(".lock"):
+                    continue
+                path = os.path.join(root, fn)
+                try:
+                    if time.time() - os.path.getmtime(path) >= min_age:
+                        os.remove(path)
+                        cleared.append(os.path.relpath(path, HERE))
+                except OSError:
+                    pass
+    except OSError:
+        pass
+    return cleared
+
+
+def _run_git(args, timeout):
+    try:
+        p = subprocess.run(("git", "-c", "core.quotePath=false") + tuple(args),
                            cwd=HERE, timeout=timeout,
                            stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
         return p.returncode == 0, p.stdout.decode("utf-8", "replace").strip()
@@ -96,6 +129,29 @@ def git(*args, timeout=120):
         return False, "git %s timed out" % (args[0] if args else "?")
     except FileNotFoundError:
         return False, "git is not installed or not on PATH"
+
+
+def git(*args, timeout=120):
+    """Run a git command, healing a stale lock if one blocks it.
+
+    core.quotePath=false stops git octal-escaping non-ASCII filenames (the
+    launcher's name starts with an emoji).
+
+    The self-heal matters: a crashed git leaves HEAD.lock behind and EVERY
+    later command fails identically forever. The old code just logged the same
+    error every 60s and never tried to clear it. If a command fails with a lock
+    error, the lock is stale by definition — our git just failed because of it —
+    so we remove it and retry once.
+    """
+    ok, out = _run_git(args, timeout)
+    if ok or not _looks_like_lock_error(out):
+        return ok, out
+
+    cleared = _force_clear_locks()
+    if not cleared:
+        return ok, out                       # nothing we could remove; report honestly
+    log("cleared stale git lock(s) and retrying: %s" % ", ".join(cleared))
+    return _run_git(args, timeout)
 
 
 def snapshot():
@@ -148,18 +204,39 @@ def sweep_logs():
 
 
 def clear_stale_lock():
-    """A crashed git leaves index.lock behind and every later command fails.
+    """Clear ANY stale git lock, not just index.lock.
 
-    Only removes it if it is over a minute old — a lock younger than that may
-    belong to a git command actually running right now.
+    git locks more than the index: HEAD.lock while moving the ref, config.lock,
+    refs/heads/<branch>.lock, packed-refs.lock. The first version of this only
+    swept index.lock, so a crashed commit left HEAD.lock behind and every later
+    sync failed with "cannot lock ref 'HEAD'" — visible but unfixable, because
+    the one thing that could clear it was not looking for it.
+
+    Only removes locks over a minute old; anything younger may belong to a git
+    command genuinely running right now.
     """
-    lock = os.path.join(HERE, ".git", "index.lock")
+    gitdir = os.path.join(HERE, ".git")
+    cleared = []
     try:
-        if os.path.exists(lock) and time.time() - os.path.getmtime(lock) > 60:
-            os.remove(lock)
-            log("cleared a stale .git/index.lock")
+        for root, dirs, files in os.walk(gitdir):
+            # refs/ and the top level are where locks live; skip the big ones.
+            if os.path.basename(root) in ("objects", "modules", "lfs"):
+                dirs[:] = []
+                continue
+            for fn in files:
+                if not fn.endswith(".lock"):
+                    continue
+                path = os.path.join(root, fn)
+                try:
+                    if time.time() - os.path.getmtime(path) > 60:
+                        os.remove(path)
+                        cleared.append(os.path.relpath(path, HERE))
+                except OSError:
+                    pass
     except OSError:
         pass
+    if cleared:
+        log("cleared stale git lock(s): %s" % ", ".join(cleared))
 
 
 def python_files_compile():
@@ -213,7 +290,7 @@ def sync(reason="change"):
 
     ok, err = python_files_compile()
     if not ok:
-        log("HOLDING — python does not compile: %s" % err)
+        log("HOLDING - python does not compile: %s" % err)
         log("        nothing pushed. Fix it and this will go automatically.")
         return False
 
@@ -273,7 +350,7 @@ def sync(reason="change"):
         log("        work is committed locally and safe. Will retry.")
         return False
 
-    log("pushed to GitHub — remote now matches your folder")
+    log("pushed to GitHub - remote now matches your folder")
     return True
 
 
@@ -291,7 +368,7 @@ def status():
 
 def watch():
     log("=" * 60)
-    log("AUTO-SYNC started — watching %s" % HERE)
+    log("AUTO-SYNC started - watching %s" % HERE)
     log("every change is committed and pushed automatically. no git needed.")
     log("=" * 60)
 

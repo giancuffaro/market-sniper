@@ -2,8 +2,15 @@
 title MARKET SNIPER
 cd /d "%~dp0"
 
-rem  A crashed git leaves this behind and every later git command fails.
-if exist ".git\index.lock" del /f /q ".git\index.lock" >nul 2>&1
+rem  A crashed git leaves lock files behind and every later git command fails.
+rem  It is not just index.lock: HEAD.lock, config.lock and refs\heads\*.lock all
+rem  do it. Sweeping only index.lock is why "cannot lock ref HEAD" could stick.
+if exist ".git\index.lock"        del /f /q ".git\index.lock"        >nul 2>&1
+if exist ".git\HEAD.lock"         del /f /q ".git\HEAD.lock"         >nul 2>&1
+if exist ".git\config.lock"       del /f /q ".git\config.lock"       >nul 2>&1
+if exist ".git\packed-refs.lock"  del /f /q ".git\packed-refs.lock"  >nul 2>&1
+if exist ".git\ORIG_HEAD.lock"    del /f /q ".git\ORIG_HEAD.lock"    >nul 2>&1
+del /f /q /s ".git\refs\*.lock" >nul 2>&1
 
 rem  One-time leftovers. Harmless once they are gone.
 if exist "_probe_delete.txt"  del /f /q "_probe_delete.txt"  >nul 2>&1

@@ -85,6 +85,16 @@
   .tcell.up{border-color:var(--green)} .tcell.up .tarr{color:var(--green)} .tcell.up .ttf{color:var(--green)}
   .tcell.dn{border-color:var(--red)} .tcell.dn .tarr{color:var(--red)} .tcell.dn .ttf{color:var(--red)}
   .tcell.flat .tarr{color:var(--amber)} .tcell.flat .ttf{color:var(--amber)}
+  /* A broker you are already logged into. Clicking it switches instantly. */
+  #modes button.live{border-color:var(--green)}
+  #modes button.live::after{content:"";display:inline-block;width:6px;height:6px;
+    border-radius:50%;background:var(--green);margin-left:6px;vertical-align:middle}
+  #modes button.holding::after{background:var(--amber)}
+  .sesbar{display:flex;gap:8px;flex-wrap:wrap;margin:0 0 10px;font-size:10.5px;
+    letter-spacing:.06em;color:var(--dim)}
+  .sestag{border:1px solid var(--line);border-radius:6px;padding:3px 7px;background:var(--panel2)}
+  .sestag.on{border-color:var(--green);color:var(--green)}
+  .sestag.pos{border-color:var(--amber);color:var(--amber)}
   /* VELOCITY — how fast the tape is printing vs the last half hour */
   .velrow{display:flex;align-items:center;gap:9px;margin-top:9px;
           border-top:1px solid var(--line);padding-top:9px}
@@ -101,6 +111,25 @@
   .velrow.fast    .velbar i{background:var(--amber)}  .velrow.fast .velval{color:var(--amber)}
   .velrow.violent .velbar i{background:var(--red)}    .velrow.violent .velval{color:var(--red)}
   .velrow.stale{opacity:.45}
+  /* Broker tabs on the DASHBOARD. Flip accounts without going back to login. */
+  .brokertabs{display:flex;gap:8px;margin:0 0 12px}
+  .brokertabs button{flex:1;background:var(--panel);border:1px solid var(--line);
+    border-radius:10px;color:var(--dim);font-family:var(--ui);font-size:12px;
+    letter-spacing:.1em;padding:9px 6px;cursor:pointer;line-height:1.35;transition:.15s}
+  .brokertabs button:hover{border-color:var(--dim)}
+  .brokertabs button small{display:block;font-size:9.5px;letter-spacing:.04em;
+    color:var(--dimmer);margin-top:3px;font-weight:400}
+  .brokertabs button.live{color:var(--txt);border-color:var(--green)}
+  .brokertabs button.live small{color:var(--green)}
+  .brokertabs button.on{background:var(--green-deep,rgba(62,207,142,.12));
+    border-color:var(--green);color:var(--green);font-weight:700}
+  .brokertabs button.holding{border-color:var(--amber)}
+  .brokertabs button.holding small{color:var(--amber)}
+  .brokertabs button.off{opacity:.5;border-style:dashed}
+  /* Market shut: grey, zeroed, and clearly labelled. Never a live-looking read. */
+  .velrow.closed .velbar i{background:var(--dimmer)}
+  .velrow.closed .velval{color:var(--dimmer)}
+  .velrow.closed{opacity:.6}
   .hero{border:1px solid var(--line);border-radius:14px;background:var(--panel);padding:22px;text-align:center;margin-bottom:14px}
   .hero .big{font-size:46px;font-weight:800;letter-spacing:.08em;color:var(--dim)}
   .hero .sub{color:var(--dim);font-size:12.5px;letter-spacing:.16em;margin-top:10px;text-transform:uppercase}
@@ -208,6 +237,7 @@
       <button data-m="NINJA">NINJA</button>
       <button data-m="TOPSTEP" style="font-size:12.5px">TOPSTEP</button>
     </div>
+    <div class="sesbar" id="sesBar"></div>
     <div style="text-align:right;margin:-4px 0 10px"><span class="setbtn" style="color:var(--green)" onclick="location.href='http://127.0.0.1:8000'">⇄ SWITCH TO OPTIONS</span></div>
 
     <div id="webullConfig" style="display:block">
@@ -267,7 +297,7 @@
   <div id="dash" class="app hidden">
     <div class="top">
       <div class="brand">
-        <button class="backbtn" onclick="FZ.back()">‹</button>
+        <button class="backbtn" title="Add another broker (stays logged in)" onclick="FZ.back()">‹</button>
         <span class="dot"></span>FUTURES
       </div>
       <div class="meta">
@@ -276,10 +306,12 @@
         <span class="setbtn" style="color:var(--green);border-color:var(--green)" onclick="location.href='http://127.0.0.1:8000'">⇄ OPTIONS</span>
         <span class="setbtn" onclick="FZ.openSettings()">CONFIGURATION</span>
         <div class="theme-dots" role="group" aria-label="Theme color"><button class="tdot tdot-white" data-set="light" onclick="FZ.setTheme('light')" aria-label="White theme"></button><button class="tdot tdot-gray" data-set="gray" onclick="FZ.setTheme('gray')" aria-label="Gray theme"></button><button class="tdot tdot-black" data-set="dark" onclick="FZ.setTheme('dark')" aria-label="Black theme"></button></div>
-        <span class="setbtn" onclick="FZ.back()">🔒</span>
+        <span class="setbtn" title="Log out of every broker" onclick="FZ.lockAll()">🔒</span>
         <span class="quitbtn" title="Shut down the app" onclick="FZ.quitApp()">✕</span>
       </div>
     </div>
+
+    <div class="brokertabs" id="brokerTabs"></div>
 
     <div class="prices">
       <div class="pchip" data-s="MNQ"><div class="s">MNQ</div><div class="p">—</div><div class="c">—</div></div>
@@ -527,8 +559,24 @@ const FZ = (function(){
   fetch('/api/health').then(r=>r.json()).then(h=>{$('appVer').textContent='v'+h.version;})
     .catch(()=>{$('appVer').textContent='server not running';});
 
-  document.querySelectorAll('#modes button').forEach(b=>b.onclick=()=>{
-    mode=b.dataset.m;
+  document.querySelectorAll('#modes button').forEach(b=>b.onclick=async()=>{
+    const target=b.dataset.m;
+    // Already logged into this broker? Just point the buttons at it. No login
+    // form, no re-auth, and the other sessions stay alive behind it.
+    if(liveModes.includes(target)){
+      const r=await api('/api/switch',{mode:target});
+      if(!r.detail){
+        mode=target;
+        document.querySelectorAll('#modes button').forEach(x=>x.classList.toggle('on',x===b));
+        applySessions(r.sessions, r.active_mode);
+        savePrefs({mode});
+        if($('dash').classList.contains('hidden')){ $('connectScreen').classList.add('hidden'); $('dash').classList.remove('hidden'); }
+        render(r); refreshPrices(); refreshTrend(); refreshVel();
+        showModeChrome(r);
+        return;
+      }
+    }
+    mode=target;
     document.querySelectorAll('#modes button').forEach(x=>x.classList.toggle('on',x===b));
     $('webullConfig').style.display = mode==='WEBULL' ? 'block' : 'none';
     $('ntConfig').style.display = mode==='NINJA' ? 'block' : 'none';
@@ -540,6 +588,86 @@ const FZ = (function(){
     savePrefs({mode});
   });
   $('rememberLogin').onchange=()=>savePrefs({remember_login:$('rememberLogin').checked});
+
+  // ---- MULTI-BROKER SESSIONS ----------------------------------------------
+  // Log into Topstep, NinjaTrader and Webull once each and flip between them.
+  // Every connected broker keeps ticking server-side, so a position left on an
+  // inactive one still has its TP/SL and trailing stop managed.
+  let liveModes=[];
+  // ---- DASHBOARD BROKER TABS ---------------------------------------------
+  // Three tabs, always visible while trading. A broker you are logged into
+  // switches instantly; one you are not takes you to its login, pre-selected.
+  const BROKERS=[['WEBULL','WEBULL'],['NINJA','NINJA'],['TOPSTEP','TOPSTEP']];
+  function renderBrokerTabs(list, active){
+    const el=$('brokerTabs'); if(!el) return;
+    list=list||[];
+    el.innerHTML=BROKERS.map(([m,label])=>{
+      const s=list.find(x=>x.mode===m);
+      const on=(m===active);
+      const cls=['',s?'live':'off',on?'on':'',s&&s.has_position?'holding':''].join(' ').trim();
+      let sub='not logged in';
+      if(s) sub = s.has_position
+        ? (s.side+' '+(s.symbol||'')+(s.pnl!=null?'  '+(s.pnl>=0?'+':'')+'$'+Math.abs(s.pnl).toFixed(2):''))
+        : (on?'active · flat':'logged in · flat');
+      return `<button class="${cls}" data-b="${m}" onclick="FZ.pickBroker('${m}')">${label}<small>${sub}</small></button>`;
+    }).join('');
+  }
+
+  async function pickBroker(m){
+    if(m===currentActive) return;
+    if(liveModes.includes(m)){
+      const r=await api('/api/switch',{mode:m});
+      if(r.detail){ showEvent('could not switch: '+r.detail); return; }
+      mode=m; savePrefs({mode});
+      applySessions(r.sessions, r.active_mode);
+      showModeChrome(r); render(r);
+      refreshPrices(); refreshTrend(); refreshVel();
+      return;
+    }
+    // Not logged in yet: drop to the connect screen with that broker chosen,
+    // WITHOUT dropping the brokers you already have open.
+    mode=m;
+    $('dash').classList.add('hidden');
+    $('connectScreen').classList.remove('hidden');
+    const b=document.querySelector('#modes button[data-m="'+m+'"]');
+    if(b){
+      document.querySelectorAll('#modes button').forEach(x=>x.classList.toggle('on',x===b));
+      $('webullConfig').style.display = m==='WEBULL' ? 'block' : 'none';
+      $('ntConfig').style.display     = m==='NINJA'  ? 'block' : 'none';
+      $('tsConfig').style.display     = m==='TOPSTEP'? 'block' : 'none';
+    }
+  }
+
+  let currentActive=null;
+  let lastSessions=[];
+  function applySessions(list, active){
+    lastSessions=list||[];
+    currentActive=active;
+    renderBrokerTabs(list, active);
+    list = list || [];
+    liveModes = list.map(x=>x.mode);
+    document.querySelectorAll('#modes button').forEach(b=>{
+      const m=b.dataset.m, s=list.find(x=>x.mode===m);
+      b.classList.toggle('live', !!s);
+      b.classList.toggle('holding', !!(s&&s.has_position));
+      b.title = s ? (s.has_position
+            ? m+': logged in - HOLDING '+(s.side||'')+' '+(s.symbol||'')
+            : m+': logged in, flat')
+          : m+': not logged in yet';
+    });
+    const bar=$('sesBar'); if(!bar) return;
+    bar.innerHTML = list.length ? list.map(x=>{
+      const cls='sestag'+(x.mode===active?' on':'')+(x.has_position?' pos':'');
+      const what=x.has_position ? (x.side+' '+x.symbol+(x.pnl!=null?' '+(x.pnl>=0?'+':'')+x.pnl:'')) : 'flat';
+      return `<span class="${cls}">${x.mode} · ${what}${x.mode===active?' · ACTIVE':''}</span>`;
+    }).join('') : '';
+  }
+  function showModeChrome(r){
+    $('modePill').textContent = mode==='WEBULL' ? 'WEBULL LIVE' : mode;
+    $('footMode').textContent = mode==='WEBULL'
+      ? ('● WEBULL LIVE '+(r.account_id||'')+' — REAL MONEY ●')
+      : ('● '+(r.account_id||mode)+' — REAL ORDERS ●');
+  }
 
   // Secrets are stored in plain text in my-settings.json, which is gitignored
   // and never leaves this machine. Showing them is a screen-privacy choice.
@@ -584,10 +712,8 @@ const FZ = (function(){
                ts_key:$('tsKey').value.trim(),
                wb_key:$('wbKey').value.trim(), wb_sec:$('wbSec').value.trim()});
     $('connectScreen').classList.add('hidden'); $('dash').classList.remove('hidden');
-    $('modePill').textContent = mode==='WEBULL' ? 'WEBULL LIVE' : mode;
-    $('footMode').textContent = mode==='WEBULL'
-      ? ('● WEBULL LIVE '+(r.account_id||'')+' — REAL MONEY ●')
-      : ('● '+(r.account_id||mode)+' — REAL ORDERS ●');
+    showModeChrome(r);
+    applySessions(r.sessions, r.active_mode);
     render(r); refreshPrices(); refreshTrend(); refreshVel();
     api('/api/settings',settings);
     syncStrategies();
@@ -629,6 +755,15 @@ const FZ = (function(){
     if(!v||!v.ok){
       row.className='velrow'; fill.style.width='0%'; val.textContent='—';
       row.title=(v&&v.reason)?v.reason:'velocity unavailable';
+      return;
+    }
+    // Market shut is its own state, not a low score. Before this, the closing
+    // auction's volume spike froze the strip on VIOLENT 100 all weekend.
+    if(v.state==='closed'){
+      row.className='velrow closed';
+      fill.style.width='0%';
+      val.textContent='MARKET CLOSED';
+      row.title=v.note||'market closed — no prints';
       return;
     }
     const arrow={up:'↑',down:'↓',flat:'→'}[v.direction]||'';
@@ -703,6 +838,9 @@ const FZ = (function(){
 
   function render(st){
     if(!st) return;
+    // Every poll carries the full broker roster, so the strip and the green
+    // dots stay honest even if a position opens or closes on an inactive one.
+    if(st.sessions) applySessions(st.sessions, st.active_mode);
     if(st.event) showEvent(st.event);
     if(st.settings) settings={...settings,...st.settings};
     $('bp').textContent='$'+Number(st.buying_power||0).toLocaleString(undefined,{minimumFractionDigits:2,maximumFractionDigits:2});
@@ -973,12 +1111,36 @@ const FZ = (function(){
   }
   function hideReject(){ $('reject').classList.remove('show'); }
 
-  async function back(){
-    if(inTrade && !confirm('You have an OPEN position. Leave anyway?')) return;
-    await api('/api/disconnect',{}); clearInterval(poll); clearInterval(priceTimer); clearInterval(trendTimer); clearInterval(velTimer); location.reload();
+  // The back ARROW no longer logs you out. It shows the login screen so you can
+  // add ANOTHER broker while the ones you already have stay connected and keep
+  // managing their positions. Logging out is the padlock, below.
+  function back(){
+    $('dash').classList.add('hidden');
+    $('connectScreen').classList.remove('hidden');
+    refreshSessions();
   }
 
-  return {step,open,close,disarm,back,toggleTheme,setTheme,openSettings,closeSettings,saveSettings,hideEvent,hideReject,
+  // The padlock: drop every broker and reload. This is the real log-out.
+  async function lockAll(){
+    const holding = (lastSessions||[]).filter(x=>x.has_position);
+    if(holding.length && !confirm(
+        'You still have an open position on '+holding.map(x=>x.mode).join(', ')+
+        '.\n\nLogging out stops this app managing its TP/SL and trailing stop.'+
+        '\nThe position stays open at the broker.\n\nLog out anyway?')) return;
+    await api('/api/disconnect',{});
+    clearInterval(poll); clearInterval(priceTimer); clearInterval(trendTimer); clearInterval(velTimer);
+    location.reload();
+  }
+
+  // Keep the connect screen honest about who is already logged in.
+  async function refreshSessions(){
+    try{
+      const r=await api('/api/sessions');
+      applySessions(r.sessions, r.active);
+    }catch(e){}
+  }
+
+  return {step,open,close,disarm,back,lockAll,pickBroker,refreshSessions,toggleTheme,setTheme,openSettings,closeSettings,saveSettings,hideEvent,hideReject,
           showTab,toggleStrategy,setStrategyField,backtestStrategy,closeBacktest,uploadData,quitApp};
 })();
 </script>

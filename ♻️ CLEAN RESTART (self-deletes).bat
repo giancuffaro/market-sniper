@@ -52,4 +52,21 @@ echo.
 
 rem  Hand over to the real launcher. It does the GitHub sync, then runs
 rem  everything in one window.
-call "%~dp0🎯 START MARKET SNIPER.bat"
+rem
+rem  The launcher's filename starts with an emoji. cmd reads .bat files in the
+rem  OEM codepage, so writing that character literally here can arrive as
+rem  mojibake and the call silently fails. Matching on the ASCII tail of the
+rem  name sidesteps the encoding entirely.
+set "LAUNCHER="
+for %%f in ("*START MARKET SNIPER.bat") do set "LAUNCHER=%%f"
+
+if not defined LAUNCHER (
+  echo.
+  echo   ERROR: could not find "START MARKET SNIPER.bat" in this folder.
+  echo   Nothing was started. This file has NOT deleted itself - try again.
+  echo.
+  pause
+  exit /b 1
+)
+
+call "%LAUNCHER%"

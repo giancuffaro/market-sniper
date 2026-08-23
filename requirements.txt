@@ -6,10 +6,15 @@ pydantic>=2.0
 # Live prices (quotes.py) use only the Python standard library — no package needed.
 
 # --- Webull official OpenAPI SDK ---
-# Needed by LIVE trading AND by PAPER (sandbox) — options paper and futures
-# paper both route real orders through this SDK to Webull's sandbox host.
+# Needed by LIVE trading. (PAPER/sandbox was removed in v3.6 — every order
+# either app sends now goes to production, gated behind ALLOW_LIVE=1.)
 # The `webull.*` namespace (ApiClient, TradeClient, DataClient) comes from the
 # GitHub project, which is the one with futures support:
 #   https://github.com/webull-inc/webull-openapi-python-sdk
 # INSTALL.bat pulls and installs it. (The old PyPI `webullsdktrade` package is
 # stocks/options only — no futures — so we use the GitHub SDK instead.)
+
+# NOTE: the tray icon deps (pystray, pillow) are deliberately NOT here.
+# The launcher runs this file on EVERY start, and an optional decoration must
+# never be able to slow down or fail a launch. INSTALL.bat installs them
+# separately, and run_all.py runs fine without them.

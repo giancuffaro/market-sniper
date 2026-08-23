@@ -1,5 +1,5 @@
 # MARKET SNIPER — Project Status
-Current version **v3.7** (renamed from EZEXECUTION → Option Sniper → Market Sniper)
+Current version **v3.8** (renamed from EZEXECUTION → Option Sniper → Market Sniper)
 
 ## Proven with real money
 - LIVE connect, multi-account picker (stacked rows w/ full ID + buying power)
@@ -12,6 +12,45 @@ Current version **v3.7** (renamed from EZEXECUTION → Option Sniper → Market 
 - Entry preview: shows the underlying trigger level + resolved strike before you ARM
 - VELOCITY strip on both apps (tape.py)
 - Futures app (MNQ/MES, trailing stop) — separate, port 8010
+
+## v3.8 changes
+
+**Stay logged into every broker at once.** The futures app held ONE session, so
+picking a different broker logged you out of the last one. It now keeps a live
+session per broker (`SESSIONS` keyed by mode) with `ACTIVE` deciding only which
+one the buttons act on. New: `GET /api/sessions`, `POST /api/switch`,
+`POST /api/disconnect {mode}` for one or all.
+
+The trap this had to avoid: `refresh_mark()` is what evaluates TP, SL and the
+trailing stop. Refreshing only the visible session would have meant switching
+tabs silently stopped managing a live position on the broker you left. So
+`_refresh_all()` ticks EVERY connected session on every poll. A position on an
+inactive broker keeps its brackets.
+UI: mode buttons get a green dot when logged in, amber when holding, and a
+strip lists each broker with its position and P&L.
+
+**Velocity no longer reads VIOLENT with the market shut.** The closing auction
+is always a volume spike, so the last live minute of the week scored 100 and the
+strip froze there all weekend. `velocity()` now checks how old the newest closed
+bar is; past 10 minutes nothing is printing, so it reports CLOSED / 0 with the
+reason. Asks the data rather than a market calendar, so it covers weekends,
+holidays, halts and futures maintenance breaks alike. `compute()` stays pure.
+
+**Fixed: open-position strike was truncated too.** `pos.strike|0` fed BOTH the
+hero line and the CLOSE button, so a TSLA 332.5C showed as 332C while you held
+it — including on the close confirmation.
+
+**Browser autofill was overwriting the Topstep username.** The Webull fields had
+`autocomplete="off"`; the Topstep and NinjaTrader ones never did, so Chrome kept
+stuffing the saved email over the loaded username. This was a SECOND cause on
+top of the persistence bug, which is why fixing persistence alone did not stop
+it. NinjaTrader had `value="Sim101"` hardcoded in the markup, fighting the saved
+account on every load. Both fixed.
+
+**Regression suite (`test_all.py`).** 93 checks across 12 scenarios, every one
+tied to a bug we actually hit. Runs against a copy of my-settings.json and
+restores it. Secrets are redacted in output — a failing assertion once printed a
+real API key.
 
 ## v3.7 changes
 

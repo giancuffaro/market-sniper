@@ -133,6 +133,10 @@
   .velrow.fast    .velbar i{background:var(--amber)}  .velrow.fast .velval{color:var(--amber)}
   .velrow.violent .velbar i{background:var(--red)}    .velrow.violent .velval{color:var(--red)}
   .velrow.stale{opacity:.45}
+  /* Market shut: grey, zeroed, and clearly labelled. Never a live-looking read. */
+  .velrow.closed .velbar i{background:var(--dimmer)}
+  .velrow.closed .velval{color:var(--dimmer)}
+  .velrow.closed{opacity:.6}
   /* Entry preview — the level an armed entry fires at, before you press ARM */
   .prevline{margin-top:9px;text-align:center;font-size:11px;letter-spacing:.05em;
             color:var(--dim);line-height:1.5;min-height:16px}
@@ -846,6 +850,15 @@ const EZ = (function(){
       row.title=(v&&v.reason)?v.reason:'velocity unavailable';
       return;
     }
+    // Market shut is its own state, not a low score. Before this, the closing
+    // auction's volume spike froze the strip on VIOLENT 100 all weekend.
+    if(v.state==='closed'){
+      row.className='velrow closed';
+      fill.style.width='0%';
+      val.textContent='MARKET CLOSED';
+      row.title=v.note||'market closed — no prints';
+      return;
+    }
     const arrow={up:'↑',down:'↓',flat:'→'}[v.direction]||'';
     row.className='velrow '+(v.state||'')+(v.stale?' stale':'');
     fill.style.width=Math.max(2,Math.min(100,v.score))+'%';
@@ -1106,7 +1119,10 @@ const EZ = (function(){
       $('armBand').classList.add('hidden');
     }
     if(pos){
-      const strike=pos.strike|0, typ=(pos.side==='CALLS'?'C':'P');
+      // Was `pos.strike|0`, which truncated. This value feeds BOTH the hero
+      // line and the CLOSE button, so on TSLA you'd sit in a 332.5C while the
+      // screen — and the close confirmation — both said 332C.
+      const strike=fmtStrike(pos.strike), typ=(pos.side==='CALLS'?'C':'P');
       $('flatActions').classList.add('hidden'); $('tradeActions').classList.remove('hidden'); $('pnlBlock').classList.remove('hidden');
       $('heroBig').textContent='IN '+pos.side;
       $('heroSub').textContent=`${pos.symbol} ${strike}${typ} × ${pos.qty} · IN ${pos.opened_at} @ ${pos.entry.toFixed(2)}`;

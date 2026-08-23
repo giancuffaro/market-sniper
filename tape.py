@@ -63,6 +63,13 @@ VIOLENT_ABOVE = 88
 _CACHE = {}              # ysym -> {"data": {...}, "ts": epoch}
 _TTL = 10.0              # seconds; the bars themselves only update once a minute
 
+# If the newest CLOSED bar is older than this, nothing is printing — the market
+# is shut, halted, or it is the weekend. Without this the reading freezes on
+# whatever the last live minute happened to be, and the closing auction is
+# always a volume spike, so a closed market reported VIOLENT 100 all weekend.
+# No market calendar needed: "are prints still arriving" is the real question.
+STALE_SECONDS = 10 * 60
+
 
 def _bars(ysym):
     """Last session of 1-minute OHLCV bars for a Yahoo symbol.
@@ -110,6 +117,14 @@ def _bars(ysym):
 def _mean(vals):
     vals = [v for v in vals if v is not None]
     return sum(vals) / len(vals) if vals else 0.0
+
+
+def closed_reading(last_bar_ts=None, note="market closed — no prints"):
+    """What we show when the tape is not running. Zero, not a stale number."""
+    return {"ok": True, "score": 0.0, "state": "closed", "direction": "flat",
+            "vol_ratio": 0.0, "range_ratio": 0.0, "accel_pct": 0.0,
+            "vol_per_min": 0, "range_per_min": 0.0, "bars_used": 0,
+            "last_bar_ts": last_bar_ts, "note": note}
 
 
 def _state(score):
@@ -200,7 +215,19 @@ def velocity(ysym):
         return c["data"]
 
     try:
-        out = compute(_bars(ysym))
+        bars = _bars(ysym)
+        # Ask the data, not a calendar: if no bar has closed in the last ten
+        # minutes then nothing is printing, whatever the clock says. Covers the
+        # weekend, holidays, halts, and futures maintenance breaks alike.
+        if not bars:
+            out = closed_reading(note="no bars yet — market closed or not open")
+        elif (now - bars[-1]["t"]) > STALE_SECONDS:
+            mins = int((now - bars[-1]["t"]) / 60)
+            out = closed_reading(bars[-1]["t"],
+                                 "market closed — last print %s ago"
+                                 % ("%d min" % mins if mins < 90 else "%.1f hrs" % (mins / 60.0)))
+        else:
+            out = compute(bars)
         out["live"] = True
     except Exception as e:                                   # noqa: BLE001
         if c:

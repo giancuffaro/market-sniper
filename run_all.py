@@ -24,6 +24,17 @@ import time
 import signal
 import threading
 import subprocess
+import webbrowser
+
+# Tray icon is OPTIONAL. If pystray/Pillow are missing or the tray fails to
+# start, the app must still run exactly as before — a missing decoration is
+# never a reason for a trading app not to launch.
+try:
+    import pystray
+    from PIL import Image, ImageDraw
+    TRAY_AVAILABLE = True
+except Exception:
+    TRAY_AVAILABLE = False
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 PY = sys.executable                      # the venv's python, since that is what launched us
@@ -75,6 +86,63 @@ def stop_all(reason=""):
                 pass
 
 
+def _icon_image():
+    """A small green crosshair, drawn in code so there is no .ico to ship."""
+    img = Image.new("RGBA", (64, 64), (0, 0, 0, 0))
+    d = ImageDraw.Draw(img)
+    green = (62, 207, 142, 255)
+    d.ellipse([6, 6, 58, 58], outline=green, width=5)
+    d.line([32, 0, 32, 20], fill=green, width=5)
+    d.line([32, 44, 32, 64], fill=green, width=5)
+    d.line([0, 32, 20, 32], fill=green, width=5)
+    d.line([44, 32, 64, 32], fill=green, width=5)
+    d.ellipse([27, 27, 37, 37], fill=green)
+    return img
+
+
+def start_tray():
+    """System-tray icon: open either app, view the log, or quit everything.
+
+    Runs on its own thread. Any failure here is swallowed — the servers keep
+    running headless and you can still reach them in the browser."""
+    if not TRAY_AVAILABLE:
+        print("[TRAY   ] pystray/Pillow not installed - running without a tray icon.", flush=True)
+        print("[TRAY   ] install with:  pip install pystray pillow", flush=True)
+        return None
+
+    def _open(url):
+        return lambda icon, item: webbrowser.open(url)
+
+    def _open_log(icon, item):
+        path = os.path.join(HERE, "logs", "auto-sync.log")
+        try:
+            os.startfile(path)                    # Windows only; harmless elsewhere
+        except Exception:
+            webbrowser.open("file:///" + path.replace("\\", "/"))
+
+    def _quit(icon, item):
+        icon.visible = False
+        icon.stop()
+        stop_all("quit from tray")
+
+    menu = pystray.Menu(
+        pystray.MenuItem("Open OPTIONS  (8000)", _open("http://127.0.0.1:8000"), default=True),
+        pystray.MenuItem("Open FUTURES  (8010)", _open("http://127.0.0.1:8010")),
+        pystray.Menu.SEPARATOR,
+        pystray.MenuItem("View sync log", _open_log),
+        pystray.Menu.SEPARATOR,
+        pystray.MenuItem("Quit Market Sniper", _quit),
+    )
+    try:
+        icon = pystray.Icon("market_sniper", _icon_image(), "MARKET SNIPER", menu)
+        threading.Thread(target=icon.run, daemon=True).start()
+        print("[TRAY   ] tray icon running - double-click it to open OPTIONS", flush=True)
+        return icon
+    except Exception as e:
+        print("[TRAY   ] could not start tray (%s) - continuing without it." % e, flush=True)
+        return None
+
+
 def main():
     print("=" * 62, flush=True)
     print("  MARKET SNIPER - all services in this one window", flush=True)
@@ -97,6 +165,8 @@ def main():
         procs.append((tag, p))
         threading.Thread(target=pump, args=(tag, p.stdout), daemon=True).start()
         print("[%-7s] started (pid %d)" % (tag, p.pid), flush=True)
+
+    tray = start_tray()
 
     try:
         while True:

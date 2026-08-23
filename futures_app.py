@@ -30,6 +30,16 @@ except Exception:
     tape = None
 
 app = FastAPI(title="MARKET SNIPER FUTURES")
+
+# v3.8: one live session PER BROKER, not one session total. Log into Topstep,
+# NinjaTrader and Webull once each and flip between them without logging out.
+# ACTIVE only decides which one the trade buttons act on — every connected
+# session stays alive.
+SESSIONS = {}                 # "TOPSTEP" | "NINJA" | "WEBULL"  ->  session
+ACTIVE = {"mode": None}
+
+# Kept so old code paths that referenced SESSION["s"] fail loudly rather than
+# silently trading the wrong account.
 SESSION = {"s": None}
 HERE = pathlib.Path(__file__).parent
 FUT_VERSION = "1.0"
@@ -62,10 +72,38 @@ class SettingsReq(BaseModel):
 
 
 def _sess():
-    s = SESSION["s"]
+    """The broker the buttons currently act on."""
+    s = SESSIONS.get(ACTIVE["mode"])
     if s is None:
         raise HTTPException(400, "not connected")
     return s
+
+
+def _summary(mode, s):
+    pos = getattr(s, "position", None)
+    return {"mode": mode,
+            "account_id": getattr(s, "account_id", None),
+            "active": mode == ACTIVE["mode"],
+            "has_position": pos is not None,
+            "symbol": (pos or {}).get("symbol"),
+            "side": (pos or {}).get("side"),
+            "pnl": (pos or {}).get("pnl"),
+            "day_realized": round(getattr(s, "day_realized", 0.0), 2)}
+
+
+def _refresh_all():
+    """Refresh EVERY connected broker, not just the visible one.
+
+    refresh_mark() is what evaluates TP, SL and the trailing stop. If it only
+    ran for the active session, switching tabs would quietly stop managing a
+    live position on the broker you switched away from — the trade would sit
+    there with no brackets and nobody watching. So all of them tick."""
+    for mode, s in list(SESSIONS.items()):
+        try:
+            if hasattr(s, "refresh_mark"):
+                s.refresh_mark()
+        except Exception as e:                               # noqa: BLE001
+            print("[state] %s refresh failed: %s" % (mode, str(e)[:150]), flush=True)
 
 
 @app.get("/", response_class=HTMLResponse)
@@ -99,14 +137,50 @@ def connect(req: ConnectReq):
             state = s.connect(req.app_key.strip(), req.app_secret.strip())
     except fc.OrderRejected as e:
         raise HTTPException(400, str(e))
-    SESSION["s"] = s
+    SESSIONS[mode] = s
+    ACTIVE["mode"] = mode
+    state = dict(state or {})
+    state["sessions"] = [_summary(m, x) for m, x in SESSIONS.items()]
+    state["active_mode"] = mode
     return state
 
 @app.get("/api/state")
 def state():
     s = _sess()
-    s.refresh_mark()
-    return s.state()
+    _refresh_all()                      # brackets tick on EVERY logged-in broker
+    st = dict(s.state() or {})
+    st["sessions"] = [_summary(m, x) for m, x in SESSIONS.items()]
+    st["active_mode"] = ACTIVE["mode"]
+    return st
+
+
+@app.get("/api/sessions")
+def sessions():
+    """Which brokers are logged in, and which one the buttons are pointed at."""
+    _refresh_all()
+    return {"active": ACTIVE["mode"],
+            "sessions": [_summary(m, x) for m, x in SESSIONS.items()]}
+
+
+class SwitchReq(BaseModel):
+    mode: str
+
+
+@app.post("/api/switch")
+def switch(req: SwitchReq):
+    """Point the buttons at an already-connected broker. No re-login."""
+    mode = fc.normalize_mode(req.mode)
+    if mode is None:
+        raise HTTPException(400, "mode must be WEBULL, NINJA or TOPSTEP")
+    if mode not in SESSIONS:
+        raise HTTPException(400, "%s is not logged in yet — connect it once first." % mode)
+    ACTIVE["mode"] = mode
+    s = SESSIONS[mode]
+    _refresh_all()
+    st = dict(s.state() or {})
+    st["sessions"] = [_summary(m, x) for m, x in SESSIONS.items()]
+    st["active_mode"] = mode
+    return st
 
 @app.post("/api/order/place")
 def place(req: OrderReq):
@@ -276,10 +350,23 @@ def set_strategies(req: dict):
     except fc.OrderRejected as e:
         raise HTTPException(400, str(e))
 
+class DisconnectReq(BaseModel):
+    mode: Optional[str] = None      # None = every broker
+
+
 @app.post("/api/disconnect")
-def disconnect():
-    SESSION["s"] = None
-    return {"ok": True}
+def disconnect(req: DisconnectReq = None):
+    """Drop one broker, or all of them when no mode is given."""
+    target = fc.normalize_mode(req.mode) if (req and req.mode) else None
+    if target:
+        s = SESSIONS.pop(target, None)
+        if ACTIVE["mode"] == target:
+            ACTIVE["mode"] = next(iter(SESSIONS), None)
+        return {"ok": True, "disconnected": target, "active": ACTIVE["mode"],
+                "sessions": [_summary(m, x) for m, x in SESSIONS.items()]}
+    SESSIONS.clear()
+    ACTIVE["mode"] = None
+    return {"ok": True, "disconnected": "all", "active": None, "sessions": []}
 
 @app.post("/api/shutdown")
 def shutdown():
