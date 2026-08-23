@@ -67,8 +67,20 @@ _TTL = 10.0              # seconds; the bars themselves only update once a minut
 # is shut, halted, or it is the weekend. Without this the reading freezes on
 # whatever the last live minute happened to be, and the closing auction is
 # always a volume spike, so a closed market reported VIOLENT 100 all weekend.
-# No market calendar needed: "are prints still arriving" is the real question.
-STALE_SECONDS = 10 * 60
+# No market calendar needed: "are prints still arriving" is the real question,
+# which also means futures hours work for free (Sunday 18:00 ET open, overnight
+# session, holidays) without hardcoding a single one of them.
+#
+# WHY 25 MINUTES, measured rather than guessed. Five days of real MNQ/MES
+# 1-minute bars say:
+#   ~11 min  quiet gap every night around 23:58 ET (Yahoo's daily rollover) —
+#            the market is WIDE OPEN through this
+#   ~62 min  the CME daily maintenance break at 17:00 ET — genuinely shut
+# The first version used 10 minutes, which sat below that 11-minute gap: every
+# night around midnight the app would have declared futures closed while they
+# were trading. 25 leaves real margin above the quiet gap and still detects the
+# maintenance break less than halfway through it.
+STALE_SECONDS = 25 * 60
 
 
 def _bars(ysym):
