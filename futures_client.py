@@ -1108,6 +1108,11 @@ class TopstepSession(BaseFuturesSession):
         p["pnl"] = round(self._points_pnl() * pv * p["qty"], 2)
         p["points"] = round(self._points_pnl(), 2)
         self._update_trail()
+        # Ask the broker BEFORE any bracket can fire. If you closed by hand,
+        # the position below is fiction and firing a stop against it would
+        # open a brand new trade the other way.
+        if self.reconcile() is not None:
+            return None                     # we just cleared it; nothing to manage
         self._maybe_auto_close()
         return self.position
 
