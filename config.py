@@ -65,7 +65,6 @@ DEFAULT_SETTINGS = {
     "strike_mode": "ITM3",
     "tp_enabled": False, "tp_value": 30.0, "tp_unit": "cents",
     "sl_enabled": False, "sl_value": 20.0, "sl_unit": "cents",
-    # MY CONFIG — round-number armed entry, +$1 whole-number TP, 10% stop.
     # MY CONFIG (round-number entry) is ON by default. G trades this way every
     # time: the buy buttons ARM and wait for the underlying to reach the nearest
     # whole dollar instead of firing at the ask, and arming auto-sets the
