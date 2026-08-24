@@ -167,6 +167,13 @@
     border:1px solid var(--red);border-radius:8px;padding:9px 0;font-family:var(--ui);
     font-size:12.5px;letter-spacing:.12em;font-weight:700;cursor:pointer}
   .fixbtn.show{display:block}
+  /* The CLEAR button above only appears after Webull REJECTS something. Close a
+     trade by hand in the Webull app and nothing is rejected, so it never shows
+     and there is no way out. This one is always there while you are "in". */
+  .flatlink{display:block;width:100%;margin-top:8px;background:transparent;
+    color:var(--dimmer);border:1px dashed var(--line);border-radius:8px;
+    padding:7px 0;font-family:var(--ui);font-size:11px;letter-spacing:.08em;cursor:pointer}
+  .flatlink:hover{color:var(--red);border-color:var(--red)}
   /* Everything that could open a NEW trade goes dead while you're in one. */
   .locknote{text-align:center;color:var(--dim);font-size:12.5px;letter-spacing:.1em;margin:2px 0 12px}
   .locked{opacity:.32;filter:grayscale(1);pointer-events:none}
@@ -394,6 +401,10 @@
     <div id="tradeActions" class="hidden">
       <button class="close-btn" onclick="EZ.close()">CLOSE <span id="closeSide">CALLS</span>
         <small id="closeSub"></small></button>
+      <button class="flatlink" onclick="EZ.forgetPosition()"
+              title="Use this if you already closed the trade yourself in the Webull app. Sends nothing to Webull.">
+        Closed it yourself in Webull? CLEAR IT FROM THE APP
+      </button>
     </div>
 
     <div class="blotter">
