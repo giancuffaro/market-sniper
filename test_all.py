@@ -532,6 +532,26 @@ try:
     check(21,"None and [] are treated differently",
           "could not ask" in fcsrc)
 
+    print("\n[22] OPTIONS: clearing a phantom must NOT need a rejection first")
+    oi = io.open(os.path.join(HERE,"index.html"),encoding="utf-8").read()
+    check(22,"the old CLEAR only showed after a rejection",
+          "rejectFix').classList.toggle('show'" in oi)
+    check(22,"there is now an ALWAYS-visible clear while in a trade",
+          "flatlink" in oi and "Closed it yourself in Webull" in oi)
+    ta = oi.split('id="tradeActions"',1)[1][:600]
+    check(22,"it sits next to CLOSE, not in the reject box", "flatlink" in ta)
+    check(22,"it still asks for confirmation", "NOT holding" in oi)
+    check(22,"it promises no order is sent", "sends NO order" in oi.replace("This sends NO order","sends NO order"))
+
+    import webull_client as _wb2
+    z = _wb2.make_session("LIVE")
+    z.position={"symbol":"QQQ","side":"CALLS","strike":711.0,"qty":1,"entry":3.0,"mark":2.7}
+    r3 = z.forget_position()
+    check(22,"forget clears it", r3["cleared"] is True and z.position is None)
+    check(22,"and says no order was sent", "No order was sent" in (z.last_event or ""))
+    check(22,"clearing twice is harmless", z.forget_position()["cleared"] is False)
+    check(22,"armed entry is cleared too", z.armed is None)
+
 finally:
     for p_ in (OPT,FUT):
         if p_:
@@ -545,7 +565,7 @@ print("\n"+"="*68)
 by={}
 for sc,name,ok,_ in results:
     by.setdefault(sc,[0,0]); by[sc][0]+=1; by[sc][1]+= (1 if ok else 0)
-T={21:"Auto-reconcile w/ broker",20:"MY CONFIG always on",19:"Phantom position",18:"Futures hours",17:"Closed market honest",16:"Restart leaves no spinner",15:"One tab only",14:"Git lock self-heal",13:"Broker tabs + tray",12:"Velocity honest when shut",11:"Multi-broker sessions",1:"Futures login survives restart",2:"remember_login default",3:"Options profiles to disk",
+T={22:"Options phantom clear",21:"Auto-reconcile w/ broker",20:"MY CONFIG always on",19:"Phantom position",18:"Futures hours",17:"Closed market honest",16:"Restart leaves no spinner",15:"One tab only",14:"Git lock self-heal",13:"Broker tabs + tray",12:"Velocity honest when shut",11:"Multi-broker sessions",1:"Futures login survives restart",2:"remember_login default",3:"Options profiles to disk",
    4:"Browser autofill guard",5:"ITM3 strike math",6:"Preview == Arm",7:"Live-only / dead modes",
    8:"Auto-sync safety",9:"Endpoints alive",10:"UI integrity"}
 for sc in sorted(by):
