@@ -66,7 +66,11 @@ DEFAULT_SETTINGS = {
     "tp_enabled": False, "tp_value": 30.0, "tp_unit": "cents",
     "sl_enabled": False, "sl_value": 20.0, "sl_unit": "cents",
     # MY CONFIG — round-number armed entry, +$1 whole-number TP, 10% stop.
-    "my_enabled": False,
+    # MY CONFIG (round-number entry) is ON by default. G trades this way every
+    # time: the buy buttons ARM and wait for the underlying to reach the nearest
+    # whole dollar instead of firing at the ask, and arming auto-sets the
+    # whole-number take-profit and the MY_CONFIG_SL_PCT stop.
+    "my_enabled": True,
 }
 # Auto-applied bracket when a MY CONFIG armed entry fires.
 MY_CONFIG_SL_PCT = 10.0
