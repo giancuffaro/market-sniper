@@ -111,6 +111,16 @@
   .velrow.fast    .velbar i{background:var(--amber)}  .velrow.fast .velval{color:var(--amber)}
   .velrow.violent .velbar i{background:var(--red)}    .velrow.violent .velval{color:var(--red)}
   .velrow.stale{opacity:.45}
+  .fixbtn{display:none;width:100%;margin-top:10px;background:transparent;color:var(--red);
+    border:1px solid var(--red);border-radius:8px;padding:9px 0;font-family:var(--ui);
+    font-size:12.5px;letter-spacing:.12em;font-weight:700;cursor:pointer}
+  .fixbtn.show{display:block}
+  /* Reachable WITHOUT a rejection: you closed by hand, so nothing was rejected
+     and the reject box never appears. This sits under CLOSE instead. */
+  .flatlink{display:block;width:100%;margin-top:8px;background:transparent;
+    color:var(--dimmer);border:1px dashed var(--line);border-radius:8px;
+    padding:7px 0;font-family:var(--ui);font-size:11px;letter-spacing:.08em;cursor:pointer}
+  .flatlink:hover{color:var(--red);border-color:var(--red)}
   /* Broker tabs on the DASHBOARD. Flip accounts without going back to login. */
   .brokertabs{display:flex;gap:8px;margin:0 0 12px}
   .brokertabs button{flex:1;background:var(--panel);border:1px solid var(--line);
@@ -375,6 +385,10 @@
 
     <div id="tradeActions" class="hidden">
       <button class="close-btn" onclick="FZ.close()">CLOSE POSITION<small id="closeSub"></small></button>
+      <button class="flatlink" onclick="FZ.forgetPosition()"
+              title="Use this if you already closed the trade yourself in NinjaTrader / TopstepX / Webull. Sends nothing to the broker.">
+        Closed it yourself? CLEAR IT FROM THE APP
+      </button>
     </div>
 
     <div class="blotter">
