@@ -522,9 +522,12 @@ try:
 
     fcsrc = io.open(os.path.join(HERE,"futures_client.py"),encoding="utf-8").read()
     ts_block = fcsrc.split("class TopstepSession",1)[1].split("\nclass ",1)[0]
-    rm = ts_block.split("def refresh_mark",1)[1][:700]
+    # take the whole refresh_mark body, up to the next def
+    rm = ts_block.split("def refresh_mark",1)[1].split("\n    def ",1)[0]
+    check(21,"reconcile is inside refresh_mark", "self.reconcile()" in rm, rm[:120])
     check(21,"reconcile runs BEFORE brackets can fire",
-          rm.index("self.reconcile()") < rm.index("_maybe_auto_close"))
+          "self.reconcile()" in rm and "_maybe_auto_close" in rm
+          and rm.index("self.reconcile()") < rm.index("_maybe_auto_close"))
     check(21,"uses the real ProjectX endpoint", "/api/Position/searchOpen" in fcsrc)
     check(21,"None and [] are treated differently",
           "could not ask" in fcsrc)
