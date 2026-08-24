@@ -564,7 +564,15 @@ const EZ = (function(){
                            body:b?JSON.stringify(b):undefined}).then(r=>r.json());
   const money=n=>(n<0?'−$':'+$')+Math.abs(n).toFixed(2);
 
-  try{ const sv=JSON.parse(localStorage.getItem(LSS)||"null"); if(sv) settings={...settings,...sv}; }catch(e){}
+  // Settings are NOT read from localStorage any more. my-settings.json on disk
+  // is the one source of truth.
+  //
+  // Why: the browser used to load its localStorage copy over the defaults, then
+  // startDash POSTed those settings to /api/settings, and the server wrote them
+  // straight back to my-settings.json. So one stale browser value silently
+  // overwrote the file on every connect - which is exactly how MY CONFIG kept
+  // turning itself back off no matter how many times the default was fixed.
+  // localStorage is still WRITTEN as a cache; it is simply never read back.
   try{ const av=JSON.parse(localStorage.getItem(LSA)||"null"); if(av) autolock={...autolock,...av}; }catch(e){}
 
   function applyTheme(t){ if(t==="white")t="light"; if(t==="black")t="dark"; document.body.dataset.theme=t; localStorage.setItem(LST,t); document.querySelectorAll(".tdot").forEach(function(d){d.classList.toggle("active",d.dataset.set===t);}); savePrefs({theme:t}); }
