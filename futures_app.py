@@ -214,6 +214,15 @@ def disarm():
     except Exception as e:                                   # noqa: BLE001
         return _fail("disarm", e)
 
+@app.post("/api/position/forget")
+def forget_position():
+    """Clear a position the broker does not actually have. Sends NOTHING."""
+    try:
+        return {"ok": True, **_sess().forget_position()}
+    except Exception as e:                                   # noqa: BLE001
+        return _fail("forget", e)
+
+
 @app.post("/api/order/close")
 def close():
     try:

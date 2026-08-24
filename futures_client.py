@@ -745,6 +745,27 @@ class BaseFuturesSession:
                 return "TRAIL"
         return None
 
+    def forget_position(self):
+        """Escape hatch for a position the app thinks you hold but the broker
+        does not - typically because you closed it by hand in the platform.
+
+        Sends NOTHING to any broker. It only clears this app's own idea of the
+        trade. That matters more here than it looks: TP, SL and the trailing
+        stop are evaluated every second, and firing one against a position you
+        have already closed sends a CLOSE for contracts you do not hold - which
+        does not flatten anything, it OPENS a new position the other way.
+
+        Only use it once you have confirmed in the platform that you are flat.
+        """
+        p, self.position = self.position, None
+        self.armed = None
+        if p:
+            self.last_event = (
+                "Cleared %s %s x%s from the screen. NO order was sent - confirm "
+                "in your platform that you are actually flat."
+                % (p.get("side"), p.get("symbol"), p.get("qty")))
+        return {"cleared": bool(p), "position": None}
+
     def _maybe_auto_close(self):
         hit = self._bracket_hit()
         if not hit:
