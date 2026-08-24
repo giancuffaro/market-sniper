@@ -490,6 +490,15 @@ try:
     _, pr = http("http://127.0.0.1:8000/api/prefs")
     check(20,"server actually SERVES it on", pr.get("settings",{}).get("my_enabled") is True,
           str(pr.get("settings",{}).get("my_enabled")))
+    # THE root cause: the browser used to load settings from localStorage, then
+    # POST them to /api/settings, which wrote them to my-settings.json. One
+    # stale browser value overwrote the file on every connect, which is why
+    # fixing the default never stuck.
+    check(20,"settings are NOT read from localStorage any more",
+          "localStorage.getItem(LSS)" not in idx2)
+    check(20,"disk is the single source of truth", "one source of truth" in idx2)
+    check(20,"you can still deliberately turn it off",
+          "settings.my_enabled=$('myEnabled').checked" in idx2.replace(" ",""))
 
     print("\n[21] AUTO-RECONCILE - the app asks Topstep what you actually hold")
     import futures_client as _fc2
