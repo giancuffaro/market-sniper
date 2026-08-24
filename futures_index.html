@@ -347,7 +347,8 @@
     <div id="eventBanner" class="event"><div class="x" onclick="FZ.hideEvent()">✕</div>
       <div class="h" id="eventHead"></div></div>
     <div id="reject" class="reject"><div class="x" onclick="FZ.hideReject()">✕</div>
-      <div class="h" id="rejectHead">◆ ORDER REJECTED</div><div class="b" id="rejectBody"></div></div>
+      <div class="h" id="rejectHead">◆ ORDER REJECTED</div><div class="b" id="rejectBody"></div>
+      <button id="rejectFix" class="fixbtn" onclick="FZ.forgetPosition()">I'M ACTUALLY FLAT — CLEAR IT</button></div>
 
     <div class="seg" id="seg">
       <button data-s="MNQ" class="on">MNQ</button>
@@ -816,6 +817,24 @@ const FZ = (function(){
   });
   function step(d){ if(inTrade)return; qty=Math.max(1,qty+d); $('qty').textContent=qty; savePrefs({qty}); }
 
+  // You closed by hand in the platform, so the broker is flat but this app is
+  // not. That is not cosmetic: TP/SL/trail are evaluated every second, and
+  // firing one now would send a CLOSE for contracts you no longer hold, which
+  // OPENS a position the other way. Clearing sends nothing to the broker.
+  async function forgetPosition(){
+    if(!confirm("Clear this position from the app?\n\n"
+              + "NOTHING is sent to your broker. Only do this if you have "
+              + "confirmed in your platform that you are actually FLAT.\n\n"
+              + "If you are still in the trade, this stops the app managing "
+              + "your stop and target."))
+      return;
+    const r = await api('/api/position/forget', {});
+    hideReject();
+    inTrade = false;
+    if(r && r.reason) showEvent(r.reason);
+    await tick();
+  }
+
   async function open(side){
     // Last line of defence — the buttons are already hidden and dead while you're
     // in a trade, but nothing gets past here either.
@@ -1235,7 +1254,7 @@ const FZ = (function(){
     }catch(e){ /* no BroadcastChannel - harmless, tabs just do not auto-close */ }
   })();
 
-  return {step,open,close,disarm,back,lockAll,pickBroker,refreshSessions,toggleTheme,setTheme,openSettings,closeSettings,saveSettings,hideEvent,hideReject,
+  return {step,open,close,disarm,back,lockAll,pickBroker,refreshSessions,forgetPosition,toggleTheme,setTheme,openSettings,closeSettings,saveSettings,hideEvent,hideReject,
           showTab,toggleStrategy,setStrategyField,backtestStrategy,closeBacktest,uploadData,quitApp};
 })();
 </script>
