@@ -473,6 +473,24 @@ try:
     check(19,"options had this all along", "/api/position/forget" in
           io.open(os.path.join(HERE,"main.py"),encoding="utf-8").read())
 
+    print("\n[20] MY CONFIG (round-number entry) IS ALWAYS ON")
+    import importlib, config as _cfg
+    _cfg = importlib.reload(_cfg)
+    check(20,"server default is ON", _cfg.DEFAULT_SETTINGS["my_enabled"] is True)
+    idx2 = io.open(os.path.join(HERE,"index.html"),encoding="utf-8").read()
+    check(20,"browser fallback is ON too (used before prefs load)",
+          "my_enabled:true}" in idx2.replace(" ",""))
+    check(20,"nothing defaults it back off",
+          not re.search(r"my_enabled\s*[:=]\s*[Ff]alse",
+                        io.open(os.path.join(HERE,"config.py"),encoding="utf-8").read()+idx2))
+    saved = json.load(io.open(SETTINGS,encoding="utf-8")).get("options_settings",{})
+    check(20,"your saved file says ON", saved.get("my_enabled") is True, str(saved.get("my_enabled")))
+    check(20,"ON means the buttons ARM, not buy at the ask",
+          "if(settings.my_enabled){" in idx2 and "/api/order/arm" in idx2)
+    _, pr = http("http://127.0.0.1:8000/api/prefs")
+    check(20,"server actually SERVES it on", pr.get("settings",{}).get("my_enabled") is True,
+          str(pr.get("settings",{}).get("my_enabled")))
+
 finally:
     for p_ in (OPT,FUT):
         if p_:
@@ -486,7 +504,7 @@ print("\n"+"="*68)
 by={}
 for sc,name,ok,_ in results:
     by.setdefault(sc,[0,0]); by[sc][0]+=1; by[sc][1]+= (1 if ok else 0)
-T={19:"Phantom position",18:"Futures hours",17:"Closed market honest",16:"Restart leaves no spinner",15:"One tab only",14:"Git lock self-heal",13:"Broker tabs + tray",12:"Velocity honest when shut",11:"Multi-broker sessions",1:"Futures login survives restart",2:"remember_login default",3:"Options profiles to disk",
+T={20:"MY CONFIG always on",19:"Phantom position",18:"Futures hours",17:"Closed market honest",16:"Restart leaves no spinner",15:"One tab only",14:"Git lock self-heal",13:"Broker tabs + tray",12:"Velocity honest when shut",11:"Multi-broker sessions",1:"Futures login survives restart",2:"remember_login default",3:"Options profiles to disk",
    4:"Browser autofill guard",5:"ITM3 strike math",6:"Preview == Arm",7:"Live-only / dead modes",
    8:"Auto-sync safety",9:"Endpoints alive",10:"UI integrity"}
 for sc in sorted(by):
