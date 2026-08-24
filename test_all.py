@@ -442,6 +442,32 @@ try:
     check(18,"tape.py makes no calendar/clock decisions",
           ".hour" not in _code and "weekday" not in _code and "localtime" not in _code)
 
+    print("\n[19] PHANTOM POSITION - closed by hand, app still thinks you are in")
+    import futures_client as _fc
+    ph = _fc.make_session("TOPSTEP")
+    ph.position = {"symbol":"MNQ","side":"LONG","qty":1,"entry":23150.0,
+                   "mark":23144.0,"best":23160.0,"pnl":-12.0}
+    ph.settings.update({"sl_enabled":True,"sl_points":5.0})
+    check(19,"a phantom WOULD have fired a bracket", ph._bracket_hit()=="SL")
+    r_=ph.forget_position()
+    check(19,"forget clears it", r_["cleared"] is True and ph.position is None)
+    check(19,"nothing can fire afterwards", ph._bracket_hit() is None)
+    check(19,"it says no order was sent", "NO order was sent" in (ph.last_event or ""))
+    check(19,"forgetting when already flat is harmless",
+          ph.forget_position()["cleared"] is False)
+    check(19,"armed order is cleared too", ph.armed is None)
+
+    fh2 = io.open(os.path.join(HERE,"futures_index.html"),encoding="utf-8").read()
+    check(19,"futures exposes forgetPosition", "forgetPosition" in fh2)
+    check(19,"reachable WITHOUT a rejection (you closed by hand)",
+          "flatlink" in fh2 and "Closed it yourself" in fh2)
+    check(19,"asks for confirmation first", "Clear this position from the app" in fh2)
+    check(19,"warns it stops managing the trade", "stops the app managing" in fh2)
+    fa2 = io.open(os.path.join(HERE,"futures_app.py"),encoding="utf-8").read()
+    check(19,"endpoint exists", "/api/position/forget" in fa2)
+    check(19,"options had this all along", "/api/position/forget" in
+          io.open(os.path.join(HERE,"main.py"),encoding="utf-8").read())
+
 finally:
     for p_ in (OPT,FUT):
         if p_:
@@ -455,7 +481,7 @@ print("\n"+"="*68)
 by={}
 for sc,name,ok,_ in results:
     by.setdefault(sc,[0,0]); by[sc][0]+=1; by[sc][1]+= (1 if ok else 0)
-T={18:"Futures hours",17:"Closed market honest",16:"Restart leaves no spinner",15:"One tab only",14:"Git lock self-heal",13:"Broker tabs + tray",12:"Velocity honest when shut",11:"Multi-broker sessions",1:"Futures login survives restart",2:"remember_login default",3:"Options profiles to disk",
+T={19:"Phantom position",18:"Futures hours",17:"Closed market honest",16:"Restart leaves no spinner",15:"One tab only",14:"Git lock self-heal",13:"Broker tabs + tray",12:"Velocity honest when shut",11:"Multi-broker sessions",1:"Futures login survives restart",2:"remember_login default",3:"Options profiles to disk",
    4:"Browser autofill guard",5:"ITM3 strike math",6:"Preview == Arm",7:"Live-only / dead modes",
    8:"Auto-sync safety",9:"Endpoints alive",10:"UI integrity"}
 for sc in sorted(by):
