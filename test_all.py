@@ -491,6 +491,44 @@ try:
     check(20,"server actually SERVES it on", pr.get("settings",{}).get("my_enabled") is True,
           str(pr.get("settings",{}).get("my_enabled")))
 
+    print("\n[21] AUTO-RECONCILE - the app asks Topstep what you actually hold")
+    import futures_client as _fc2
+    def _rs(broker_says):
+        x = _fc2.make_session("TOPSTEP")
+        x.token="t"; x.acct={"id":1}
+        x.position={"symbol":"MNQ","side":"LONG","qty":1,"entry":23150.0,
+                    "mark":23144.0,"best":23160.0,"pnl":-12.0}
+        x.settings.update({"sl_enabled":True,"sl_points":5.0})
+        x.broker_positions = lambda: broker_says
+        x._last_reconcile = 0
+        return x
+
+    x=_rs([]);  check(21,"a phantom WOULD have fired a stop", x._bracket_hit()=="SL")
+    x.refresh_mark()
+    check(21,"broker says FLAT -> app clears itself", x.position is None)
+    check(21,"and explains why", "FLAT" in (x.last_event or ""))
+    check(21,"no order was sent", "No order was sent" in (x.last_event or ""))
+
+    x=_rs([{"contractId":"MNQ","size":1}]); x.refresh_mark()
+    check(21,"broker CONFIRMS -> position kept", x.position is not None)
+
+    x=_rs(None); x.refresh_mark()
+    check(21,"API failure is NOT read as flat", x.position is not None)
+
+    hits=[]
+    x=_rs([]); x.broker_positions=lambda: (hits.append(1), [])[1]; x._last_reconcile=0
+    x.reconcile(); x.reconcile(); x.reconcile()
+    check(21,"rate-limited, does not hammer the API", len(hits)==1, f"{len(hits)} calls")
+
+    fcsrc = io.open(os.path.join(HERE,"futures_client.py"),encoding="utf-8").read()
+    ts_block = fcsrc.split("class TopstepSession",1)[1].split("\nclass ",1)[0]
+    rm = ts_block.split("def refresh_mark",1)[1][:700]
+    check(21,"reconcile runs BEFORE brackets can fire",
+          rm.index("self.reconcile()") < rm.index("_maybe_auto_close"))
+    check(21,"uses the real ProjectX endpoint", "/api/Position/searchOpen" in fcsrc)
+    check(21,"None and [] are treated differently",
+          "could not ask" in fcsrc)
+
 finally:
     for p_ in (OPT,FUT):
         if p_:
@@ -504,7 +542,7 @@ print("\n"+"="*68)
 by={}
 for sc,name,ok,_ in results:
     by.setdefault(sc,[0,0]); by[sc][0]+=1; by[sc][1]+= (1 if ok else 0)
-T={20:"MY CONFIG always on",19:"Phantom position",18:"Futures hours",17:"Closed market honest",16:"Restart leaves no spinner",15:"One tab only",14:"Git lock self-heal",13:"Broker tabs + tray",12:"Velocity honest when shut",11:"Multi-broker sessions",1:"Futures login survives restart",2:"remember_login default",3:"Options profiles to disk",
+T={21:"Auto-reconcile w/ broker",20:"MY CONFIG always on",19:"Phantom position",18:"Futures hours",17:"Closed market honest",16:"Restart leaves no spinner",15:"One tab only",14:"Git lock self-heal",13:"Broker tabs + tray",12:"Velocity honest when shut",11:"Multi-broker sessions",1:"Futures login survives restart",2:"remember_login default",3:"Options profiles to disk",
    4:"Browser autofill guard",5:"ITM3 strike math",6:"Preview == Arm",7:"Live-only / dead modes",
    8:"Auto-sync safety",9:"Endpoints alive",10:"UI integrity"}
 for sc in sorted(by):
