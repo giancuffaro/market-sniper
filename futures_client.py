@@ -974,6 +974,54 @@ class TopstepSession(BaseFuturesSession):
             self.buying_power = 0.0
         return self.state()
 
+    # ---- Broker truth -----------------------------------------------------
+    # The app's idea of your position is its own bookkeeping. Close a trade by
+    # hand in TopstepX and this app never hears about it - it keeps managing a
+    # trade that no longer exists, and a TP/SL firing then sends a CLOSE for
+    # contracts you do not hold, which OPENS a position the other way.
+    # ProjectX can just tell us, so ask it.
+    RECONCILE_EVERY = 10.0            # seconds; the API is not free
+
+    def broker_positions(self):
+        """Open positions ACCORDING TO TOPSTEP. None means 'could not ask'.
+
+        None and [] mean very different things here: [] is 'the broker says you
+        are flat', None is 'the question failed'. Never treat a failed question
+        as a flat account."""
+        if not (self.token and self.acct):
+            return None
+        try:
+            r = _ts_req("/api/Position/searchOpen", token=self.token,
+                        body={"accountId": self.acct.get("id")})
+        except Exception:
+            return None
+        if not isinstance(r, dict) or not r.get("success", True):
+            return None
+        pos = r.get("positions")
+        return pos if isinstance(pos, list) else None
+
+    def reconcile(self, force=False):
+        """Drop our position if the broker says we are flat. Sends no orders."""
+        now = time.time()
+        if not force and now - getattr(self, "_last_reconcile", 0) < self.RECONCILE_EVERY:
+            return None
+        self._last_reconcile = now
+        if not self.position:
+            return None
+        live = self.broker_positions()
+        if live is None:
+            return None                       # could not ask - change nothing
+        if len(live) > 0:
+            return None                       # broker agrees we hold something
+        p = self.position
+        self.position = None
+        self.armed = None
+        self.last_event = (
+            "Topstep says you are FLAT, so the app cleared its %s %s x%s. "
+            "You closed it outside the app. No order was sent."
+            % (p.get("side"), p.get("symbol"), p.get("qty")))
+        return {"cleared": True}
+
     def _contract_for(self, sym):
         if sym in self._contracts:
             return self._contracts[sym]
