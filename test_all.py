@@ -1,9 +1,14 @@
 """Market Sniper v3.7 — 10-scenario regression suite."""
-import io, json, os, re, shutil, subprocess, sys, time, urllib.request, urllib.error
+import io, json, os, re, shutil, subprocess, sys, tempfile, time, urllib.request, urllib.error
 
 HERE = "/sessions/stoic-brave-ritchie/mnt/Market Sniper"
 sys.path.insert(0, HERE); os.chdir(HERE)
-SETTINGS = os.path.join(HERE, "my-settings.json"); BACKUP = "/tmp/ms/settings.realbackup"
+SETTINGS = os.path.join(HERE, "my-settings.json")
+# Scratch dir for the backup + temp logs. Created here so the suite runs on a
+# clean machine instead of assuming a folder someone made by hand once.
+SCRATCH = os.path.join(tempfile.gettempdir(), "market_sniper_tests")
+os.makedirs(SCRATCH, exist_ok=True)
+BACKUP = os.path.join(SCRATCH, "settings.realbackup")
 results = []
 
 SECRETY = ("key","sec","secret","token","pass")
@@ -40,8 +45,8 @@ def boot(app, port, log):
 shutil.copy(SETTINGS, BACKUP)
 OPT = FUT = None
 try:
-    OPT = boot("main:app", 8000, "/tmp/ms/opt1.log")
-    FUT = boot("futures_app:app", 8010, "/tmp/ms/fut1.log")
+    OPT = boot("main:app", 8000, os.path.join(SCRATCH,"opt1.log"))
+    FUT = boot("futures_app:app", 8010, os.path.join(SCRATCH,"fut1.log"))
     time.sleep(11)
 
     print("\n[1] FUTURES LOGIN SURVIVES A RESTART")
@@ -49,7 +54,7 @@ try:
         "mode":"TOPSTEP","ts_user":"giancuffaro230","ts_acct":"EXPRESS-V2-CT-DLL-132001-66482406",
         "ts_key":"TSKEY","wb_key":"WBKEY","wb_sec":"WBSEC","nt_account":"1114140","nt_folder":"C:/nt/incoming"})
     FUT.terminate(); FUT.wait(timeout=10)
-    FUT = boot("futures_app:app", 8010, "/tmp/ms/fut2.log"); time.sleep(9)
+    FUT = boot("futures_app:app", 8010, os.path.join(SCRATCH,"fut2.log")); time.sleep(9)
     _, r = http("http://127.0.0.1:8010/api/prefs"); p = r.get("prefs", {})
     check(1,"username survives restart", p.get("ts_user")=="giancuffaro230", repr(p.get("ts_user")))
     check(1,"topstep account survives", str(p.get("ts_acct","")).startswith("EXPRESS-V2"), repr(p.get("ts_acct")))
@@ -74,7 +79,7 @@ try:
         "profiles":[{"name":"Main","k":"K1","s":"S1"},{"name":"Mirror","k":"K2","s":"S2"}],
         "active_profile":"Main","show_secrets":True})
     OPT.terminate(); OPT.wait(timeout=10)
-    OPT = boot("main:app", 8000, "/tmp/ms/opt2.log"); time.sleep(9)
+    OPT = boot("main:app", 8000, os.path.join(SCRATCH,"opt2.log")); time.sleep(9)
     _, r = http("http://127.0.0.1:8000/api/prefs"); op = r.get("prefs", {})
     profs = op.get("profiles", [])
     check(3,"both profiles survive restart", [x.get("name") for x in profs]==["Main","Mirror"], str(profs))
@@ -159,7 +164,7 @@ try:
           hv.get("version")==_cfg.APP_VERSION, str(hv.get("version")))
     code,_ = http("http://127.0.0.1:8000/api/tape?symbol=NVDA")
     check(9,"unknown symbol rejected", code==400)
-    for log in ("/tmp/ms/opt2.log","/tmp/ms/fut2.log"):
+    for log in (os.path.join(SCRATCH,"opt2.log"),os.path.join(SCRATCH,"fut2.log")):
         txt = io.open(log,encoding="utf-8",errors="replace").read() if os.path.exists(log) else ""
         check(9,f"no traceback in {os.path.basename(log)}", "Traceback" not in txt)
 
@@ -179,7 +184,7 @@ try:
             blocks = re.findall(r"<script>(.*?)</script>", src_, re.S)
             check(10,f"{page}: has script blocks", len(blocks)>0)
             for i,js in enumerate(blocks):
-                f_=f"/tmp/_chk_{page}_{i}.js"
+                f_=os.path.join(SCRATCH,f"chk_{page}_{i}.js")
                 io.open(f_,"w",encoding="utf-8").write(js)
                 r_=_sp.run(["node","--check",f_],capture_output=True,text=True)
                 check(10,f"{page}: script block {i} parses",
