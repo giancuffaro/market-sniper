@@ -133,6 +133,8 @@
   .velrow.fast    .velbar i{background:var(--amber)}  .velrow.fast .velval{color:var(--amber)}
   .velrow.violent .velbar i{background:var(--red)}    .velrow.violent .velval{color:var(--red)}
   .velrow.stale{opacity:.45}
+  /* A contract the app will not sell you. Dead on the screen AND on the server. */
+  .buy-c.blocked, .buy-p.blocked{opacity:.35;filter:grayscale(1);pointer-events:none}
   /* What is armed RIGHT NOW. Only one thing ever can be. */
   .activemode{margin:0 0 12px;padding:8px 10px;border-radius:8px;font-size:11.5px;
     letter-spacing:.06em;border:1px solid var(--line);background:var(--panel2);color:var(--dim)}
@@ -395,8 +397,8 @@
 
     <div id="flatActions">
       <div class="duo">
-        <button class="buy-c" onclick="EZ.buy('CALLS')">BUY CALLS<small id="callSub">loading…</small></button>
-        <button class="buy-p" onclick="EZ.buy('PUTS')">BUY PUTS<small id="putSub">loading…</small></button>
+        <button class="buy-c" id="buyCall" onclick="EZ.buy('CALLS')">BUY CALLS<small id="callSub">loading…</small></button>
+        <button class="buy-p" id="buyPut" onclick="EZ.buy('PUTS')">BUY PUTS<small id="putSub">loading…</small></button>
       </div>
       <div id="previewLine" class="prevline" title="Where an ABSOLUTE ENTRY would fire, and the contract you'd be holding when it does. Nothing is sent until you press ARM."></div>
     </div>
@@ -925,6 +927,23 @@ const EZ = (function(){
   // What this trade actually costs: one contract controls 100 shares.
   const fmtCost=ask=>'$'+Math.round(Number(ask)*100*qty).toLocaleString();
 
+  // Show the contract, or say plainly why it will not be sold to you.
+  function paintSide(subId, btnId, q){
+    const sub=$(subId), btn=$(btnId);
+    if(!q || q.detail){ if(sub) sub.textContent = (q&&q.detail)||'—'; return; }
+    const qual = q.quality || {};
+    if(q.tradable === false){
+      if(sub) sub.innerHTML = 'BLOCKED — ' + (qual.reasons&&qual.reasons[0]
+              ? qual.reasons[0].split('—')[0].trim() : 'poor contract');
+      if(btn){ btn.classList.add('blocked'); btn.title = (qual.reasons||[]).join('\n'); }
+      return;
+    }
+    if(btn){ btn.classList.remove('blocked'); btn.title=''; }
+    if(sub) sub.textContent =
+      `STRIKE ${fmtStrike(q.strike)} · $${q.ask.toFixed(2)} · ${fmtCost(q.ask)}`
+      + (qual.extrinsic_pct!=null ? ` · ${Math.round(qual.extrinsic_pct)}% time` : '');
+  }
+
   async function refreshQuote(){
     // Two things make a quote pointless: no session, and no market. Asking
     // anyway just produced a 400 every 5s and an unreadable Webull error on
@@ -944,8 +963,10 @@ const EZ = (function(){
       // strike as "332" — a strike that does not exist. fmtStrike keeps the half.
       // Cost is shown because ITM3 contracts run 3x an OTM1, so the number of
       // contracts no longer tells you what you are about to spend.
-      $('callSub').textContent=`STRIKE ${fmtStrike(c.strike)} · $${c.ask.toFixed(2)} · ${fmtCost(c.ask)}`;
-      $('putSub').textContent =`STRIKE ${fmtStrike(p.strike)} · $${p.ask.toFixed(2)} · ${fmtCost(p.ask)}`;
+      // A contract that fails the quality filter is not offered at all. The
+      // server refuses it too, so this is presentation, not the safety net.
+      paintSide('callSub','buyCall', c);
+      paintSide('putSub', 'buyPut',  p);
       $('tickerRow').innerHTML=`<b>${sym}</b> SPOT ${c.spot.toFixed(2)} &nbsp; 0DTE · EXP <b>TODAY</b>`;
     }catch(e){}
     refreshPreview();
