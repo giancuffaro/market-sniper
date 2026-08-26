@@ -228,7 +228,7 @@
           display:flex;flex-direction:column}
   .panes{flex:1;min-height:0;overflow-y:auto;margin:0 -4px;padding:0 4px}
   .smodal h2,.smodal .tabs,.smodal .activemode,.smodal .sactions{flex:none}
-  .smodal h2{margin:0 0 16px;font-size:15px;letter-spacing:.2em;color:var(--txt);text-align:center}
+  .smodal h2{display:flex;align-items:center;justify-content:center;gap:10px;margin:0 0 16px;font-size:15px;letter-spacing:.2em;color:var(--txt);text-align:center}
   .sgroup{border:1px solid var(--line);border-radius:12px;padding:14px;margin-bottom:12px}
   /* ABSOLUTE ENTRY — deliberately a different typeface so you know it's yours */
   .myfont{font-family:'Space Grotesk','Inter',sans-serif}
@@ -289,6 +289,14 @@
   .ssave{border:0;background:var(--green-btn);color:#fff}
   body:not([data-theme="light"]) .ssave{color:#08130c}
   .scancel{border:1px solid var(--line);background:transparent;color:var(--dim)}
+  /* No SAVE button: every control writes the moment you touch it. This says so,
+     and says the one thing that is NOT immediate - an open trade keeps the
+     terms it was opened with. */
+  .savedtag{font-size:10.5px;letter-spacing:.12em;color:var(--green);opacity:0;
+            transition:opacity .18s;margin-left:auto;font-weight:700}
+  .savedtag.on{opacity:1}
+  .livenote{border:1px solid var(--amber);background:var(--red-deep);color:var(--amber);
+            border-radius:10px;padding:9px 12px;font-size:11.5px;margin-top:8px;flex:none}
 </style>
 </head>
 <body>
@@ -449,8 +457,8 @@
   <!-- CONFIGURATION MODAL -->
   <div id="setScrim" class="scrim">
     <div class="smodal">
-      <h2>SETTINGS</h2>
-      <div class="tabs">
+      <h2>SETTINGS <span id="savedTag" class="savedtag">SAVED</span></h2>
+      <div class="tabs" style="position:relative">
         <button id="tabConfig" class="tab on" onclick="EZ.showTab('config')">CONFIGURATION</button>
         <button id="tabStrat" class="tab" onclick="EZ.showTab('strat')">STRATEGIES</button>
         <button id="tabMirror" class="tab" onclick="EZ.showTab('mirror')">MIRROR</button>
@@ -463,10 +471,12 @@
       <div class="sgroup mine myfont">
         <div class="glbl">★ ABSOLUTE ENTRY with RATCHET TRAILING</div>
         <div class="srow">
-          <label class="tog"><span class="sw"><input type="checkbox" id="myEnabled"><i></i></span>
+          <label class="tog"><span class="sw"><input type="checkbox" id="myEnabled"
+              onchange="EZ.applySettings()"><i></i></span>
             <span class="lbl">ABSOLUTE ENTRY + RATCHET</span></label>
           <span style="flex:1"></span>
           step <input id="ratchetStep" type="number" min="1" max="100" step="1" value="10"
+                     onchange="EZ.applySettings()" onblur="EZ.applySettings()"
                      style="width:60px;text-align:center"> %
         </div>
         <div class="shint myfont"><b>The entry.</b> Waits for the underlying to reach the
@@ -553,9 +563,9 @@
       </div>
       </div><!-- /panes -->
 
+      <div id="liveNote" class="livenote" hidden></div>
       <div class="sactions">
-        <button class="scancel" onclick="EZ.closeSettings()">CANCEL</button>
-        <button class="ssave" onclick="EZ.saveSettings()">SAVE</button>
+        <button class="ssave" onclick="EZ.closeSettings()">DONE</button>
       </div>
     </div>
   </div>
@@ -792,6 +802,7 @@ const EZ = (function(){
       .map(p=>`<option value="${p.name}">${p.name}</option>`).join('')||'<option value="">no other saved account</option>';
     $('mirrorBtn').textContent=mirrorOn?'DISABLE':'ENABLE';
     $('mirrorBtn').className='mini'+(mirrorOn?' off':'');
+    paintLiveNote();
     $('setScrim').classList.add('show');
   }
   // One place decides which strike button is lit, so adding a depth later
@@ -807,22 +818,46 @@ const EZ = (function(){
   function setStrikeMode(m){
     settings.strike_mode=m;
     paintStrikeMode(m);
-    refreshQuote();          // the preview line and button subtitles follow it
+    applySettings();         // no SAVE button - the pick IS the save
   }
   function closeSettings(){ $('setScrim').classList.remove('show'); }
-  async function saveSettings(){
+
+  // A trade already running is NOT retuned by anything typed here - it keeps
+  // the ratchet terms it opened with. Say so, plainly, while it is open.
+  function paintLiveNote(){
+    const n=$('liveNote'); if(!n) return;
+    const live=!!position;
+    n.hidden=!live;
+    if(live) n.textContent='A trade is live. It keeps the settings it was opened '
+      +'with — anything you change here applies to your NEXT trade.';
+  }
+  let savedTimer=null;
+  function flashSaved(){
+    const t=$('savedTag'); if(!t) return;
+    t.classList.add('on'); clearTimeout(savedTimer);
+    savedTimer=setTimeout(()=>t.classList.remove('on'),1100);
+  }
+
+  // Every control calls this. There is no SAVE button to forget to press, and
+  // no CANCEL - which means nothing is ever half-applied, the state you see is
+  // the state on disk.
+  async function applySettings(){
     settings.my_enabled=$('myEnabled').checked;
     if(settings.my_enabled && strategies.some(x=>x.enabled)){
       strategies.forEach(x=>x.enabled=false);   // entry wins; server agrees
       persistStrategies(); renderStrategies();
     }
     settings.ratchet_enabled=settings.my_enabled;   // one switch, both halves
+    // Empty or junk in the step box falls back to 10, and the box is written
+    // back so what you read is what is stored.
     settings.ratchet_step_pct=Math.max(1,Math.min(parseFloat($('ratchetStep').value)||10,100));
+    $('ratchetStep').value=settings.ratchet_step_pct;
     localStorage.setItem(LSS,JSON.stringify(settings));
     localStorage.setItem(LSA,JSON.stringify(autolock));
     savePrefs({autolock});
     await api('/api/settings',settings);
-    closeSettings(); refreshQuote();
+    paintActiveMode(); paintLiveNote(); flashSaved();
+    refreshQuote();               // stays open - closing is the DONE button
   }
 
   async function mirrorToggle(){
@@ -1412,7 +1447,7 @@ const EZ = (function(){
   })();
 
   return {step,buy,close,disarm,hideReject,forgetPosition,disconnect,quitApp,switchAccount,toggleTheme,setTheme,lockNow,
-          openSettings,closeSettings,saveSettings,setStrikeMode,hideEvent,
+          openSettings,closeSettings,applySettings,setStrikeMode,hideEvent,
           mirrorToggle,selectProfile,saveProfile,deleteProfile,pickAccount,
           showTab,toggleStrategy,newStrategy,editStrategy,saveStrategy,deleteStrategy,cancelStrategyEdit,stTypeChanged};
 })();
