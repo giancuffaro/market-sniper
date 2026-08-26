@@ -82,6 +82,10 @@
   .acctrow .t1{display:flex;justify-content:space-between;font-size:15px;font-weight:700;color:var(--txt)}
   .acctrow .t1 .typ{letter-spacing:.1em}
   .acctrow .t1 .bp{color:var(--green)}
+  /* The contract count goes red when the account cannot cover that many. The
+     number itself is the warning - no dollar figure appears, which is the
+     whole point of the percent-only screen. */
+  #qty.over{color:var(--red)}
   .acctrow .t2{color:var(--dim);font-size:12.5px;margin-top:5px}
   .acctrow.fut{opacity:.75}
   .acctrow.fut .typ{color:var(--amber)}
@@ -361,8 +365,6 @@
         <span class="setbtn" style="color:var(--blue,#4aa3e0);border-color:var(--blue,#4aa3e0)" onclick="location.href='http://127.0.0.1:8010'">⇄ FUTURES</span>
         <span class="setbtn" onclick="EZ.openSettings()">CONFIGURATION</span>
         <div class="theme-dots" role="group" aria-label="Theme color"><button class="tdot tdot-white" data-set="light" onclick="EZ.setTheme('light')" aria-label="White theme"></button><button class="tdot tdot-gray" data-set="gray" onclick="EZ.setTheme('gray')" aria-label="Gray theme"></button><button class="tdot tdot-black" data-set="dark" onclick="EZ.setTheme('dark')" aria-label="Black theme"></button></div>
-        <span class="setbtn" title="lock now" onclick="EZ.lockNow()">LOCK</span>
-        <span class="quitbtn" title="Shut down the app" onclick="EZ.quitApp()">✕</span>
       </div>
     </div>
 
@@ -575,6 +577,9 @@
 const EZ = (function(){
   const LSK="ezexec_creds", LSS="ezexec_settings", LSP="ezexec_profiles", LSPA="ezexec_active_profile", LST="ezexec_theme", LSA="ezexec_autolock", LSST="ezexec_strategies";
   let connected=false, marketClosed=false, lastPreview=null;
+  // Buying power is never shown. It exists to answer one question: can this
+  // account cover the number of contracts currently selected?
+  let buyingPower=0, lastAsks={CALLS:null, PUTS:null};
   let sym="QQQ", side="CALLS", qty=1, inTrade=false, poll=null, priceTimer=null, trendTimer=null, velTimer=null;
   let profiles=[], activeProf=null, mirrorOn=false;
   let settings={strike_mode:"ITM2",ratchet_step_pct:10,tp_enabled:false,tp_value:30,tp_unit:"cents",
@@ -818,6 +823,19 @@ const EZ = (function(){
     $('smITM').classList.toggle('on',m==='ITM1');
     $('smITM2').classList.toggle('on',m==='ITM2');
   }
+  // Red means: at this size, the cheapest of the two sides already costs more
+  // than the account has. Judged on the CHEAPER side deliberately - going red
+  // while one side is still affordable would be crying wolf.
+  function paintQtyAfford(){
+    const el=$('qty'); if(!el) return;
+    const asks=[lastAsks.CALLS, lastAsks.PUTS].filter(a=>a!=null && a>0);
+    if(!buyingPower || !asks.length){ el.classList.remove('over'); el.title=''; return; }
+    const cost=Math.min.apply(null,asks)*100*qty;   // 1 contract = 100 shares
+    const over=cost>buyingPower;
+    el.classList.toggle('over',over);
+    el.title=over?'More contracts than this account can cover.':'';
+  }
+
   function setStrikeMode(m){
     settings.strike_mode=m;
     paintStrikeMode(m);
@@ -986,6 +1004,7 @@ const EZ = (function(){
   function step(d){
     if(inTrade)return;
     qty=Math.max(1,qty+d); $('qty').textContent=qty; savePrefs({qty});
+    paintQtyAfford();
     refreshQuote();          // cost on the buttons is per-qty, so it must follow
   }
 
@@ -995,6 +1014,10 @@ const EZ = (function(){
   // Show the contract, or say plainly why it will not be sold to you.
   function paintSide(subId, btnId, q){
     const sub=$(subId), btn=$(btnId);
+    // Remember the ask per side so the CONTRACTS number can tell whether the
+    // account covers the current size. The price itself is never rendered.
+    if(q && q.side) lastAsks[q.side] = (q.detail||q.ask==null) ? null : Number(q.ask);
+    paintQtyAfford();
     if(!q || q.detail){ if(sub) sub.textContent = (q&&q.detail)||'—'; return; }
     const qual = q.quality || {};
     if(q.tradable === false){
@@ -1285,6 +1308,10 @@ const EZ = (function(){
       return `<div class="trow"><span class="t">${t.time}</span><span class="s">${t.desc}</span>
         <span class="mv">${t.move}</span><span class="pl ${up?'up':'dn'}">${up?'+':'−'}${Math.abs(Number(t.pct||0)).toFixed(1)}%</span></div>`;
     }).join('');
+
+    // Kept only to colour the CONTRACTS number. Never displayed.
+    if(st.buying_power!=null) buyingPower=Number(st.buying_power)||0;
+    paintQtyAfford();
 
     const pos=st.position; inTrade=!!pos;
     lockdown(inTrade);

@@ -1050,17 +1050,28 @@ try:
           _sm.returncode == 0, (_sm.stdout + _sm.stderr).strip()[:400])
 
     # And prove the harness can still see that exact failure, or it is theatre.
-    _broken = io.open(os.path.join(HERE, "index.html"), encoding="utf-8").read() \
-        .replace("    const live=!!inTrade;", "    const live=!!position;", 1) \
-        .replace("    $('setScrim').classList.add('show');\n    try{\n    showTab('config')",
-                 "    showTab('config')", 1)
+    # Undo the guard AND reintroduce the undeclared variable, so the throw
+    # propagates exactly as it did when SETTINGS stopped opening.
+    _orig = io.open(os.path.join(HERE, "index.html"), encoding="utf-8").read()
+    _swaps = [
+        ("    const live=!!inTrade;", "    const live=!!position;"),
+        ("$('setScrim').classList.add('show');\n    try{\n    showTab('config')",
+         "showTab('config')"),
+        ("paintLiveNote();\n    }catch(e){ console.error('settings paint failed:', e); }",
+         "paintLiveNote();\n    $('setScrim').classList.add('show');"),
+    ]
+    _broken = _orig
+    for _a, _b in _swaps:
+        check(33, "self-test can rebuild the bug (%s)" % _a.strip()[:34], _a in _broken)
+        _broken = _broken.replace(_a, _b, 1)
     _bp = os.path.join(HERE, "_ui_smoke_selftest.html")
     io.open(_bp, "w", encoding="utf-8").write(_broken)
     try:
         _bad = _sp.run(["node", "ui_smoke.js", "_ui_smoke_selftest.html"],
                        cwd=HERE, capture_output=True, text=True, timeout=60)
+        _out = _bad.stdout + _bad.stderr
         check(33, "the smoke test still catches an undeclared variable",
-              _bad.returncode != 0 and "is not defined" in (_bad.stdout + _bad.stderr))
+              _bad.returncode != 0 and "is not defined" in _out, _out.strip()[:200])
     finally:
         try: os.remove(_bp)
         except OSError: pass
@@ -1070,6 +1081,29 @@ try:
           "$('setScrim').classList.add('show');\n    try{" in _idx)
     check(33, "a painter that throws is logged, not fatal",
           "catch(e){ console.error('settings paint failed:', e); }" in _idx)
+
+    # --- 34. LOCK / quit removed; size warns without showing cash ---------
+    check(34, "the LOCK button is gone from the header", "EZ.lockNow()" not in _idx)
+    check(34, "the quit X is gone", "EZ.quitApp()" not in _idx)
+    # The in-trade lock is a different thing and stays: it is what stops you
+    # pressing BUY again while a position is open.
+    check(34, "the in-trade lock still exists", 'id="lockNote"' in _idx and "lockdown(inTrade)" in _idx)
+    check(34, "CONTRACTS goes red when unaffordable", "#qty.over{color:var(--red)}" in _idx)
+    check(34, "affordability is rechecked when you change size",
+          "$('qty').textContent=qty; savePrefs({qty});\n    paintQtyAfford();" in _idx)
+    check(34, "and when a fresh quote lands", "paintQtyAfford();" in _idx.split("function paintSide",1)[1][:600])
+    check(34, "buying power is read from state but never rendered",
+          "buyingPower=Number(st.buying_power)" in _idx and "$('bp')" not in _idx)
+    # "$" alone would match the $() element helper. What must not appear is a
+    # dollar sign rendered into text.
+    _aff = _idx.split("function paintQtyAfford", 1)[1].split("function setStrikeMode", 1)[0]
+    check(34, "still no dollar figure attached to the warning",
+          "'$" not in _aff and '"$' not in _aff and "$'+" not in _aff)
+    check(34, "the server still supplies buying power",
+          '"buying_power": round(self.buying_power, 2),' in _wc2)
+    # A contract is 100 shares - forgetting the multiplier makes the check
+    # useless, since a $3.00 option would read as $3 against the account.
+    check(34, "cost uses the 100x contract multiplier", "*100*qty" in _idx)
     check(29,"and no premium/time value on the button",
           "% time" not in ix6 and "q.ask.toFixed" not in code6)
 
@@ -1106,7 +1140,7 @@ print("\n"+"="*68)
 by={}
 for sc,name,ok,_ in results:
     by.setdefault(sc,[0,0]); by[sc][0]+=1; by[sc][1]+= (1 if ok else 0)
-T={33:"Page actually runs",32:"No SAVE / live trade frozen",31:"One switch / still modal",30:"Directional entry levels",29:"Percent only, no cash",28:"Grid/ATM/quality/one-armed",27:"Config screen cleanup",26:"Ratchet stop",25:"Console auto-hide",24:"Options auto-reconcile",23:"Daily trade log",22:"Options phantom clear",21:"Auto-reconcile w/ broker",20:"MY CONFIG always on",19:"Phantom position",18:"Futures hours",17:"Closed market honest",16:"Restart leaves no spinner",15:"One tab only",14:"Git lock self-heal",13:"Broker tabs + tray",12:"Velocity honest when shut",11:"Multi-broker sessions",1:"Futures login survives restart",2:"remember_login default",3:"Options profiles to disk",
+T={34:"LOCK/X gone, size warns",33:"Page actually runs",32:"No SAVE / live trade frozen",31:"One switch / still modal",30:"Directional entry levels",29:"Percent only, no cash",28:"Grid/ATM/quality/one-armed",27:"Config screen cleanup",26:"Ratchet stop",25:"Console auto-hide",24:"Options auto-reconcile",23:"Daily trade log",22:"Options phantom clear",21:"Auto-reconcile w/ broker",20:"MY CONFIG always on",19:"Phantom position",18:"Futures hours",17:"Closed market honest",16:"Restart leaves no spinner",15:"One tab only",14:"Git lock self-heal",13:"Broker tabs + tray",12:"Velocity honest when shut",11:"Multi-broker sessions",1:"Futures login survives restart",2:"remember_login default",3:"Options profiles to disk",
    4:"Browser autofill guard",5:"ITM3 strike math",6:"Preview == Arm",7:"Live-only / dead modes",
    8:"Auto-sync safety",9:"Endpoints alive",10:"UI integrity"}
 for sc in sorted(by):
