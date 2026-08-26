@@ -930,7 +930,8 @@ try:
     # Server refuses to hold the two apart, whatever arrives.
     class _One(wb.LiveSession):
         def __init__(self):
-            self.settings = dict(config.DEFAULT_SETTINGS); self.strategies = []
+            import config as _cfg
+            self.settings = dict(_cfg.DEFAULT_SETTINGS); self.strategies = []
         def _enforce_single_mode(self, prefer=None): pass
     _f = _One()
     for _start in (True, False):
