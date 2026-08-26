@@ -41,13 +41,23 @@ except Exception:
     XLSX_AVAILABLE = False
 
 FIELDS = [
-    "date", "time_in", "time_out", "app", "broker", "account",
-    "symbol", "side", "strike", "expiry", "qty",
-    "entry", "exit", "pnl", "pnl_pct", "exit_reason", "held_secs", "note",
+    "date", "time_in", "time_out", "held_secs", "app", "broker", "account",
+    "symbol", "side", "strike", "strike_mode", "expiry", "qty",
+    "entry", "exit", "pnl", "pnl_pct",
+    # How the trade actually travelled, not just where it started and stopped.
+    # best/worst are the high and low water marks while it was open; give_back
+    # is how much of the best was handed back by the time it closed. A ratchet
+    # that is working shows a small gave_back_pct. A big one means the stop was
+    # too far behind the move.
+    "best_pct", "worst_pct", "best_price", "worst_price", "gave_back_pct",
+    "ratchet_stop_pct", "ratchet_step",
+    "exit_reason", "note",
 ]
 
 # Columns that should be numbers in Excel, not text.
-_NUM = {"strike", "qty", "entry", "exit", "pnl", "pnl_pct", "held_secs"}
+_NUM = {"strike", "qty", "entry", "exit", "pnl", "pnl_pct", "held_secs",
+        "best_pct", "worst_pct", "best_price", "worst_price", "gave_back_pct",
+        "ratchet_stop_pct", "ratchet_step"}
 
 
 def _rows():
@@ -60,10 +70,41 @@ def _rows():
         return []
 
 
+def _migrate_header():
+    """Rewrite the CSV if its header is older than FIELDS.
+
+    Appending a row in FIELDS order to a file whose header has FEWER columns
+    silently shifts every value out of its column - the file still opens, it is
+    just wrong, and you would not notice until you tried to read your own
+    numbers back. So the header is checked before every append, and old rows
+    are rewritten with blanks in the new columns.
+    """
+    if not os.path.exists(CSV_PATH):
+        return
+    try:
+        with open(CSV_PATH, "r", encoding="utf-8", newline="") as f:
+            rdr = csv.reader(f)
+            head = next(rdr, None)
+        if head is None or head == FIELDS:
+            return
+        with open(CSV_PATH, "r", encoding="utf-8", newline="") as f:
+            old = list(csv.DictReader(f))
+        with open(CSV_PATH, "w", encoding="utf-8", newline="") as f:
+            w = csv.DictWriter(f, fieldnames=FIELDS)
+            w.writeheader()
+            for r in old:
+                w.writerow({k: r.get(k, "") for k in FIELDS})
+        print("[trade_log] header upgraded: %d -> %d columns, %d rows kept"
+              % (len(head), len(FIELDS), len(old)), flush=True)
+    except Exception as e:                                   # noqa: BLE001
+        print("[trade_log] header migration skipped: %s" % str(e)[:120], flush=True)
+
+
 def record(trade):
     """Append ONE closed trade. Never raises - logging must not break trading."""
     try:
         os.makedirs(LOG_DIR, exist_ok=True)
+        _migrate_header()
         row = {k: trade.get(k, "") for k in FIELDS}
         row["date"] = row["date"] or dt.date.today().isoformat()
         new_file = not os.path.exists(CSV_PATH)
