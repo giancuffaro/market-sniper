@@ -727,7 +727,7 @@ const EZ = (function(){
 
   ['click','keydown','touchstart'].forEach(ev=>document.addEventListener(ev,()=>{lastActivity=Date.now();}));
   setInterval(()=>{
-    if(!autolock.enabled) return;
+    if(!autolock.enabled) return;   // AUTO-LOCK removed from the UI - never true now
     if($('dash').classList.contains('hidden')) return;
     if(inTrade) return;
     if(Date.now()-lastActivity > autolock.minutes*60000) lockNow(true);
@@ -772,8 +772,6 @@ const EZ = (function(){
     settings.ratchet_enabled=$('ratchetEnabled').checked;
     settings.ratchet_step_pct=Math.max(1,Math.min(parseFloat($('ratchetStep').value)||10,100));
     localStorage.setItem(LSS,JSON.stringify(settings));
-    autolock.enabled=$('alEnabled').checked;
-    autolock.minutes=Math.max(1,parseInt($('alMinutes').value)||10);
     localStorage.setItem(LSA,JSON.stringify(autolock));
     savePrefs({autolock});
     await api('/api/settings',settings);
@@ -1299,7 +1297,7 @@ const EZ = (function(){
   })();
 
   return {step,buy,close,disarm,hideReject,forgetPosition,disconnect,quitApp,switchAccount,toggleTheme,setTheme,lockNow,
-          openSettings,closeSettings,saveSettings,setStrikeMode,hideEvent,tpUnitChanged,
+          openSettings,closeSettings,saveSettings,setStrikeMode,hideEvent,
           mirrorToggle,selectProfile,saveProfile,deleteProfile,pickAccount,
           showTab,toggleStrategy,newStrategy,editStrategy,saveStrategy,deleteStrategy,cancelStrategyEdit,stTypeChanged};
 })();
