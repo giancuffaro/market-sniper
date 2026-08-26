@@ -915,7 +915,20 @@ class BaseSession:
                 "pnl_pct": (round((float(exit_price) - p["entry"]) / p["entry"] * 100, 2)
                             if p.get("entry") else ""),
                 "exit_reason": p.get("exit_reason") or ("ESTIMATED" if estimated else "CLOSE"),
-                "held_secs": "",
+                # How good and how bad it ever got. Together with exit_reason
+                # these answer whether the ratchet earned its keep on this trade.
+                "best_pct": p.get("best_pct", ""),
+                "worst_pct": p.get("worst_pct", ""),
+                "best_price": p.get("best_price", ""),
+                "worst_price": p.get("worst_price", ""),
+                "gave_back_pct": (round(p["best_pct"] - ((float(exit_price) - p["entry"])
+                                  / p["entry"] * 100.0), 2)
+                                  if p.get("best_pct") and p.get("entry") else ""),
+                "ratchet_stop_pct": (p.get("ratchet") or {}).get("stop_pct", ""),
+                "ratchet_step": p.get("ratchet_step", ""),
+                "strike_mode": self.settings.get("strike_mode", ""),
+                "held_secs": (int(time.time() - p["opened_ts"])
+                              if p.get("opened_ts") else ""),
                 "note": "price estimated until Webull confirms the fill" if estimated else "",
             })
         except Exception as e:                               # noqa: BLE001
@@ -1344,6 +1357,7 @@ class LiveSession(BaseSession):
                          "option_type": q["option_type"], "expiration": _expiry_for(symbol),
                          "entry": q["ask"], "mark": q["ask"],
                          "opened_at": dt.datetime.now().strftime("%H:%M"),
+                         "opened_ts": time.time(),
                          "client_order_id": orders[0]["client_order_id"],
                          "fill_checked": 0,
                          # THE TERMS OF THIS TRADE, frozen at the moment it
@@ -1402,10 +1416,38 @@ class LiveSession(BaseSession):
                 p["spot"] = quotes.get_price(p["symbol"])["price"]
             p["pnl"] = round((p["mark"] - p["entry"]) * 100 * p["qty"], 2)
             p["pnl_pct"] = round((p["mark"] - p["entry"]) / p["entry"] * 100, 1)
+            self._track_excursion(p)
             self._maybe_auto_close()
         except Exception:
             pass
         return self.position
+
+    @staticmethod
+    def _track_excursion(p):
+        """Best and worst this trade ever got to, in premium and in percent.
+
+        The high-water mark already existed but only inside the ratchet, so it
+        was only tracked when the ratchet was on and vanished when the trade
+        closed. These live on the position itself and get written to the log,
+        which is what makes "did the ratchet actually work" answerable after
+        the fact: if best was +38% and the trade closed at +20%, the stop did
+        its job; if best was +38% and it closed at -10%, it did not.
+        """
+        entry, mark = p.get("entry"), p.get("mark")
+        if not entry or mark is None:
+            return
+        pct = (mark - entry) / entry * 100.0
+        if p.get("best_price") is None or mark > p["best_price"]:
+            p["best_price"] = mark
+            p["best_pct"] = round(pct, 2)
+        if p.get("worst_price") is None or mark < p["worst_price"]:
+            p["worst_price"] = mark
+            p["worst_pct"] = round(pct, 2)
+        # Never let the best read below zero or the worst above it: a trade that
+        # only ever went up still has a worst of 0, which is the truth - you
+        # were never down.
+        p["best_pct"] = max(p.get("best_pct", 0.0), 0.0)
+        p["worst_pct"] = min(p.get("worst_pct", 0.0), 0.0)
 
     def close(self):
         if not self.position:
