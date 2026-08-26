@@ -549,7 +549,7 @@ const EZ = (function(){
   const $=id=>document.getElementById(id);
   const api=(p,b)=>fetch(p,{method:b?'POST':'GET',headers:{'Content-Type':'application/json'},
                            body:b?JSON.stringify(b):undefined}).then(r=>r.json());
-  const money=n=>(n<0?'−$':'+$')+Math.abs(n).toFixed(2);
+  // money() removed - this screen shows percentages only, never cash.
 
   // Settings are NOT read from localStorage any more. my-settings.json on disk
   // is the one source of truth.
@@ -924,8 +924,6 @@ const EZ = (function(){
 
   // 720.0 -> "720", but TSLA's 2.50 step must keep its half: 332.5 -> "332.5"
   const fmtStrike=v=>(v==null?'—':(Number(v)%1===0?String(Math.round(v)):Number(v).toFixed(1)));
-  // What this trade actually costs: one contract controls 100 shares.
-  const fmtCost=ask=>'$'+Math.round(Number(ask)*100*qty).toLocaleString();
 
   // Show the contract, or say plainly why it will not be sold to you.
   function paintSide(subId, btnId, q){
