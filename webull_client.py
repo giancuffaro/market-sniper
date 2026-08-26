@@ -1263,11 +1263,26 @@ class LiveSession(BaseSession):
         if spread_pct is not None and spread_pct > config.CONTRACT_MAX_SPREAD_PCT:
             bad.append("bid/ask spread is %.0f%% (max %.0f%%) — you would be down that "
                        "much the instant you fill" % (spread_pct, config.CONTRACT_MAX_SPREAD_PCT))
+        # EXTRINSIC IS A WARNING, NOT A BLOCK.
+        #
+        # This used to refuse the order and it was wrong. Extrinsic percentage
+        # is not a measure of a bad contract - it measures how close spot is to
+        # the strike and how much time is left, and both of those are inherent
+        # to 0DTE. Right at the open almost everything is 90%+ time value; an
+        # ITM1 with price sitting a nickel from the strike is 95% by
+        # arithmetic, not because it is junk. Blocking on it meant the app
+        # refused to trade at exactly the hour there is most to trade.
+        #
+        # The thing that genuinely has no value is a FULLY out-of-the-money
+        # contract, and intrinsic <= 0 above already blocks that outright.
+        warn = []
         if extrinsic_pct > config.CONTRACT_MAX_EXTRINSIC_PCT:
-            bad.append("%.0f%% of this premium is time value (max %.0f%%) and it "
-                       "decays to zero at expiry — only $%.2f of the $%.2f is real"
-                       % (extrinsic_pct, config.CONTRACT_MAX_EXTRINSIC_PCT, intrinsic, ask))
+            warn.append("%.0f%% of this premium is time value — only $%.2f of the "
+                        "$%.2f is real. Normal near the money and early in the day; "
+                        "it decays fastest in the last hour."
+                        % (extrinsic_pct, intrinsic, ask))
         return {"ok": not bad,
+                "warnings": warn,
                 "intrinsic": round(intrinsic, 4),
                 "extrinsic": round(extrinsic, 4),
                 "extrinsic_pct": round(extrinsic_pct, 1),

@@ -106,10 +106,12 @@ CONTRACT_MIN_PREMIUM     = 0.20   # under ~20c the spread alone eats the trade
 CONTRACT_MAX_SPREAD_PCT  = 15.0   # (ask-bid)/mid. 20% spread = down 20% on fill
 CONTRACT_REQUIRE_INTRINSIC = True # the real rule: never buy a fully-OTM contract
 
-# Backstop, deliberately loose. The FIRST version of this capped extrinsic at
-# 60%, which blocked ATM1 outright - at-the-money 0DTE is mostly time value by
-# definition, so that rule made the ATM button unusable. Being fully OTM is the
-# thing that kills you, not having time value, so that is what gets blocked and
-# this only catches the extreme tail.
+# WARNING THRESHOLD ONLY - this no longer blocks anything.
+# It was a block, at 60%, then 88%, and both were wrong for the same reason:
+# extrinsic % measures distance-to-strike and time-remaining, not quality. At
+# the open nearly every 0DTE is 90%+ time value, and an ITM1 sitting a nickel
+# from the strike is 95% by arithmetic. The rule refused trades at the busiest
+# hour of the day. Being fully OUT of the money is what actually has no value,
+# and CONTRACT_REQUIRE_INTRINSIC blocks that outright.
 CONTRACT_MAX_EXTRINSIC_PCT = 88.0
 CONTRACT_QUALITY_ENFORCED = True  # False = warn in the payload but allow it
