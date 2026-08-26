@@ -1073,8 +1073,18 @@ try:
         check(33, "the smoke test still catches an undeclared variable",
               _bad.returncode != 0 and "is not defined" in _out, _out.strip()[:200])
     finally:
-        try: os.remove(_bp)
-        except OSError: pass
+        # This file is a deliberately BROKEN copy of index.html. If the delete
+        # ever fails it must not be left sitting in the app folder, where
+        # auto-sync will happily commit it - park it in _trash, which the
+        # launcher wipes on every start.
+        try:
+            os.remove(_bp)
+        except OSError:
+            try:
+                _t = os.path.join(HERE, "_trash"); os.makedirs(_t, exist_ok=True)
+                shutil.move(_bp, os.path.join(_t, "_ui_smoke_selftest.html"))
+            except Exception:
+                pass
 
     # The guard that keeps one bad painter from locking you out of settings.
     check(33, "settings open BEFORE anything is painted",
