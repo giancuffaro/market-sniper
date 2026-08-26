@@ -219,7 +219,15 @@
      clicking the page background beside the app column wouldn't close the popup */
   .scrim{position:fixed;inset:0;background:rgba(0,0,0,.6);display:none;align-items:center;justify-content:center;padding:22px;z-index:5}
   .scrim.show{display:flex}
-  .smodal{width:100%;max-width:410px;border:1px solid var(--line);border-radius:16px;background:var(--panel);padding:24px 20px;max-height:90vh;overflow-y:auto}
+  /* Fixed height, not content height. The modal is vertically centred, so a
+     tall tab and a short tab used to centre at different points and the whole
+     window - tab strip included - jumped every time you switched. Now the
+     frame never changes size: title and tabs are pinned, only .panes scrolls. */
+  .smodal{width:100%;max-width:410px;border:1px solid var(--line);border-radius:16px;
+          background:var(--panel);padding:24px 20px;height:min(90vh,760px);
+          display:flex;flex-direction:column}
+  .panes{flex:1;min-height:0;overflow-y:auto;margin:0 -4px;padding:0 4px}
+  .smodal h2,.smodal .tabs,.smodal .activemode,.smodal .sactions{flex:none}
   .smodal h2{margin:0 0 16px;font-size:15px;letter-spacing:.2em;color:var(--txt);text-align:center}
   .sgroup{border:1px solid var(--line);border-radius:12px;padding:14px;margin-bottom:12px}
   /* ABSOLUTE ENTRY — deliberately a different typeface so you know it's yours */
@@ -239,6 +247,19 @@
   .srow select{background:var(--panel2);border:1px solid var(--line);border-radius:8px;color:var(--txt);font-family:var(--ui);font-size:14px;padding:10px;max-width:170px;flex:1}
   .srow label.tog{display:flex;align-items:center;gap:8px;color:var(--dim);font-size:12.5px;cursor:pointer}
   .srow input[type=checkbox]{width:16px;height:16px;accent-color:var(--green)}
+  /* Toggle switch. The checkbox itself stays in the DOM (hidden) so every
+     .checked read and write in the JS keeps working untouched. */
+  .sw{position:relative;display:inline-block;width:46px;height:25px;flex:none}
+  .sw input{position:absolute;opacity:0;width:0;height:0;margin:0}
+  .sw i{position:absolute;inset:0;border-radius:999px;background:var(--panel2);
+        border:1px solid var(--line);transition:background .16s,border-color .16s}
+  .sw i:after{content:"";position:absolute;left:3px;top:3px;width:17px;height:17px;
+        border-radius:50%;background:var(--dim);transition:transform .16s,background .16s}
+  .sw input:checked + i{background:var(--green-deep);border-color:var(--green)}
+  .sw input:checked + i:after{transform:translateX(21px);background:var(--green)}
+  .sw input:focus-visible + i{outline:2px solid var(--green);outline-offset:2px}
+  label.tog .lbl{font-weight:700;letter-spacing:.06em}
+  .srow input:checked ~ .lbl,label.tog input:checked ~ .lbl{color:var(--green)}
   .srow .mini{border:1px solid var(--green);background:var(--green-deep);color:var(--green);border-radius:8px;padding:10px 12px;font-family:var(--ui);font-size:11.5px;font-weight:700;cursor:pointer;white-space:nowrap}
   .srow .mini.off{border-color:var(--red);background:var(--red-deep);color:var(--red)}
   .strikeopts{display:flex;gap:8px}
@@ -437,30 +458,34 @@
 
       <div id="activeMode" class="activemode manual"></div>
 
+      <div class="panes">
       <div id="paneConfig" class="pane">
       <div class="sgroup mine myfont">
         <div class="glbl">★ ABSOLUTE ENTRY with RATCHET TRAILING</div>
         <div class="srow">
-          <label class="tog"><input type="checkbox" id="myEnabled"> ABSOLUTE ENTRY</label>
-        </div>
-        <div class="shint myfont">Waits for the underlying to reach the nearest level,
-        then buys. Levels are <b>every whole dollar</b> plus the <b>X2.50 and X7.50</b>
-        halves — 707.00, 707.50, 708.00, 709.00 … 712.00, <b>712.50</b>, 713.00.
-        That is the entry — the exit belongs to the ratchet below.</div>
-
-        <div class="srow" style="margin-top:10px">
-          <label class="tog"><input type="checkbox" id="ratchetEnabled"> RATCHET TRAILING</label>
+          <label class="tog"><span class="sw"><input type="checkbox" id="myEnabled"><i></i></span>
+            <span class="lbl">ABSOLUTE ENTRY + RATCHET</span></label>
           <span style="flex:1"></span>
           step <input id="ratchetStep" type="number" min="1" max="100" step="1" value="10"
                      style="width:60px;text-align:center"> %
         </div>
-        <div class="shint myfont">The stop climbs and never comes back down. It always sits
+        <div class="shint myfont"><b>The entry.</b> Waits for the underlying to reach the
+        level in front of price, then buys. Levels are <b>every whole dollar</b> plus the
+        <b>X2.50 and X7.50</b> halves — 707.00, 707.50, 708.00 … 712.00, <b>712.50</b>, 713.00.
+        Calls wait for the level at or <b>below</b> price, puts at or <b>above</b>.</div>
+
+        <div class="shint myfont" style="margin-top:9px"><b>The exit.</b> One switch, because
+        an entry with no exit is not a system. The stop climbs and never comes back down.
+        It always sits
         <b>one step below the best you have seen</b>:<br>
         best 0% → stop <b>−10%</b> · +10% → <b>breakeven</b> · +20% → <b>+10%</b> ·
         +30% → <b>+20%</b> … no cap.<br>
         Percent is of the <b>premium you paid</b>. Reaching +10% does <b>not</b> close you —
         it moves the stop to breakeven. The trade ends when price falls back into the
         stop, or you press CLOSE.</div>
+        <div class="shint myfont" style="margin-top:9px;opacity:.7">Switched off, the buy
+        buttons fire instantly at the ask and <b>nothing manages the exit</b> — you are
+        closing it by hand.</div>
       </div>
 
       <div class="sgroup">
@@ -526,6 +551,7 @@
         Each places ONE entry per day when its condition is met, then manages it with the
         take-profit and stop you set. You can enable several at once. Start with one contract.</div>
       </div>
+      </div><!-- /panes -->
 
       <div class="sactions">
         <button class="scancel" onclick="EZ.closeSettings()">CANCEL</button>
@@ -754,9 +780,11 @@ const EZ = (function(){
     showTab('config'); cancelStrategyEdit(); renderStrategies();
     paintStrikeMode(settings.strike_mode);
     paintActiveMode();
-    $('ratchetEnabled').checked=!!settings.ratchet_enabled;
     $('ratchetStep').value=settings.ratchet_step_pct||10;
-    $('myEnabled').checked=!!settings.my_enabled;
+    // ONE switch now. Entry and ratchet are a single feature, so a saved file
+    // where only one of them is true still lights the switch - and saving
+    // writes them back in step.
+    $('myEnabled').checked = !!(settings.my_enabled || settings.ratchet_enabled);
     // TAKE PROFIT / STOP LOSS / AUTO-LOCK were removed from the screen: the
     // ratchet owns the exit now. The settings still exist server-side because
     // STRATEGIES uses tp/sl per strategy - they are simply not hand-edited.
@@ -788,7 +816,7 @@ const EZ = (function(){
       strategies.forEach(x=>x.enabled=false);   // entry wins; server agrees
       persistStrategies(); renderStrategies();
     }
-    settings.ratchet_enabled=$('ratchetEnabled').checked;
+    settings.ratchet_enabled=settings.my_enabled;   // one switch, both halves
     settings.ratchet_step_pct=Math.max(1,Math.min(parseFloat($('ratchetStep').value)||10,100));
     localStorage.setItem(LSS,JSON.stringify(settings));
     localStorage.setItem(LSA,JSON.stringify(autolock));
@@ -1096,7 +1124,7 @@ const EZ = (function(){
     const el=$('stratList'); if(!el) return;
     el.innerHTML = strategies.map(s=>`
       <div class="scard ${s.enabled?'act':''}">
-        <label class="stitle"><input type="checkbox" ${s.enabled?'checked':''} onchange="EZ.toggleStrategy('${s.id}')"> ${s.name}</label>
+        <label class="stitle"><span class="sw"><input type="checkbox" ${s.enabled?'checked':''} onchange="EZ.toggleStrategy('${s.id}')"><i></i></span> ${s.name}</label>
         <div class="sdesc">${s.desc||''}</div>
         <div class="scardft"><span class="stag">${s.symbol} · ${trigSummary(s)} · ×${s.qty} · TP ${s.tp_value}${s.tp_unit==='whole'?'w':s.tp_unit==='pct'?'%':'¢'} · SL ${s.sl_value}${s.sl_unit==='pct'?'%':'¢'}</span>
           <button onclick="EZ.editStrategy('${s.id}')">EDIT</button></div>
@@ -1120,14 +1148,15 @@ const EZ = (function(){
     if(turningOn){
       strategies.forEach(x=>{ x.enabled = (x.id===id); });
       settings.my_enabled = false;
+      settings.ratchet_enabled = false;
       $('myEnabled').checked = false;
-      api('/api/settings',{my_enabled:false});
+      api('/api/settings',{my_enabled:false, ratchet_enabled:false});
     }else{
       s.enabled = false;
     }
     persistStrategies(); renderStrategies(); paintActiveMode();
     showEvent(turningOn
-      ? `"${s.name}" is now the ONLY thing armed — ABSOLUTE ENTRY switched off`
+      ? `"${s.name}" is now the ONLY thing armed — ABSOLUTE ENTRY + RATCHET switched off`
       : `"${s.name}" turned off — nothing is armed, buys are manual`);
   }
 
