@@ -485,8 +485,9 @@ class BaseSession:
 
     def _update_ratchet(self):
         """Track the best % this trade has seen and where the stop now sits."""
-        p, s = self.position, self.settings
-        if not (p and s.get("ratchet_enabled")):
+        p = self.position
+        # p["ratchet_on"], not settings: a trade keeps the terms it opened with.
+        if not (p and p.get("ratchet_on", self.settings.get("ratchet_enabled"))):
             return
         if not p.get("entry"):
             return
@@ -494,7 +495,9 @@ class BaseSession:
         # High-water mark. It only ever goes UP, which is what makes the stop
         # a ratchet rather than something that can loosen again.
         p["peak_pct"] = max(p.get("peak_pct", 0.0), pct)
-        lv = self.ratchet_levels(p["peak_pct"], s.get("ratchet_step_pct", 10.0))
+        lv = self.ratchet_levels(p["peak_pct"],
+                                 p.get("ratchet_step",
+                                       self.settings.get("ratchet_step_pct", 10.0)))
         p["ratchet"] = {**lv, "pct": round(pct, 2),
                         "stop_price": round(p["entry"] * (1 + lv["stop_pct"] / 100.0), 4),
                         "next_price": round(p["entry"] * (1 + lv["next_pct"] / 100.0), 4)}
@@ -509,7 +512,7 @@ class BaseSession:
         # the stop moves to breakeven. Leaving the old take-profit live would
         # close the trade at the exact moment the ratchet is trying to let it
         # run, so the two cannot both be active.
-        if s.get("ratchet_enabled") and p.get("entry"):
+        if p.get("ratchet_on", s.get("ratchet_enabled")) and p.get("entry"):
             self._update_ratchet()
             r = p.get("ratchet") or {}
             if r and r["pct"] <= r["stop_pct"]:
@@ -1322,7 +1325,15 @@ class LiveSession(BaseSession):
                          "entry": q["ask"], "mark": q["ask"],
                          "opened_at": dt.datetime.now().strftime("%H:%M"),
                          "client_order_id": orders[0]["client_order_id"],
-                         "fill_checked": 0}
+                         "fill_checked": 0,
+                         # THE TERMS OF THIS TRADE, frozen at the moment it
+                         # opened. There is no SAVE button any more - every
+                         # control writes the instant you touch it - so without
+                         # this, nudging the step from 10 to 25 while a trade
+                         # was live would move the stop underneath a position
+                         # already running. Settings change the NEXT trade.
+                         "ratchet_on": bool(self.settings.get("ratchet_enabled")),
+                         "ratchet_step": float(self.settings.get("ratchet_step_pct") or 10.0)}
         self._decorate_position(q)
         self.last_event = (f"ORDER SENT — BUY {qty} × {symbol} {int(q['strike'])}"
                            f"{'C' if side=='CALLS' else 'P'} limit ${limit:.2f} "
