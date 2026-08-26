@@ -82,9 +82,18 @@ def first_otm_strike(spot, side, step):
     return math.ceil(spot / step) * step - step
 
 def parse_strike_mode(mode):
-    """'ITM3' -> ('ITM', 3). Anything unreadable falls back to ('OTM', 1)."""
-    m = str(mode or "OTM1").upper().strip()
-    kind = "ITM" if m.startswith("ITM") else "OTM"
+    """'ITM3' -> ('ITM', 3), 'ATM1' -> ('ATM', 1).
+
+    Anything unreadable falls back to ('ITM', 1) - erring toward a contract with
+    intrinsic value rather than a lottery ticket.
+    """
+    m = str(mode or "ITM1").upper().strip()
+    if m.startswith("ATM"):
+        kind = "ATM"
+    elif m.startswith("OTM"):
+        kind = "OTM"
+    else:
+        kind = "ITM"
     try:
         depth = int(m[3:] or 1)
     except ValueError:
@@ -105,6 +114,18 @@ def pick_strike(spot, side, step, mode="OTM1"):
         PUTS  -> floor(724) + 3 = 727   (above spot, already in the money)
     """
     kind, depth = parse_strike_mode(mode)
+
+    if kind == "ATM":
+        # Nearest strike to spot, but NEVER out of the money. If the nearest
+        # lands OTM we step one in, so an ATM pick always carries some intrinsic
+        # value instead of being pure time premium that expires worthless.
+        near = round(spot / step) * step
+        if side == "CALLS" and near > spot:
+            near -= step                       # above spot = OTM call -> step in
+        elif side == "PUTS" and near < spot:
+            near += step                       # below spot = OTM put  -> step in
+        return round(near, 4)
+
     if kind == "ITM":
         if side == "CALLS":
             return math.ceil(spot / step) * step - depth * step
@@ -387,7 +408,7 @@ class BaseSession:
             # Accept any ITM/OTM depth (ITM1..ITM20, OTM1..OTM20). Rebuilt from
             # the parsed pair so a typo can't reach the order path as-is.
             kind, depth = parse_strike_mode(new["strike_mode"])
-            s["strike_mode"] = "%s%d" % (kind, depth)
+            s["strike_mode"] = "%s%d" % (kind, 1 if kind == "ATM" else depth)
         if "tp_enabled" in new: s["tp_enabled"] = bool(new["tp_enabled"])
         if "sl_enabled" in new: s["sl_enabled"] = bool(new["sl_enabled"])
         if "my_enabled" in new: s["my_enabled"] = bool(new["my_enabled"])
@@ -541,14 +562,32 @@ class BaseSession:
             return None
 
     @staticmethod
+    def entry_levels_near(spot, span=3):
+        """Every ABSOLUTE ENTRY level within a few dollars of `spot`.
+
+        The grid is every WHOLE dollar, plus the half-dollar levels that land on
+        X2.50 and X7.50 - so 707.00, 707.50, 708.00 ... 712.00, 712.50, 713.00,
+        but NOT 708.50 or 709.50.
+        """
+        base = int(math.floor(spot))
+        out = []
+        for d in range(base - span, base + span + 1):
+            out.append(float(d))
+            if d % 10 in (2, 7):            # ...2.50 and ...7.50 only
+                out.append(d + 0.5)
+        return sorted(out)
+
+    @staticmethod
     def entry_target(spot):
-        """The underlying level a MY CONFIG entry fires at: nearest whole dollar.
+        """The underlying level an ABSOLUTE ENTRY fires at: the nearest level on
+        the grid above.
 
         Single source of truth. arm() uses it to set the real trigger and
         preview_entry() uses it to show you that trigger beforehand, so the
         number on screen can never drift away from the number that fires.
         """
-        return float(round(spot))
+        spot = float(spot)
+        return min(LiveSession.entry_levels_near(spot), key=lambda lv: (abs(lv - spot), lv))
 
     def preview_entry(self, symbol, side):
         """What an armed entry WOULD do at the current price. Sends nothing.
