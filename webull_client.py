@@ -424,8 +424,15 @@ class BaseSession:
         # POST. The dangerous half is entry ON with ratchet OFF: that buys on
         # its own and then manages nothing.
         if "my_enabled" in new or "ratchet_enabled" in new:
-            s["ratchet_enabled"] = s["my_enabled"] = bool(
-                s.get("my_enabled") or s.get("ratchet_enabled"))
+            # Whichever key ARRIVED decides, and the other follows it.
+            # OR-ing the two instead looks reasonable and is not: sending
+            # my_enabled=false while a stale ratchet_enabled=true sat in the
+            # settings would OR back to true, and the switch could never be
+            # turned off. my_enabled wins a disagreement - it is the key the
+            # single on-screen switch is bound to.
+            want = bool(new["my_enabled"] if "my_enabled" in new
+                        else new["ratchet_enabled"])
+            s["my_enabled"] = s["ratchet_enabled"] = want
         if "ratchet_step_pct" in new:
             try:
                 s["ratchet_step_pct"] = max(1.0, min(float(new["ratchet_step_pct"]), 100.0))
