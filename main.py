@@ -358,6 +358,17 @@ def set_strategies(req: dict):
             pass
     return {"ok": True, "strategies": strategies}
 
+@app.get("/api/tradelog")
+def tradelog(days: int = 7):
+    """Recent per-day totals, straight from the trade log."""
+    try:
+        import trade_log
+        return {"ok": True, "path": trade_log.XLSX_PATH,
+                "days": trade_log.summary(days)}
+    except Exception as e:                                   # noqa: BLE001
+        return {"ok": False, "reason": str(e)[:140]}
+
+
 @app.post("/api/position/forget")
 def forget_position():
     """Clear a position the broker doesn't actually have. Sends NOTHING to Webull."""

@@ -113,6 +113,13 @@ def start_tray():
     def _open(url):
         return lambda icon, item: webbrowser.open(url)
 
+    def _open_trades(icon, item):
+        path = os.path.join(HERE, "logs", "Market Sniper Trade Log.xlsx")
+        try:
+            os.startfile(path)
+        except Exception:
+            webbrowser.open("file:///" + path.replace("\\", "/"))
+
     def _open_log(icon, item):
         path = os.path.join(HERE, "logs", "auto-sync.log")
         try:
@@ -129,6 +136,7 @@ def start_tray():
         pystray.MenuItem("Open OPTIONS  (8000)", _open("http://127.0.0.1:8000"), default=True),
         pystray.MenuItem("Open FUTURES  (8010)", _open("http://127.0.0.1:8010")),
         pystray.Menu.SEPARATOR,
+        pystray.MenuItem("Open trade log (Excel)", _open_trades),
         pystray.MenuItem("View sync log", _open_log),
         pystray.Menu.SEPARATOR,
         pystray.MenuItem("Quit Market Sniper", _quit),

@@ -796,6 +796,8 @@ class BaseFuturesSession:
 
     def _maybe_auto_close(self):
         hit = self._bracket_hit()
+        # Remember WHY, so the trade log says TP / SL / TRAIL instead of CLOSE.
+        self._exit_reason = hit or "CLOSE"
         if not hit:
             return
         try:
