@@ -583,16 +583,30 @@ class BaseSession:
         return sorted(out)
 
     @staticmethod
-    def entry_target(spot):
-        """The underlying level an ABSOLUTE ENTRY fires at: the nearest level on
-        the grid above.
+    def entry_target(spot, side="CALLS"):
+        """The underlying level an ABSOLUTE ENTRY fires at. DIRECTIONAL.
+
+        CALLS wait for the nearest level at or BELOW spot - you buy the dip to
+        support. PUTS wait for the nearest level at or ABOVE - you buy the push
+        into resistance. Whole dollars plus the .50 levels on the 2s and 7s.
+
+        It has to be directional, because _maybe_trigger_entry asks
+        "spot <= target" for calls and "spot >= target" for puts. Return the
+        NEAREST level instead and at spot 709.80 the call target is 710.00,
+        which is already >= spot - so it would fire the instant you armed it,
+        having waited for nothing.
 
         Single source of truth. arm() uses it to set the real trigger and
-        preview_entry() uses it to show you that trigger beforehand, so the
-        number on screen can never drift away from the number that fires.
+        preview_entry() uses it to show that trigger beforehand, so the number
+        on screen can never drift from the number that fires.
         """
         spot = float(spot)
-        return min(LiveSession.entry_levels_near(spot), key=lambda lv: (abs(lv - spot), lv))
+        levels = LiveSession.entry_levels_near(spot, span=4)
+        if str(side).upper() == "CALLS":
+            at_or_below = [lv for lv in levels if lv <= spot + 1e-9]
+            return at_or_below[-1] if at_or_below else levels[0]
+        at_or_above = [lv for lv in levels if lv >= spot - 1e-9]
+        return at_or_above[0] if at_or_above else levels[-1]
 
     def preview_entry(self, symbol, side):
         """What an armed entry WOULD do at the current price. Sends nothing.
@@ -605,7 +619,7 @@ class BaseSession:
         if spot is None:
             return {"ok": False, "reason": "no underlying price available"}
 
-        target = self.entry_target(spot)
+        target = self.entry_target(spot, side)
         step = config.SYMBOLS.get(symbol, {}).get("strike_step", 1.0)
         mode = self.settings.get("strike_mode", "OTM1")
 
@@ -637,7 +651,7 @@ class BaseSession:
         spot = self._underlying(symbol)
         if spot is None:
             raise OrderRejected("no underlying price available to arm the entry")
-        target = self.entry_target(spot)    # closest round number
+        target = self.entry_target(spot, side)   # the level in FRONT of price
         s = self.settings
         s["my_enabled"] = True
         # The RATCHET owns the exit when it is on, so do not also arm a
@@ -673,11 +687,12 @@ class BaseSession:
                 # not the noisy fill price — that's the whole point of MY CONFIG.
                 p["entry_round"] = a["target"]
                 p["tp_spot"] = a["target"] + 1.0 if a["side"] == "CALLS" else a["target"] - 1.0
+            # .2f, not .0f: half-levels are real targets and 707.50 printed as
+            # "708" is a different price than the one that actually fired.
             self.last_event = (f"ENTRY TRIGGERED — {a['symbol']} reached "
-                               f"{a['target']:.0f}, bought {a['side']} at the ask "
-                               f"(TP {p['tp_spot']:.0f} · 10% stop)")
+                               f"{a['target']:.2f}, bought {a['side']} at the ask")
         except OrderRejected as e:
-            self.last_event = f"MY CONFIG entry blocked at {a['target']:.0f}: {e}"
+            self.last_event = f"ABSOLUTE ENTRY blocked at {a['target']:.2f}: {e}"
 
     # ---- Strategy engine: conditions that auto-execute --------------------
     def _enforce_single_mode(self, prefer=None):
