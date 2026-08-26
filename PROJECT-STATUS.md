@@ -1,5 +1,5 @@
 # MARKET SNIPER — Project Status
-Current version **v3.9** (renamed from EZEXECUTION → Option Sniper → Market Sniper)
+Current version **v4.0** (renamed from EZEXECUTION → Option Sniper → Market Sniper)
 
 ## Proven with real money
 - LIVE connect, multi-account picker (stacked rows w/ full ID + buying power)
@@ -12,6 +12,60 @@ Current version **v3.9** (renamed from EZEXECUTION → Option Sniper → Market 
 - Entry preview: shows the underlying trigger level + resolved strike before you ARM
 - VELOCITY strip on both apps (tape.py)
 - Futures app (MNQ/MES, trailing stop) — separate, port 8010
+
+## v4.0 changes
+
+**Daily trade log.** One workbook, `logs/Market Sniper Trade Log.xlsx`, appended
+forever - never a file per day. TRADES has every closed trade with the exit
+reason (TP / SL / CLOSE); BY DAY has trades, wins, losses, win rate and net P&L
+per day. Options and futures both feed it.
+The real record is `logs/trades.csv` and the xlsx is REBUILT from it. That is
+deliberate: on Windows an open workbook is LOCKED, so if the xlsx were the only
+copy, closing a trade with the sheet open would lose it permanently. The CSV
+append happens first and always succeeds; the sheet catches up later.
+
+**Phantom positions clear themselves, both apps.** Close a trade by hand at the
+broker and the app used to keep managing a trade that no longer existed - and a
+TP/SL firing then sends a close for contracts you do not hold, which does not
+flatten anything, it OPENS a position the other way. Both apps now ask the
+broker what is actually held (ProjectX `searchOpen`; the Webull SDK call is
+found by runtime inspection since it gets renamed between versions) and clear
+themselves within ~3s. Runs BEFORE any bracket can fire.
+None and [] are treated differently throughout: [] is "the broker says you hold
+nothing", None is "the question failed". A failed question is never read as a
+flat account, or one network blip would drop a live trade off the screen.
+A manual "Closed it yourself? CLEAR IT" button remains in both apps - it used to
+render only inside the rejection box, which never appears when you close by
+hand, so the escape hatch was unreachable in exactly the situation it existed
+for.
+
+**MY CONFIG is on by default, and now STAYS on.** Fixing the default was not
+enough three separate times, because the browser read settings from
+localStorage, then POSTed them to the server on connect, and the server wrote
+them to my-settings.json. One stale browser value silently overwrote the file on
+every connect. Settings are no longer read from localStorage at all - disk is
+the single source of truth.
+
+**Launcher: console now hides itself.** Starts visible so you see the boot and
+any error, hides after 6s, tray takes over. It will NOT hide unless the tray is
+actually running - hiding without a tray leaves the app alive with no window and
+no menu. Shutdown un-hides first so a failure message is never delivered to a
+window nobody can see.
+
+**Nothing reinstalls on a normal launch.** `pip install -r requirements.txt` used
+to run every single start - a round trip to PyPI to be told the same packages
+were already there. Dependencies, tray and the Webull SDK are all import-checked
+first; pip only runs when something is genuinely missing.
+
+**Folder cleaned.** Deleted on request: STOP EVERYTHING.bat, START HIDDEN.vbs,
+INSTALL.bat, TUTORIAL.html, CHECK-SETUP.bat. INSTALL was the only thing that
+installed the Webull SDK, so the launcher absorbed that first - deleting it
+as-is would have quietly broken any fresh setup.
+Also cleared 4.5 MB of dead SDK logs (23 files, one 3.2 MB). auto-sync now
+prunes rotated logs older than 7 days; the trade log and sync log are explicitly
+protected.
+
+Suite: 243 checks across 25 scenarios.
 
 ## v3.9 changes
 
@@ -48,10 +102,9 @@ lock is stale by definition - our own git just failed because of it - so it is
 removed and the command retried once. Locks under 30s old are left alone so a
 genuinely running git is never stomped.
 
-**Tray icon + hidden launcher.** `run_all.py` optionally shows a system-tray
-crosshair (open either app, view log, quit). `START HIDDEN (tray only).vbs` runs
-the whole thing with no window. Tray deps are optional and kept OUT of
-requirements.txt, which the launcher runs on every start.
+**Tray icon.** `run_all.py` optionally shows a system-tray crosshair (open
+either app, the trade log, the sync log, show/hide console, quit). Tray deps are
+optional - a missing decoration never stops a trading app launching.
 
 **JS syntax gate in the suite.** These pages hold ~40KB of hand-edited
 JavaScript; a stray bracket would blank the page with the error only in the
