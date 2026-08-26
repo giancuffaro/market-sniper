@@ -844,6 +844,11 @@ class BaseSession:
                     + ("  ~est" if estimated else ""),
             "move": f"{p['entry']:.2f} -> {float(exit_price):.2f}",
             "pnl": pnl,
+            # The screen shows PERCENT only - no dollar figures anywhere. The
+            # dollar value is still recorded here and in the trade log, it is
+            # simply never displayed.
+            "pct": (round((float(exit_price) - p["entry"]) / p["entry"] * 100.0, 1)
+                    if p.get("entry") else 0.0),
             "estimated": bool(estimated)})
         self._save_day()
 
@@ -1013,6 +1018,12 @@ class BaseSession:
                 "buying_power": round(self.buying_power, 2),
                 "position": self.position, "armed": self.armed,
                 "day_realized": round(self.day_realized, 2),
+                # Percent view of the day: every trade's return added up. With a
+                # constant position size this is the number that matters, and it
+                # is the only one the screen is allowed to show.
+                "day_pct": round(sum(float(b.get("pct") or 0) for b in self.blotter), 1),
+                "day_wins": sum(1 for b in self.blotter if float(b.get("pct") or 0) > 0),
+                "day_losses": sum(1 for b in self.blotter if float(b.get("pct") or 0) < 0),
                 "blotter": self.blotter[-20:], "settings": self.settings,
                 "strategies": self.strategies, "event": ev,
                 "active_mode": getattr(self, "active_mode", None)}
