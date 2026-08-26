@@ -70,6 +70,8 @@ DEFAULT_SETTINGS = {
     # firing at the ask. Entry only - the RATCHET below owns the exit.
     "my_enabled": True,
     # RATCHET — the stop climbs in steps and never comes back down.
+    # Tied to my_enabled above: ONE switch on screen arms both, because an
+    # entry that fires by itself with no managed exit is not a system.
     # Stop always sits one step BELOW the highest rung reached:
     #   best  0%  -> stop -10%   (the opening stop)
     #   best +10% -> stop   0%   (breakeven, now hunting +20%)

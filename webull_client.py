@@ -418,6 +418,14 @@ class BaseSession:
             # versa. One armed thing at a time, always.
             self._enforce_single_mode("entry" if s["my_enabled"] else None)
         if "ratchet_enabled" in new: s["ratchet_enabled"] = bool(new["ratchet_enabled"])
+        # ONE FEATURE, ONE SWITCH. The entry and the ratchet are halves of the
+        # same thing, so the server refuses to hold them apart no matter what
+        # arrives - an old my-settings.json, a stale browser, a hand-edited
+        # POST. The dangerous half is entry ON with ratchet OFF: that buys on
+        # its own and then manages nothing.
+        if "my_enabled" in new or "ratchet_enabled" in new:
+            s["ratchet_enabled"] = s["my_enabled"] = bool(
+                s.get("my_enabled") or s.get("ratchet_enabled"))
         if "ratchet_step_pct" in new:
             try:
                 s["ratchet_step_pct"] = max(1.0, min(float(new["ratchet_step_pct"]), 100.0))
