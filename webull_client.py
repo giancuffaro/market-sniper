@@ -675,6 +675,98 @@ class BaseSession:
         self._save_day()
         return pnl
 
+    # ---- Broker truth ------------------------------------------------------
+    # The app's position is its own bookkeeping. Close the trade by hand in the
+    # Webull app and this app never hears about it - it keeps managing a trade
+    # that no longer exists, and a TP/SL firing then sends a SELL for contracts
+    # you do not hold, which does not flatten anything.
+    RECONCILE_EVERY = 12.0            # seconds
+
+    def _position_fns(self):
+        """Find the SDK's 'list my positions' call at runtime.
+
+        The Webull SDK renames things between versions, which is why the option
+        snapshot call is discovered rather than hardcoded. Same trick here: look
+        for anything on the trade client that reads like a positions endpoint.
+        """
+        found = []
+        holders = [("trade", self.trade)]
+        for attr in dir(self.trade):
+            if attr.startswith("_"):
+                continue
+            if any(w in attr.lower() for w in ("account", "position", "trade")):
+                try:
+                    holders.append((attr, getattr(self.trade, attr)))
+                except Exception:
+                    pass
+        for hname, h in holders:
+            for m in dir(h):
+                if m.startswith("_"):
+                    continue
+                low = m.lower()
+                if "position" in low and any(w in low for w in ("get", "list", "query", "search")):
+                    fn = getattr(h, m, None)
+                    if callable(fn):
+                        found.append(("%s.%s" % (hname, m), fn))
+        return found
+
+    def broker_positions(self):
+        """Open positions ACCORDING TO WEBULL. None means 'could not ask'.
+
+        None and [] are deliberately different: [] is the broker saying you hold
+        nothing, None is the question failing. A failed question must never be
+        mistaken for a flat account, or one network blip would drop a live trade
+        off the screen and stop managing it.
+        """
+        if not (self.trade and self.account_id):
+            return None
+        for name, fn in self._position_fns():
+            for args in ((self.account_id,), ()):
+                try:
+                    res = fn(*args)
+                except Exception:
+                    continue
+                try:
+                    body = res.json() if hasattr(res, "json") else res
+                except Exception:
+                    continue
+                if getattr(res, "status_code", 200) != 200:
+                    continue
+                rows = body
+                if isinstance(body, dict):
+                    for key in ("data", "positions", "items", "list", "result"):
+                        if isinstance(body.get(key), list):
+                            rows = body[key]
+                            break
+                if isinstance(rows, list):
+                    self._pos_fn_name = name
+                    return rows
+        return None
+
+    def reconcile(self, force=False):
+        """Clear our position if Webull says we hold nothing. Sends no orders."""
+        now = time.time()
+        if not force and now - getattr(self, "_last_reconcile", 0) < self.RECONCILE_EVERY:
+            return None
+        self._last_reconcile = now
+        if not self.position:
+            return None
+        rows = self.broker_positions()
+        if rows is None:
+            return None                       # could not ask - change nothing
+        if len(rows) > 0:
+            return None                       # broker still shows something open
+        with self._order_lock:
+            p, self.position = self.position, None
+            self.armed = None
+        if p:
+            self.last_event = (
+                "Webull says you hold nothing, so the app cleared its %s %s%s. "
+                "You closed it outside the app. No order was sent."
+                % (p["symbol"], int(p["strike"]) if float(p["strike"]).is_integer()
+                   else p["strike"], "C" if p["side"] == "CALLS" else "P"))
+        return {"cleared": bool(p)}
+
     def forget_position(self):
         """Escape hatch for a position the app thinks you have but the broker
         doesn't. Sends NOTHING to Webull — it only clears the app's own screen so
