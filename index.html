@@ -1031,6 +1031,9 @@ const EZ = (function(){
     // no cost, no time value. Cash figures are deliberately absent everywhere.
     // While an entry is armed, show the strike THE TRIGGER resolves to. Fall
     // back to the live quote's strike only when there is no armed level.
+    // Warnings are NOT blocks. They go in the tooltip so the button keeps
+    // showing the only two things asked for: strike, and the level it fires at.
+    if(btn) btn.title = (qual.warnings||[]).join('\n');
     const pv = lastPreview && lastPreview[q.side];
     const strike = (pv && pv.strike != null) ? pv.strike : q.strike;
     if(sub) sub.textContent = `${fmtStrike(strike)}${q.side==='CALLS'?'C':'P'}`

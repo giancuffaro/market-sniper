@@ -1114,6 +1114,29 @@ try:
     # A contract is 100 shares - forgetting the multiplier makes the check
     # useless, since a $3.00 option would read as $3 against the account.
     check(34, "cost uses the 100x contract multiplier", "*100*qty" in _idx)
+
+    # --- 35. Time value warns, it does not block -------------------------
+    # This blocked a live trade at 9:30 on the first real session. Extrinsic %
+    # measures distance-to-strike and time-left, not quality: at the open
+    # nearly every 0DTE is 90%+ time value, and an ITM1 a nickel from the
+    # strike is 95% by arithmetic. Being fully OTM is the real problem, and
+    # that is blocked separately.
+    _Q = wb.LiveSession.contract_quality
+    _q = _Q(713.95, 714.0, "PUT", 1.00, 0.97)          # the exact live case
+    check(35, "95% time value is TRADABLE", _q["ok"] is True,
+          str(_q.get("reasons")))
+    check(35, "but it still says so", any("time value" in w for w in _q.get("warnings", [])))
+    check(35, "warnings are separate from blocking reasons", _q["reasons"] == [])
+    # The three that must still refuse.
+    check(35, "fully OTM is still blocked", _Q(714.50, 714.0, "PUT", 0.80, 0.77)["ok"] is False)
+    check(35, "penny premium is still blocked", _Q(713.95, 714.0, "PUT", 0.10, 0.05)["ok"] is False)
+    check(35, "a wide spread is still blocked", _Q(713.10, 714.0, "PUT", 1.40, 1.05)["ok"] is False)
+    check(35, "a clean contract has no warning at all",
+          _Q(713.10, 714.0, "PUT", 1.40, 1.37)["warnings"] == [])
+    check(35, "the warning reaches the button as a tooltip, not as text",
+          "btn.title = (qual.warnings||[]).join" in _idx)
+    check(35, "the button text is still strike + level",
+          "fmtStrike(strike)" in _idx)
     check(29,"and no premium/time value on the button",
           "% time" not in ix6 and "q.ask.toFixed" not in code6)
 
@@ -1150,7 +1173,7 @@ print("\n"+"="*68)
 by={}
 for sc,name,ok,_ in results:
     by.setdefault(sc,[0,0]); by[sc][0]+=1; by[sc][1]+= (1 if ok else 0)
-T={34:"LOCK/X gone, size warns",33:"Page actually runs",32:"No SAVE / live trade frozen",31:"One switch / still modal",30:"Directional entry levels",29:"Percent only, no cash",28:"Grid/ATM/quality/one-armed",27:"Config screen cleanup",26:"Ratchet stop",25:"Console auto-hide",24:"Options auto-reconcile",23:"Daily trade log",22:"Options phantom clear",21:"Auto-reconcile w/ broker",20:"MY CONFIG always on",19:"Phantom position",18:"Futures hours",17:"Closed market honest",16:"Restart leaves no spinner",15:"One tab only",14:"Git lock self-heal",13:"Broker tabs + tray",12:"Velocity honest when shut",11:"Multi-broker sessions",1:"Futures login survives restart",2:"remember_login default",3:"Options profiles to disk",
+T={35:"Time value warns not blocks",34:"LOCK/X gone, size warns",33:"Page actually runs",32:"No SAVE / live trade frozen",31:"One switch / still modal",30:"Directional entry levels",29:"Percent only, no cash",28:"Grid/ATM/quality/one-armed",27:"Config screen cleanup",26:"Ratchet stop",25:"Console auto-hide",24:"Options auto-reconcile",23:"Daily trade log",22:"Options phantom clear",21:"Auto-reconcile w/ broker",20:"MY CONFIG always on",19:"Phantom position",18:"Futures hours",17:"Closed market honest",16:"Restart leaves no spinner",15:"One tab only",14:"Git lock self-heal",13:"Broker tabs + tray",12:"Velocity honest when shut",11:"Multi-broker sessions",1:"Futures login survives restart",2:"remember_login default",3:"Options profiles to disk",
    4:"Browser autofill guard",5:"ITM3 strike math",6:"Preview == Arm",7:"Live-only / dead modes",
    8:"Auto-sync safety",9:"Endpoints alive",10:"UI integrity"}
 for sc in sorted(by):
