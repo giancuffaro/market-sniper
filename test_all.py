@@ -665,6 +665,76 @@ try:
     check(25,"the hide is conditional on the tray, in code",
           "if tray is None" in rsrc)
 
+    print("\n[26] RATCHET - stop climbs a rung at a time and never drops")
+    import webull_client as _w4
+    L = _w4.LiveSession
+    # the ladder G specified, verbatim
+    for peak, stop, nxt in [(0,-10,10),(5,-10,10),(9.9,-10,10),(10,0,20),
+                            (15,0,20),(20,10,30),(30,20,40),(100,90,110)]:
+        lv = L.ratchet_levels(peak, 10)
+        check(26,f"best {peak}% -> stop {stop}%, next +{nxt}%",
+              lv["stop_pct"]==stop and lv["next_pct"]==nxt,
+              f"got stop {lv['stop_pct']} next {lv['next_pct']}")
+    check(26,"exactly +10% counts (float error nearly broke this)",
+          L.ratchet_levels((3.30-3.00)/3.00*100, 10)["stop_pct"]==0.0)
+    check(26,"a gap from +5% to +25% still lands the stop on +10%",
+          L.ratchet_levels(25,10)["stop_pct"]==10.0)
+
+    def _rt(marks, step=10.0, entry=3.00):
+        z=_w4.make_session("LIVE")
+        z.settings.update({"ratchet_enabled":True,"ratchet_step_pct":step})
+        z.position={"symbol":"QQQ","side":"CALLS","strike":711.0,"qty":1,
+                    "entry":entry,"mark":entry,"expiration":"2026-08-26"}
+        out=[]
+        for m in marks:
+            z.position["mark"]=m
+            hit=z._bracket_hit()
+            out.append((m, dict(z.position.get("ratchet") or {}), hit,
+                        z.position.get("exit_reason")))
+            if hit: break
+        return z, out
+
+    z,run = _rt([3.00,2.85,3.15,3.30,3.45,3.60,3.90,3.40])
+    stops = {m: r.get("stop_pct") for m,r,_,_ in run}
+    check(26,"opens at -10%", stops[3.00]==-10.0)
+    check(26,"a dip to -5% does NOT exit", run[1][2] is None)
+    check(26,"+10% moves the stop to BREAKEVEN, does not close",
+          stops[3.30]==0.0 and run[3][2] is None)
+    check(26,"+20% locks in +10%", stops[3.60]==10.0)
+    check(26,"+30% locks in +20%", stops[3.90]==20.0)
+    check(26,"falling back through the stop closes", run[-1][2] is not None)
+    check(26,"and the log says which rung", "RATCHET+20" in str(run[-1][3]), str(run[-1][3]))
+
+    # never loosens
+    z2,run2 = _rt([3.00,3.90,3.70,3.75,3.72])
+    seq=[r.get("stop_pct") for _,r,_,_ in run2]
+    check(26,"stop never moves DOWN", all(b>=a for a,b in zip(seq,seq[1:])), str(seq))
+
+    # breakeven exit names itself
+    z3,run3 = _rt([3.00,3.30,2.99])
+    check(26,"a give-back to breakeven exits as BE",
+          "RATCHET-BE" in str(run3[-1][3]), str(run3[-1][3]))
+
+    # ratchet replaces TP/SL
+    z4=_w4.make_session("LIVE")
+    z4.settings.update({"ratchet_enabled":True,"tp_enabled":True,"tp_unit":"cents",
+                        "tp_value":1,"sl_enabled":True,"sl_unit":"pct","sl_value":1})
+    z4.position={"symbol":"QQQ","side":"CALLS","strike":711.0,"qty":1,
+                 "entry":3.00,"mark":3.06,"expiration":"2026-08-26"}
+    check(26,"a 1c take-profit can NOT close a ratcheted trade", z4._bracket_hit() is None)
+
+    z5=_w4.make_session("LIVE"); z5._guard_open=lambda q: None
+    z5.settings["ratchet_enabled"]=True
+    z5._underlying=lambda sym: 713.0
+    z5.arm("QQQ","CALLS",1)
+    check(26,"arming does not re-enable a take-profit", z5.settings["tp_enabled"] is False)
+
+    cfg = io.open(os.path.join(HERE,"config.py"),encoding="utf-8").read()
+    check(26,"on by default", "\"ratchet_enabled\": True" in cfg)
+    idx4 = io.open(os.path.join(HERE,"index.html"),encoding="utf-8").read()
+    check(26,"live stop shown while in a trade", "next rung" in idx4)
+    check(26,"settings expose it", "ratchetEnabled" in idx4 and "ratchetStep" in idx4)
+
 finally:
     for p_ in (OPT,FUT):
         if p_:
@@ -678,7 +748,7 @@ print("\n"+"="*68)
 by={}
 for sc,name,ok,_ in results:
     by.setdefault(sc,[0,0]); by[sc][0]+=1; by[sc][1]+= (1 if ok else 0)
-T={25:"Console auto-hide",24:"Options auto-reconcile",23:"Daily trade log",22:"Options phantom clear",21:"Auto-reconcile w/ broker",20:"MY CONFIG always on",19:"Phantom position",18:"Futures hours",17:"Closed market honest",16:"Restart leaves no spinner",15:"One tab only",14:"Git lock self-heal",13:"Broker tabs + tray",12:"Velocity honest when shut",11:"Multi-broker sessions",1:"Futures login survives restart",2:"remember_login default",3:"Options profiles to disk",
+T={26:"Ratchet stop",25:"Console auto-hide",24:"Options auto-reconcile",23:"Daily trade log",22:"Options phantom clear",21:"Auto-reconcile w/ broker",20:"MY CONFIG always on",19:"Phantom position",18:"Futures hours",17:"Closed market honest",16:"Restart leaves no spinner",15:"One tab only",14:"Git lock self-heal",13:"Broker tabs + tray",12:"Velocity honest when shut",11:"Multi-broker sessions",1:"Futures login survives restart",2:"remember_login default",3:"Options profiles to disk",
    4:"Browser autofill guard",5:"ITM3 strike math",6:"Preview == Arm",7:"Live-only / dead modes",
    8:"Auto-sync safety",9:"Endpoints alive",10:"UI integrity"}
 for sc in sorted(by):
