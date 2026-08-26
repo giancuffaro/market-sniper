@@ -740,7 +740,9 @@ try:
     check(26,"on by default", "\"ratchet_enabled\": True" in cfg)
     idx4 = io.open(os.path.join(HERE,"index.html"),encoding="utf-8").read()
     check(26,"live stop shown while in a trade", "next rung" in idx4)
-    check(26,"settings expose it", "ratchetEnabled" in idx4 and "ratchetStep" in idx4)
+    # The separate RATCHET checkbox is gone - it is one switch with the entry
+    # now - so the screen proof is the step input plus the combined switch.
+    check(26,"settings expose it", 'id="ratchetStep"' in idx4 and 'id="myEnabled"' in idx4)
 
     print("\n[27] CONFIG SCREEN: one combined strategy, dead sections gone")
     ix = io.open(os.path.join(HERE,"index.html"),encoding="utf-8").read()
@@ -750,7 +752,10 @@ try:
     check(27,"the old +$1 TP / 10% stop blurb is gone",
           "Auto-sets a" not in ix and "Overrides the TP/SL" not in ix)
     check(27,"entry and ratchet sit in ONE section",
-          "myEnabled" in cfg_pane and "ratchetEnabled" in cfg_pane)
+          "myEnabled" in cfg_pane and "ratchetStep" in cfg_pane)
+    check(27,"and are ONE switch, not two",
+          "ratchetEnabled" not in cfg_pane and
+          "ABSOLUTE ENTRY + RATCHET" in cfg_pane)
     for gone in ("TAKE PROFIT — closes","STOP LOSS — closes","AUTO-LOCK"):
         check(27,f"{gone.split(chr(8212))[0].strip()} removed from CONFIGURATION",
               gone not in cfg_pane)
