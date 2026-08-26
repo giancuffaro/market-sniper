@@ -830,6 +830,45 @@ try:
     check(28,"blocked contracts are unclickable", ".buy-c.blocked" in ix5 and "pointer-events:none" in ix5)
     check(28,"armed-mode banner exists", 'id="activeMode"' in ix5)
 
+    print("\n[29] PERCENT ONLY - no cash anywhere on the options screen")
+    ix6 = io.open(os.path.join(HERE,"index.html"),encoding="utf-8").read()
+    # strip comments so the explanations do not count as violations
+    code6 = re.sub(r"//[^\n]*", "", ix6)
+    for gone, what in [("money(", "money() helper"),
+                       ("fmtCost", "contract cost"),
+                       ('id="bp"', "buying power chip"),
+                       ('id="pnlN"', "dollar P&L element"),
+                       ("BP $", "mirror buying power")]:
+        check(29, f"{what} removed", gone not in code6)
+    check(29,"DAY is a percentage, not dollars",
+          "DAY <b" in ix6 and "DAY NET" not in ix6)
+    check(29,"blotter rows show %", "t.pct" in code6 and "t.pnl" not in code6)
+    check(29,"ratchet line shows rungs without prices",
+          "stop_price" not in code6 and "next_price" not in code6)
+    check(29,"hero line drops the rotating fill price",
+          "pos.entry.toFixed" not in code6)
+    check(29,"buy button shows strike + the level it fires at",
+          "lastPreview" in code6 and "fmtStrike(q.strike)" in code6)
+    check(29,"and no premium/time value on the button",
+          "% time" not in ix6 and "q.ask.toFixed" not in code6)
+
+    import importlib, webull_client as _w6
+    _w6 = importlib.reload(_w6)
+    z6 = _w6.make_session("LIVE")
+    for e_, x_ in ((3.00,3.45),(2.40,2.05)):
+        z6._record_close({"symbol":"QQQ","side":"CALLS","strike":711.0,"qty":1,
+                          "entry":e_,"expiration":"2026-08-26","opened_at":"09:41"},
+                         x_, estimated=False)
+    st6 = z6.state()
+    check(29,"server sends day_pct", "day_pct" in st6)
+    check(29,"and the W/L count", st6["day_wins"]==1 and st6["day_losses"]==1)
+    check(29,"every blotter row carries a percent",
+          all("pct" in b for b in st6["blotter"]))
+    check(29,"percent is right", abs(st6["blotter"][0]["pct"] - 15.0) < 0.05,
+          str(st6["blotter"][0]["pct"]))
+    check(29,"dollars still RECORDED for the trade log, just not shown",
+          all("pnl" in b for b in st6["blotter"]))
+
 finally:
     for p_ in (OPT,FUT):
         if p_:
@@ -843,7 +882,7 @@ print("\n"+"="*68)
 by={}
 for sc,name,ok,_ in results:
     by.setdefault(sc,[0,0]); by[sc][0]+=1; by[sc][1]+= (1 if ok else 0)
-T={28:"Grid/ATM/quality/one-armed",27:"Config screen cleanup",26:"Ratchet stop",25:"Console auto-hide",24:"Options auto-reconcile",23:"Daily trade log",22:"Options phantom clear",21:"Auto-reconcile w/ broker",20:"MY CONFIG always on",19:"Phantom position",18:"Futures hours",17:"Closed market honest",16:"Restart leaves no spinner",15:"One tab only",14:"Git lock self-heal",13:"Broker tabs + tray",12:"Velocity honest when shut",11:"Multi-broker sessions",1:"Futures login survives restart",2:"remember_login default",3:"Options profiles to disk",
+T={29:"Percent only, no cash",28:"Grid/ATM/quality/one-armed",27:"Config screen cleanup",26:"Ratchet stop",25:"Console auto-hide",24:"Options auto-reconcile",23:"Daily trade log",22:"Options phantom clear",21:"Auto-reconcile w/ broker",20:"MY CONFIG always on",19:"Phantom position",18:"Futures hours",17:"Closed market honest",16:"Restart leaves no spinner",15:"One tab only",14:"Git lock self-heal",13:"Broker tabs + tray",12:"Velocity honest when shut",11:"Multi-broker sessions",1:"Futures login survives restart",2:"remember_login default",3:"Options profiles to disk",
    4:"Browser autofill guard",5:"ITM3 strike math",6:"Preview == Arm",7:"Live-only / dead modes",
    8:"Auto-sync safety",9:"Endpoints alive",10:"UI integrity"}
 for sc in sorted(by):
