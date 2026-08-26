@@ -1,7 +1,7 @@
 """MARKET SNIPER — Webull session wrapper. v3.1
 (Symbols: SPY/QQQ daily-0DTE, TSLA weekly via nearest-Friday expiry.)"""
 
-import os, uuid, math, random, threading, functools
+import os, time, uuid, math, random, threading, functools
 import datetime as dt
 try:
     from zoneinfo import ZoneInfo
