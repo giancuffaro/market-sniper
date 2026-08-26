@@ -3,6 +3,10 @@ fastapi>=0.110
 uvicorn[standard]>=0.29
 pydantic>=2.0
 
+# Daily trade log workbook (trade_log.py). If this is ever missing the log
+# still records every trade to logs/trades.csv - only the .xlsx is skipped.
+openpyxl>=3.1
+
 # Live prices (quotes.py) use only the Python standard library — no package needed.
 
 # --- Webull official OpenAPI SDK ---
