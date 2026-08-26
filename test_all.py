@@ -561,6 +561,77 @@ try:
     check(22,"clearing twice is harmless", z.forget_position()["cleared"] is False)
     check(22,"armed entry is cleared too", z.armed is None)
 
+    print("\n[23] DAILY TRADE LOG - one workbook, appended forever")
+    import trade_log as _tl, tempfile as _tf, importlib
+    _tl = importlib.reload(_tl)
+    _sc = _tf.mkdtemp(prefix="tlog")
+    _tl.LOG_DIR=_sc; _tl.CSV_PATH=os.path.join(_sc,"trades.csv")
+    _tl.XLSX_PATH=os.path.join(_sc,"Market Sniper Trade Log.xlsx")
+    check(23,"openpyxl available", _tl.XLSX_AVAILABLE)
+
+    for d,sym,e_,x_,rz in [("2026-08-21","QQQ",3.0,3.85,"TP"),
+                           ("2026-08-21","QQQ",2.4,2.05,"SL"),
+                           ("2026-08-22","SPY",1.8,2.60,"CLOSE")]:
+        _tl.record({"date":d,"symbol":sym,"side":"CALLS","strike":711,"qty":1,
+                    "entry":e_,"exit":x_,"pnl":round((x_-e_)*100,2),"exit_reason":rz,
+                    "app":"OPTIONS","broker":"WEBULL"})
+    check(23,"every trade lands in the CSV", len(_tl._rows())==3, str(len(_tl._rows())))
+    check(23,"ONE workbook, not one per day", os.path.exists(_tl.XLSX_PATH))
+    check(23,"only one xlsx exists",
+          len([f for f in os.listdir(_sc) if f.endswith(".xlsx")])==1)
+
+    import openpyxl as _px
+    _wb=_px.load_workbook(_tl.XLSX_PATH)
+    check(23,"TRADES + BY DAY sheets", _wb.sheetnames==["TRADES","BY DAY"], str(_wb.sheetnames))
+    check(23,"every trade is a row", _wb["TRADES"].max_row==4, str(_wb["TRADES"].max_row))
+    bd=_tl.by_day()
+    check(23,"grouped by day", [d["date"] for d in bd]==["2026-08-21","2026-08-22"])
+    check(23,"daily net is right", bd[0]["net"]==50.0 and bd[1]["net"]==80.0,
+          f"{bd[0]['net']} / {bd[1]['net']}")
+    check(23,"wins and losses counted", bd[0]["wins"]==1 and bd[0]["losses"]==1)
+
+    # the failure that would silently lose a trade
+    _real=_tl.rebuild_xlsx
+    def _locked(): raise PermissionError("open in Excel")
+    _tl.rebuild_xlsx=_locked
+    _tl.record({"date":"2026-08-22","symbol":"QQQ","side":"PUTS","strike":700,"qty":1,
+                "entry":1.0,"exit":1.4,"pnl":40.0,"exit_reason":"TP"})
+    check(23,"workbook LOCKED in Excel -> trade still saved", len(_tl._rows())==4)
+    _tl.rebuild_xlsx=_real
+    _tl.rebuild_xlsx()
+    check(23,"and appears once Excel is closed",
+          _px.load_workbook(_tl.XLSX_PATH)["TRADES"].max_row==5)
+
+    wsrc = io.open(os.path.join(HERE,"webull_client.py"),encoding="utf-8").read()
+    check(23,"options logs from the ONE close funnel",
+          "trade_log.record" in wsrc.split("_record_close",1)[1][:2500])
+    check(23,"auto-exits record TP/SL not just CLOSE", 'position["exit_reason"] = hit' in wsrc)
+    fsrc = io.open(os.path.join(HERE,"futures_client.py"),encoding="utf-8").read()
+    check(23,"futures logs too", "_log_trade" in fsrc)
+    check(23,"declared in requirements",
+          "openpyxl" in io.open(os.path.join(HERE,"requirements.txt"),encoding="utf-8").read())
+
+    print("\n[24] OPTIONS AUTO-RECONCILE with Webull")
+    import webull_client as _wb3
+    def _os_(broker):
+        z=_wb3.make_session("LIVE"); z.account_id="A"
+        z.position={"symbol":"QQQ","side":"CALLS","strike":711.0,"qty":1,
+                    "entry":3.0,"mark":2.7,"expiration":"2026-08-24"}
+        z.broker_positions=lambda: broker
+        z._last_reconcile=0
+        return z
+    z=_os_([]);   z.reconcile(force=True)
+    check(24,"Webull says nothing open -> cleared", z.position is None)
+    check(24,"explains why", "hold nothing" in (z.last_event or ""))
+    z=_os_(None); z.reconcile(force=True)
+    check(24,"API failure is NOT read as flat", z.position is not None)
+    z=_os_([{"x":1}]); z.reconcile(force=True)
+    check(24,"broker confirms -> kept", z.position is not None)
+    check(24,"runs BEFORE brackets fire",
+          wsrc.split("def refresh_mark",1)[1].split("def close",1)[0].index("self.reconcile()")
+          < wsrc.split("def refresh_mark",1)[1].split("def close",1)[0].index("_maybe_auto_close"))
+    check(24,"finds the SDK call at runtime, not hardcoded", "_position_fns" in wsrc)
+
 finally:
     for p_ in (OPT,FUT):
         if p_:
@@ -574,7 +645,7 @@ print("\n"+"="*68)
 by={}
 for sc,name,ok,_ in results:
     by.setdefault(sc,[0,0]); by[sc][0]+=1; by[sc][1]+= (1 if ok else 0)
-T={22:"Options phantom clear",21:"Auto-reconcile w/ broker",20:"MY CONFIG always on",19:"Phantom position",18:"Futures hours",17:"Closed market honest",16:"Restart leaves no spinner",15:"One tab only",14:"Git lock self-heal",13:"Broker tabs + tray",12:"Velocity honest when shut",11:"Multi-broker sessions",1:"Futures login survives restart",2:"remember_login default",3:"Options profiles to disk",
+T={24:"Options auto-reconcile",23:"Daily trade log",22:"Options phantom clear",21:"Auto-reconcile w/ broker",20:"MY CONFIG always on",19:"Phantom position",18:"Futures hours",17:"Closed market honest",16:"Restart leaves no spinner",15:"One tab only",14:"Git lock self-heal",13:"Broker tabs + tray",12:"Velocity honest when shut",11:"Multi-broker sessions",1:"Futures login survives restart",2:"remember_login default",3:"Options profiles to disk",
    4:"Browser autofill guard",5:"ITM3 strike math",6:"Preview == Arm",7:"Live-only / dead modes",
    8:"Auto-sync safety",9:"Endpoints alive",10:"UI integrity"}
 for sc in sorted(by):
