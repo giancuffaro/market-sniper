@@ -745,19 +745,14 @@ const EZ = (function(){
     $('ratchetEnabled').checked=!!settings.ratchet_enabled;
     $('ratchetStep').value=settings.ratchet_step_pct||10;
     $('myEnabled').checked=!!settings.my_enabled;
-    $('tpEnabled').checked=settings.tp_enabled; $('tpValue').value=settings.tp_value; $('tpUnit').value=settings.tp_unit;
-    $('slEnabled').checked=settings.sl_enabled; $('slValue').value=settings.sl_value; $('slUnit').value=settings.sl_unit;
-    $('alEnabled').checked=autolock.enabled; $('alMinutes').value=autolock.minutes;
+    // TAKE PROFIT / STOP LOSS / AUTO-LOCK were removed from the screen: the
+    // ratchet owns the exit now. The settings still exist server-side because
+    // STRATEGIES uses tp/sl per strategy - they are simply not hand-edited.
     $('mirrorProf').innerHTML=profiles.filter(p=>p.name!==activeProf)
       .map(p=>`<option value="${p.name}">${p.name}</option>`).join('')||'<option value="">no other saved account</option>';
     $('mirrorBtn').textContent=mirrorOn?'DISABLE':'ENABLE';
     $('mirrorBtn').className='mini'+(mirrorOn?' off':'');
-    tpUnitChanged();
     $('setScrim').classList.add('show');
-  }
-  function tpUnitChanged(){
-    const whole=$('tpUnit').value==='whole';
-    $('tpValue').disabled=whole; $('tpValue').style.opacity=whole?0.35:1;
   }
   // One place decides which strike button is lit, so adding a depth later
   // can't leave two of them highlighted at once.
@@ -776,12 +771,6 @@ const EZ = (function(){
     settings.my_enabled=$('myEnabled').checked;
     settings.ratchet_enabled=$('ratchetEnabled').checked;
     settings.ratchet_step_pct=Math.max(1,Math.min(parseFloat($('ratchetStep').value)||10,100));
-    settings.tp_enabled=$('tpEnabled').checked;
-    settings.tp_value=parseFloat($('tpValue').value)||settings.tp_value;
-    settings.tp_unit=$('tpUnit').value;
-    settings.sl_enabled=$('slEnabled').checked;
-    settings.sl_value=parseFloat($('slValue').value)||settings.sl_value;
-    settings.sl_unit=$('slUnit').value;
     localStorage.setItem(LSS,JSON.stringify(settings));
     autolock.enabled=$('alEnabled').checked;
     autolock.minutes=Math.max(1,parseInt($('alMinutes').value)||10);
@@ -1067,10 +1056,13 @@ const EZ = (function(){
       </div>`).join('') || '<div class="shint">No strategies yet — tap NEW STRATEGY.</div>';
   }
   function showTab(t){
-    const cfg=(t==='config');
-    $('tabConfig').classList.toggle('on',cfg); $('tabStrat').classList.toggle('on',!cfg);
-    $('paneConfig').hidden=!cfg; $('paneStrat').hidden=cfg;
-    if(!cfg) renderStrategies();
+    const panes={config:'paneConfig', strat:'paneStrat', mirror:'paneMirror'};
+    const tabs ={config:'tabConfig',  strat:'tabStrat',  mirror:'tabMirror'};
+    Object.keys(panes).forEach(k=>{
+      $(panes[k]).hidden = (k!==t);
+      $(tabs[k]).classList.toggle('on', k===t);
+    });
+    if(t==='strat') renderStrategies();
   }
   function toggleStrategy(id){
     const s=strategies.find(x=>x.id===id); if(!s) return;
