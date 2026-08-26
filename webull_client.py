@@ -592,8 +592,12 @@ class BaseSession:
         target = self.entry_target(spot)    # closest round number
         s = self.settings
         s["my_enabled"] = True
-        s["tp_enabled"] = True; s["tp_unit"] = "whole"
-        s["sl_enabled"] = True; s["sl_unit"] = "pct"; s["sl_value"] = config.MY_CONFIG_SL_PCT
+        # The RATCHET owns the exit when it is on, so do not also arm a
+        # take-profit that would close the trade at the exact moment the
+        # ratchet is trying to let it run.
+        if not s.get("ratchet_enabled"):
+            s["tp_enabled"] = True; s["tp_unit"] = "whole"
+            s["sl_enabled"] = True; s["sl_unit"] = "pct"; s["sl_value"] = config.MY_CONFIG_SL_PCT
         self.armed = {"symbol": symbol, "side": side, "qty": qty,
                       "target": target, "spot_at_arm": round(spot, 2)}
         return dict(self.armed)

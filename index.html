@@ -441,6 +441,24 @@
       </div>
 
       <div class="sgroup">
+        <div class="glbl">RATCHET — climbing stop</div>
+        <label class="srow" style="cursor:pointer">
+          <input type="checkbox" id="ratchetEnabled"> <b>ON</b>
+          <span style="flex:1"></span>
+          step <input id="ratchetStep" type="number" min="1" max="100" step="1" value="10"
+                     style="width:64px;text-align:center"> %
+        </label>
+        <div class="shint">The stop climbs and never comes back down. It always sits
+        <b>one step below the best you have seen</b>:<br>
+        best 0% → stop <b>−10%</b> · best +10% → stop <b>breakeven</b> · best +20% → stop
+        <b>+10%</b> · +30% → <b>+20%</b> … forever.<br>
+        Percent is of the <b>premium you paid</b>. While this is ON it <b>replaces</b>
+        Take Profit and Stop Loss below — +10% stops being an exit and becomes the
+        trigger that moves your stop to breakeven. The trade only ends when price
+        falls back into the stop, or you press CLOSE.</div>
+      </div>
+
+      <div class="sgroup">
         <div class="glbl">STRIKE SELECTION</div>
         <div class="strikeopts">
           <button id="smOTM" onclick="EZ.setStrikeMode('OTM1')">1 STRIKE<br>OUT OF THE MONEY<br><span class="risk hi">MORE RISK</span></button>
@@ -555,7 +573,7 @@ const EZ = (function(){
   let connected=false, marketClosed=false;
   let sym="QQQ", side="CALLS", qty=1, inTrade=false, poll=null, priceTimer=null, trendTimer=null, velTimer=null;
   let profiles=[], activeProf=null, mirrorOn=false;
-  let settings={strike_mode:"ITM3",tp_enabled:false,tp_value:30,tp_unit:"cents",
+  let settings={strike_mode:"ITM3",ratchet_enabled:true,ratchet_step_pct:10,tp_enabled:false,tp_value:30,tp_unit:"cents",
                 sl_enabled:false,sl_value:20,sl_unit:"cents",my_enabled:true};
   let autolock={enabled:false,minutes:10}, lastActivity=Date.now();
   let prefs={}, prefsReady=false, prefsLoaded=null;
@@ -767,6 +785,8 @@ const EZ = (function(){
   function openSettings(){
     showTab('config'); cancelStrategyEdit(); renderStrategies();
     paintStrikeMode(settings.strike_mode);
+    $('ratchetEnabled').checked=!!settings.ratchet_enabled;
+    $('ratchetStep').value=settings.ratchet_step_pct||10;
     $('myEnabled').checked=!!settings.my_enabled;
     $('tpEnabled').checked=settings.tp_enabled; $('tpValue').value=settings.tp_value; $('tpUnit').value=settings.tp_unit;
     $('slEnabled').checked=settings.sl_enabled; $('slValue').value=settings.sl_value; $('slUnit').value=settings.sl_unit;
@@ -797,6 +817,8 @@ const EZ = (function(){
   function closeSettings(){ $('setScrim').classList.remove('show'); }
   async function saveSettings(){
     settings.my_enabled=$('myEnabled').checked;
+    settings.ratchet_enabled=$('ratchetEnabled').checked;
+    settings.ratchet_step_pct=Math.max(1,Math.min(parseFloat($('ratchetStep').value)||10,100));
     settings.tp_enabled=$('tpEnabled').checked;
     settings.tp_value=parseFloat($('tpValue').value)||settings.tp_value;
     settings.tp_unit=$('tpUnit').value;
@@ -1200,8 +1222,22 @@ const EZ = (function(){
         else if(settings.sl_unit==='cents') parts.push('SL @ '+Math.max(0.01,pos.entry-settings.sl_value/100).toFixed(2));
         else parts.push('SL −$'+settings.sl_value);
       }
-      $('bracketLine').textContent=parts.join('  ·  ');
-      $('bracketLine').style.color=parts.length?'var(--amber)':'';
+      // RATCHET readout wins the line when it is running - it IS the exit,
+      // so showing the old TP/SL next to it would just be noise.
+      const rt = pos.ratchet;
+      if(rt){
+        const be = Math.abs(rt.stop_pct) < 0.001;
+        $('bracketLine').innerHTML =
+            `STOP <b>${rt.stop_pct>0?'+':''}${rt.stop_pct}%</b> ($${rt.stop_price.toFixed(2)})`
+          + (be ? ' <b>BREAKEVEN</b>' : '')
+          + ` &nbsp;·&nbsp; best ${rt.pct>=0?'+':''}${Math.round(rt.pct*10)/10}%`
+          + ` &nbsp;·&nbsp; next rung <b>+${rt.next_pct}%</b> ($${rt.next_price.toFixed(2)})`;
+        $('bracketLine').style.color = rt.stop_pct > 0 ? 'var(--green)'
+                                     : (be ? 'var(--amber)' : 'var(--red)');
+      }else{
+        $('bracketLine').textContent=parts.join('  ·  ');
+        $('bracketLine').style.color=parts.length?'var(--amber)':'';
+      }
       $('closeSide').textContent=pos.side;
       $('closeSub').textContent=`SELL TO CLOSE · MARKETABLE · ${pos.symbol} ${strike}${typ} × ${pos.qty}`;
       $('hero').className='hero in'+(pnl<0?' loss':'');
