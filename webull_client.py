@@ -446,6 +446,10 @@ class BaseSession:
 
     def _do_auto_close(self, hit):
         try:
+            # Stamp the reason on the position BEFORE closing, so the trade log
+            # records TP / SL rather than a generic manual CLOSE.
+            if self.position:
+                self.position["exit_reason"] = hit
             res = self.close()
             pnl = float(res.get("pnl") or 0.0)
             if self.blotter:
