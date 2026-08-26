@@ -43,6 +43,20 @@ def boot(app, port, log):
                             stdout=open(log, "wb"), stderr=subprocess.STDOUT)
 
 shutil.copy(SETTINGS, BACKUP)
+
+# THE SUITE MUST NEVER TOUCH THE REAL TRADE LOG.
+# _record_close() writes a row for every finished trade, and the fake sessions
+# in here finish plenty of them. Three test trades once landed in the live
+# money log next to a real one. Redirect the module ONCE, before any scenario
+# runs, rather than per-scenario where a later reload can quietly undo it.
+import tempfile as _tf_boot, trade_log as _tl_boot
+_TLOG_SANDBOX = _tf_boot.mkdtemp(prefix="ms_tradelog_")
+_tl_boot.LOG_DIR   = _TLOG_SANDBOX
+_tl_boot.CSV_PATH  = os.path.join(_TLOG_SANDBOX, "trades.csv")
+_tl_boot.XLSX_PATH = os.path.join(_TLOG_SANDBOX, "Market Sniper Trade Log.xlsx")
+REAL_TRADES_CSV = os.path.join(HERE, "logs", "trades.csv")
+_REAL_TRADES_BEFORE = (io.open(REAL_TRADES_CSV, encoding="utf-8").read()
+                       if os.path.exists(REAL_TRADES_CSV) else None)
 OPT = FUT = None
 try:
     OPT = boot("main:app", 8000, os.path.join(SCRATCH,"opt1.log"))
@@ -1168,6 +1182,15 @@ finally:
                 try: p_.kill()
                 except Exception: pass
     shutil.copy(BACKUP, SETTINGS)
+    # Prove it, rather than trusting the redirect above.
+    _after = (io.open(REAL_TRADES_CSV, encoding="utf-8").read()
+              if os.path.exists(REAL_TRADES_CSV) else None)
+    if _after != _REAL_TRADES_BEFORE:
+        if _REAL_TRADES_BEFORE is not None:
+            io.open(REAL_TRADES_CSV, "w", encoding="utf-8").write(_REAL_TRADES_BEFORE)
+        print("  !! the suite wrote to the REAL trade log - reverted. Fix the redirect.")
+    else:
+        print("  real trade log untouched.")
 
 print("\n"+"="*68)
 by={}
