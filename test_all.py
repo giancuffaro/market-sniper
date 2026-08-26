@@ -961,6 +961,66 @@ try:
     _f.update_settings({"strike_mode": "ITM1"})
     check(31, "an unrelated setting leaves the switch alone",
           _f.settings["my_enabled"] and _f.settings["ratchet_enabled"])
+
+    # --- 32. No SAVE button; a live trade keeps its own terms -------------
+    check(32, "the SAVE button is gone", "EZ.saveSettings()" not in _idx)
+    check(32, "and CANCEL with it", ">CANCEL<" not in _idx)
+    check(32, "DONE just closes", 'onclick="EZ.closeSettings()">DONE<' in _idx)
+    check(32, "the switch writes on change",
+          'id="myEnabled"' in _idx and
+          'onchange="EZ.applySettings()"' in _idx.split('id="myEnabled"',1)[1][:120])
+    check(32, "the step box writes on change and on blur",
+          'onchange="EZ.applySettings()" onblur="EZ.applySettings()"' in _idx)
+    check(32, "picking a strike writes it",
+          "applySettings();         // no SAVE button" in _idx)
+    check(32, "applying does NOT close the window",
+          "closeSettings(); refreshQuote();" not in _idx)
+    check(32, "a cleared step box falls back to 10",
+          "parseFloat($('ratchetStep').value)||10" in _idx)
+    check(32, "and the box is written back so it matches storage",
+          "$('ratchetStep').value=settings.ratchet_step_pct" in _idx)
+    check(32, "10% is the shipped default", config.DEFAULT_SETTINGS["ratchet_step_pct"] == 10.0)
+    check(32, "and the input agrees", 'id="ratchetStep" type="number" min="1" max="100" step="1" value="10"' in _idx)
+    check(32, "an open trade is called out on screen", 'id="liveNote"' in _idx and "NEXT trade" in _idx)
+
+    # The reason this matters: with no SAVE button, every keystroke reaches the
+    # server at once. A live trade must not be re-tuned underneath itself.
+    _wc2 = io.open("webull_client.py", encoding="utf-8").read()
+    check(32, "terms are frozen onto the position at open",
+          '"ratchet_on": bool(self.settings.get("ratchet_enabled"))' in _wc2 and
+          '"ratchet_step": float(self.settings.get("ratchet_step_pct")' in _wc2)
+    check(32, "the ratchet reads the position, not live settings",
+          'p.get("ratchet_on"' in _wc2 and 'p.get("ratchet_step"' in _wc2)
+
+    class _Live(wb.LiveSession):
+        def __init__(self):
+            import config as _c
+            self.settings = dict(_c.DEFAULT_SETTINGS); self.strategies = []
+    _lv = _Live()
+    # Opened at 10% step, then the step is changed to 50% mid-trade.
+    _lv.position = {"entry": 3.00, "mark": 3.30, "qty": 1,
+                    "ratchet_on": True, "ratchet_step": 10.0}
+    _lv._update_ratchet()
+    _stop_before = _lv.position["ratchet"]["stop_pct"]
+    _lv.settings["ratchet_step_pct"] = 50.0
+    _lv._update_ratchet()
+    _stop_after = _lv.position["ratchet"]["stop_pct"]
+    check(32, "changing the step mid-trade does NOT move a live stop",
+          _stop_before == _stop_after == 0.0, "%s -> %s" % (_stop_before, _stop_after))
+    # Switching the whole feature off mid-trade must not abandon the open stop.
+    _lv.settings["ratchet_enabled"] = False
+    _lv._update_ratchet()
+    check(32, "switching it off mid-trade does not abandon the open stop",
+          _lv.position.get("ratchet") is not None)
+    # And the NEXT trade does pick the new terms up.
+    _lv.settings.update({"ratchet_enabled": True, "ratchet_step_pct": 50.0})
+    _lv.position = {"entry": 3.00, "mark": 4.80, "qty": 1,
+                    "ratchet_on": bool(_lv.settings["ratchet_enabled"]),
+                    "ratchet_step": float(_lv.settings["ratchet_step_pct"])}
+    _lv._update_ratchet()
+    check(32, "the next trade uses the new step (+60% -> stop +0%)",
+          _lv.position["ratchet"]["stop_pct"] == 0.0,
+          str(_lv.position["ratchet"]["stop_pct"]))
     check(29,"and no premium/time value on the button",
           "% time" not in ix6 and "q.ask.toFixed" not in code6)
 
@@ -997,7 +1057,7 @@ print("\n"+"="*68)
 by={}
 for sc,name,ok,_ in results:
     by.setdefault(sc,[0,0]); by[sc][0]+=1; by[sc][1]+= (1 if ok else 0)
-T={31:"One switch / still modal",30:"Directional entry levels",29:"Percent only, no cash",28:"Grid/ATM/quality/one-armed",27:"Config screen cleanup",26:"Ratchet stop",25:"Console auto-hide",24:"Options auto-reconcile",23:"Daily trade log",22:"Options phantom clear",21:"Auto-reconcile w/ broker",20:"MY CONFIG always on",19:"Phantom position",18:"Futures hours",17:"Closed market honest",16:"Restart leaves no spinner",15:"One tab only",14:"Git lock self-heal",13:"Broker tabs + tray",12:"Velocity honest when shut",11:"Multi-broker sessions",1:"Futures login survives restart",2:"remember_login default",3:"Options profiles to disk",
+T={32:"No SAVE / live trade frozen",31:"One switch / still modal",30:"Directional entry levels",29:"Percent only, no cash",28:"Grid/ATM/quality/one-armed",27:"Config screen cleanup",26:"Ratchet stop",25:"Console auto-hide",24:"Options auto-reconcile",23:"Daily trade log",22:"Options phantom clear",21:"Auto-reconcile w/ broker",20:"MY CONFIG always on",19:"Phantom position",18:"Futures hours",17:"Closed market honest",16:"Restart leaves no spinner",15:"One tab only",14:"Git lock self-heal",13:"Broker tabs + tray",12:"Velocity honest when shut",11:"Multi-broker sessions",1:"Futures login survives restart",2:"remember_login default",3:"Options profiles to disk",
    4:"Browser autofill guard",5:"ITM3 strike math",6:"Preview == Arm",7:"Live-only / dead modes",
    8:"Auto-sync safety",9:"Endpoints alive",10:"UI integrity"}
 for sc in sorted(by):
