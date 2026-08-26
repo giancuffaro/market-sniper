@@ -92,7 +92,10 @@ scripts.forEach((src, i) => {
   catch (e) { bad(`script block ${i} threw while loading`, e); }
 });
 
-const EZ = ctx.EZ;
+// `const EZ = ...` at the top level of a script is a LEXICAL binding: it never
+// becomes a property of the context object, so ctx.EZ reads undefined. Ask the
+// context for it by name instead.
+const EZ = vm.runInContext('typeof EZ !== "undefined" ? EZ : null', ctx);
 if (!EZ) { console.log('  FAIL  EZ was never defined'); process.exit(1); }
 
 // The handlers a user can actually reach from the settings screen.
