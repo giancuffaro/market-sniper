@@ -406,9 +406,67 @@ class BaseSession:
         uc.save("options_settings", s)      # remembered for next launch
         return s
 
+    @staticmethod
+    def ratchet_levels(peak_pct, step):
+        """Where the stop sits, given the best percentage this trade has seen.
+
+        The stop always rests exactly one step BELOW the highest rung reached,
+        and rungs are whole multiples of `step`:
+
+            best seen      rung      stop        next target
+            entry (0%)       0%      -10%           +10%
+            +10%           +10%        0%  (BE)     +20%
+            +20%           +20%      +10%           +30%
+            +30%           +30%      +20%           +40%
+
+        Deriving it from the high-water mark (rather than nudging a stop each
+        time a level is crossed) means a gap straight from +5% to +25% still
+        lands the stop on +10% - the +20% rung was cleared, so it counts.
+        """
+        step = float(step) if step else 10.0
+        if step <= 0:
+            step = 10.0
+        rung = math.floor(max(0.0, float(peak_pct)) / step) * step
+        return {"rung": round(rung, 4),
+                "stop_pct": round(rung - step, 4),
+                "next_pct": round(rung + step, 4)}
+
+    def _update_ratchet(self):
+        """Track the best % this trade has seen and where the stop now sits."""
+        p, s = self.position, self.settings
+        if not (p and s.get("ratchet_enabled")):
+            return
+        if not p.get("entry"):
+            return
+        pct = (p["mark"] - p["entry"]) / p["entry"] * 100.0
+        # High-water mark. It only ever goes UP, which is what makes the stop
+        # a ratchet rather than something that can loosen again.
+        p["peak_pct"] = max(p.get("peak_pct", 0.0), pct)
+        lv = self.ratchet_levels(p["peak_pct"], s.get("ratchet_step_pct", 10.0))
+        p["ratchet"] = {**lv, "pct": round(pct, 2),
+                        "stop_price": round(p["entry"] * (1 + lv["stop_pct"] / 100.0), 4),
+                        "next_price": round(p["entry"] * (1 + lv["next_pct"] / 100.0), 4)}
+
     def _bracket_hit(self):
         p, s = self.position, self.settings
         if not p or p.get("mark") is None:
+            return None
+
+        # RATCHET owns the exit when it is on. It deliberately replaces TP/SL:
+        # under the ratchet, +10% is no longer somewhere you sell, it is where
+        # the stop moves to breakeven. Leaving the old take-profit live would
+        # close the trade at the exact moment the ratchet is trying to let it
+        # run, so the two cannot both be active.
+        if s.get("ratchet_enabled") and p.get("entry"):
+            self._update_ratchet()
+            r = p.get("ratchet") or {}
+            if r and r["pct"] <= r["stop_pct"]:
+                # Name the exit for the trade log: breakeven, a locked-in gain,
+                # or the original stop.
+                sp = r["stop_pct"]
+                p["exit_reason"] = ("RATCHET-BE" if abs(sp) < 1e-9
+                                    else ("RATCHET+%g%%" % sp if sp > 0 else "SL"))
+                return "SL" if sp < 0 else "TP"
             return None
         move_cents = (p["mark"] - p["entry"]) * 100.0
         pnl_usd = (p["mark"] - p["entry"]) * 100.0 * p["qty"]
