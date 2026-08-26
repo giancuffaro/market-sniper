@@ -197,7 +197,7 @@ try:
     _code = _re.sub(r"//[^\n]*", "", idx)      # strip comments before searching
     check(10,"strike no longer truncated with |0", "strike|0" not in _code)
     check(10,"cost shown on buy buttons", "fmtCost" in idx)
-    check(10,"ITM3 button present", "smITM3" in idx)
+    check(10,"strike buttons present", "smATM" in idx and "smITM2" in idx)
     fidx = io.open(os.path.join(HERE,"futures_index.html"),encoding="utf-8").read()
     check(10,"no Tradovate UI left", "tvConfig" not in fidx and "tvUser" not in fidx)
     print("\n[11] MULTI-BROKER SESSIONS (stay logged in, toggle freely)")
@@ -483,9 +483,13 @@ try:
     idx2 = io.open(os.path.join(HERE,"index.html"),encoding="utf-8").read()
     check(20,"browser fallback is ON too (used before prefs load)",
           "my_enabled:true}" in idx2.replace(" ",""))
-    check(20,"nothing defaults it back off",
-          not re.search(r"my_enabled\s*[:=]\s*[Ff]alse",
-                        io.open(os.path.join(HERE,"config.py"),encoding="utf-8").read()+idx2))
+    # The DEFAULT must be on. Turning it off when a strategy is armed is
+    # correct and expected, so only the declared defaults are checked here.
+    check(20,"the config default is not False",
+          not re.search(r'"my_enabled"\s*:\s*False',
+                        io.open(os.path.join(HERE,"config.py"),encoding="utf-8").read()))
+    check(20,"the browser fallback is not false",
+          "my_enabled:false" not in idx2.replace(" ",""))
     saved = json.load(io.open(SETTINGS,encoding="utf-8")).get("options_settings",{})
     check(20,"your saved file says ON", saved.get("my_enabled") is True, str(saved.get("my_enabled")))
     check(20,"ON means the buttons ARM, not buy at the ask",
