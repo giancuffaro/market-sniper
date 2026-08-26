@@ -417,22 +417,14 @@ class BaseSession:
             # Turning ABSOLUTE ENTRY on switches every strategy off, and vice
             # versa. One armed thing at a time, always.
             self._enforce_single_mode("entry" if s["my_enabled"] else None)
-        if "ratchet_enabled" in new: s["ratchet_enabled"] = bool(new["ratchet_enabled"])
-        # ONE FEATURE, ONE SWITCH. The entry and the ratchet are halves of the
-        # same thing, so the server refuses to hold them apart no matter what
-        # arrives - an old my-settings.json, a stale browser, a hand-edited
-        # POST. The dangerous half is entry ON with ratchet OFF: that buys on
-        # its own and then manages nothing.
-        if "my_enabled" in new or "ratchet_enabled" in new:
-            # Whichever key ARRIVED decides, and the other follows it.
-            # OR-ing the two instead looks reasonable and is not: sending
-            # my_enabled=false while a stale ratchet_enabled=true sat in the
-            # settings would OR back to true, and the switch could never be
-            # turned off. my_enabled wins a disagreement - it is the key the
-            # single on-screen switch is bound to.
-            want = bool(new["my_enabled"] if "my_enabled" in new
-                        else new["ratchet_enabled"])
-            s["my_enabled"] = s["ratchet_enabled"] = want
+        # "ratchet_enabled" is no longer a setting - entry and ratchet are ONE
+        # thing, stored once as my_enabled. Older saved files and any caller
+        # still sending the old key are folded in here rather than rejected,
+        # and the key is never written back, so it dies out on first save.
+        if "ratchet_enabled" in new and "my_enabled" not in new:
+            s["my_enabled"] = bool(new["ratchet_enabled"])
+            self._enforce_single_mode("entry" if s["my_enabled"] else None)
+        s.pop("ratchet_enabled", None)
         if "ratchet_step_pct" in new:
             try:
                 s["ratchet_step_pct"] = max(1.0, min(float(new["ratchet_step_pct"]), 100.0))
@@ -487,7 +479,7 @@ class BaseSession:
         """Track the best % this trade has seen and where the stop now sits."""
         p = self.position
         # p["ratchet_on"], not settings: a trade keeps the terms it opened with.
-        if not (p and p.get("ratchet_on", self.settings.get("ratchet_enabled"))):
+        if not (p and p.get("ratchet_on", self.settings.get("my_enabled"))):
             return
         if not p.get("entry"):
             return
@@ -512,7 +504,7 @@ class BaseSession:
         # the stop moves to breakeven. Leaving the old take-profit live would
         # close the trade at the exact moment the ratchet is trying to let it
         # run, so the two cannot both be active.
-        if p.get("ratchet_on", s.get("ratchet_enabled")) and p.get("entry"):
+        if p.get("ratchet_on", s.get("my_enabled")) and p.get("entry"):
             self._update_ratchet()
             r = p.get("ratchet") or {}
             if r and r["pct"] <= r["stop_pct"]:
@@ -675,7 +667,7 @@ class BaseSession:
         # The RATCHET owns the exit when it is on, so do not also arm a
         # take-profit that would close the trade at the exact moment the
         # ratchet is trying to let it run.
-        if not s.get("ratchet_enabled"):
+        if not s.get("my_enabled"):
             s["tp_enabled"] = True; s["tp_unit"] = "whole"
             s["sl_enabled"] = True; s["sl_unit"] = "pct"; s["sl_value"] = config.MY_CONFIG_SL_PCT
         self.armed = {"symbol": symbol, "side": side, "qty": qty,
@@ -1332,7 +1324,7 @@ class LiveSession(BaseSession):
                          # this, nudging the step from 10 to 25 while a trade
                          # was live would move the stop underneath a position
                          # already running. Settings change the NEXT trade.
-                         "ratchet_on": bool(self.settings.get("ratchet_enabled")),
+                         "ratchet_on": bool(self.settings.get("my_enabled")),
                          "ratchet_step": float(self.settings.get("ratchet_step_pct") or 10.0)}
         self._decorate_position(q)
         self.last_event = (f"ORDER SENT — BUY {qty} × {symbol} {int(q['strike'])}"

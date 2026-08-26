@@ -68,10 +68,17 @@ DEFAULT_SETTINGS = {
     # ABSOLUTE ENTRY (round-number entry) is ON by default. The buy buttons ARM
     # and wait for the underlying to reach the nearest whole dollar instead of
     # firing at the ask. Entry only - the RATCHET below owns the exit.
-    "my_enabled": True,
-    # RATCHET — the stop climbs in steps and never comes back down.
-    # Tied to my_enabled above: ONE switch on screen arms both, because an
-    # entry that fires by itself with no managed exit is not a system.
+    # ONE KEY, not two kept in step. Entry and ratchet were separate flags and
+    # every layer had to remember to move them together - a rule you can forget
+    # in one place and then entry is armed with nothing managing the exit.
+    # There is now a single setting. "ratchet_enabled" no longer exists;
+    # anything that used to read it reads this.
+    #
+    # ON  = buy buttons ARM and wait for the level, and the ratchet owns the exit
+    # OFF = buy buttons fire at the ask, nothing manages the exit
+    #
+    # RATCHET: the stop climbs in steps and never comes back down. It always
+    # sits one step BELOW the highest rung reached:
     # Stop always sits one step BELOW the highest rung reached:
     #   best  0%  -> stop -10%   (the opening stop)
     #   best +10% -> stop   0%   (breakeven, now hunting +20%)
@@ -79,7 +86,6 @@ DEFAULT_SETTINGS = {
     # Percent is of the OPTION PREMIUM you paid. When this is on it REPLACES
     # take-profit and stop-loss: +10% stops being an exit and becomes the
     # trigger that moves the stop to breakeven.
-    "ratchet_enabled": True,
     "ratchet_step_pct": 10.0,
 }
 # Legacy fallback stop, used ONLY if the ratchet is switched off. With the
