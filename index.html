@@ -426,36 +426,31 @@
       <div class="tabs">
         <button id="tabConfig" class="tab on" onclick="EZ.showTab('config')">CONFIGURATION</button>
         <button id="tabStrat" class="tab" onclick="EZ.showTab('strat')">STRATEGIES</button>
+        <button id="tabMirror" class="tab" onclick="EZ.showTab('mirror')">MIRROR</button>
       </div>
 
       <div id="paneConfig" class="pane">
       <div class="sgroup mine myfont">
-        <div class="glbl">★ MY CONFIG — round-number entry</div>
+        <div class="glbl">★ ABSOLUTE ENTRY with RATCHET TRAILING</div>
         <div class="srow">
-          <label class="tog"><input type="checkbox" id="myEnabled"> USE MY CONFIG</label>
+          <label class="tog"><input type="checkbox" id="myEnabled"> ABSOLUTE ENTRY</label>
         </div>
-        <div class="shint myfont">When ON, <b>BUY</b> arms instead of firing: it waits for the
-        underlying to reach the nearest whole dollar, then buys the ask. Auto-sets a
-        <b>+$1</b> take-profit (next whole number) and a <b>10%</b> stop. Overrides the TP/SL
-        below while enabled.</div>
-      </div>
+        <div class="shint myfont">Waits for the underlying to reach the nearest whole
+        dollar, then buys. That is the entry — the exit belongs to the ratchet below.</div>
 
-      <div class="sgroup">
-        <div class="glbl">RATCHET — climbing stop</div>
-        <label class="srow" style="cursor:pointer">
-          <input type="checkbox" id="ratchetEnabled"> <b>ON</b>
+        <div class="srow" style="margin-top:10px">
+          <label class="tog"><input type="checkbox" id="ratchetEnabled"> RATCHET TRAILING</label>
           <span style="flex:1"></span>
           step <input id="ratchetStep" type="number" min="1" max="100" step="1" value="10"
-                     style="width:64px;text-align:center"> %
-        </label>
-        <div class="shint">The stop climbs and never comes back down. It always sits
+                     style="width:60px;text-align:center"> %
+        </div>
+        <div class="shint myfont">The stop climbs and never comes back down. It always sits
         <b>one step below the best you have seen</b>:<br>
-        best 0% → stop <b>−10%</b> · best +10% → stop <b>breakeven</b> · best +20% → stop
-        <b>+10%</b> · +30% → <b>+20%</b> … forever.<br>
-        Percent is of the <b>premium you paid</b>. While this is ON it <b>replaces</b>
-        Take Profit and Stop Loss below — +10% stops being an exit and becomes the
-        trigger that moves your stop to breakeven. The trade only ends when price
-        falls back into the stop, or you press CLOSE.</div>
+        best 0% → stop <b>−10%</b> · +10% → <b>breakeven</b> · +20% → <b>+10%</b> ·
+        +30% → <b>+20%</b> … no cap.<br>
+        Percent is of the <b>premium you paid</b>. Reaching +10% does <b>not</b> close you —
+        it moves the stop to breakeven. The trade ends when price falls back into the
+        stop, or you press CLOSE.</div>
       </div>
 
       <div class="sgroup">
@@ -472,36 +467,9 @@
         (2.50 steps) 3 deep is $7.50, not $3.</div>
       </div>
 
-      <div class="sgroup">
-        <div class="glbl">TAKE PROFIT — closes the trade automatically</div>
-        <div class="srow">
-          <label class="tog"><input type="checkbox" id="tpEnabled"> ON</label>
-          <input type="number" id="tpValue" min="0.01" step="1" placeholder="30">
-          <select id="tpUnit" onchange="EZ.tpUnitChanged()">
-            <option value="cents">¢ premium move</option>
-            <option value="usd">$ total profit</option>
-            <option value="whole">next whole number (spot)</option>
-          </select>
-        </div>
-        <div class="shint">¢: entry 1.24 + 30¢ → closes 1.54. $: whole position up that much.
-        <b>Next whole number:</b> calls entered with QQQ at 755.02 close when QQQ hits <b>756</b>.</div>
-      </div>
+      </div><!-- /paneConfig -->
 
-      <div class="sgroup">
-        <div class="glbl">STOP LOSS — closes the trade automatically</div>
-        <div class="srow">
-          <label class="tog"><input type="checkbox" id="slEnabled"> ON</label>
-          <input type="number" id="slValue" min="0.01" step="0.01" placeholder="20">
-          <select id="slUnit">
-            <option value="cents">¢ premium move</option>
-            <option value="usd">$ total loss</option>
-            <option value="price">$ underlying price level</option>
-          </select>
-        </div>
-        <div class="shint"><b>Underlying price level:</b> calls entered at 755.02 with stop
-        <b>754.75</b> close if QQQ drops there. Puts trigger when spot rises to the level.</div>
-      </div>
-
+      <div id="paneMirror" class="pane" hidden>
       <div class="sgroup">
         <div class="glbl">MIRROR TRADING — your own second account (LIVE only)</div>
         <div class="srow">
@@ -512,18 +480,7 @@
         account at market. Only accounts that belong to YOU.</div>
       </div>
 
-      <div class="sgroup">
-        <div class="glbl">AUTO-LOCK</div>
-        <div class="srow">
-          <label class="tog"><input type="checkbox" id="alEnabled"> ON</label>
-          <input type="number" id="alMinutes" min="1" step="1" placeholder="10">
-          <span style="color:var(--dim);font-size:11px">minutes idle</span>
-        </div>
-        <div class="shint">Locks to the account screen after inactivity (never while in a trade).
-        The LOCK button locks instantly.</div>
-      </div>
-
-      </div><!-- /paneConfig -->
+      </div><!-- /paneMirror -->
 
       <div id="paneStrat" class="pane" hidden>
         <div id="stratList"></div>
