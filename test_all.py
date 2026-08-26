@@ -196,7 +196,7 @@ try:
     import re as _re
     _code = _re.sub(r"//[^\n]*", "", idx)      # strip comments before searching
     check(10,"strike no longer truncated with |0", "strike|0" not in _code)
-    check(10,"buy button shows the strike", "fmtStrike(q.strike)" in idx)
+    check(10,"buy button shows a strike", "fmtStrike(strike)" in idx)
     check(10,"strike buttons present", "smATM" in idx and "smITM2" in idx)
     fidx = io.open(os.path.join(HERE,"futures_index.html"),encoding="utf-8").read()
     check(10,"no Tradovate UI left", "tvConfig" not in fidx and "tvUser" not in fidx)
@@ -851,7 +851,11 @@ try:
     check(29,"hero line drops the rotating fill price",
           "pos.entry.toFixed" not in code6)
     check(29,"buy button shows strike + the level it fires at",
-          "lastPreview" in code6 and "fmtStrike(q.strike)" in code6)
+          "lastPreview" in code6 and "fmtStrike(strike)" in code6)
+    # The strike must come from the TRIGGER, not the live spot - at 713.40 those
+    # resolve to 711C and 712C respectively, so mixing them would mislabel it.
+    check(29,"strike is taken from the armed trigger, not current spot",
+          "pv.strike != null" in code6)
     check(29,"and no premium/time value on the button",
           "% time" not in ix6 and "q.ask.toFixed" not in code6)
 
