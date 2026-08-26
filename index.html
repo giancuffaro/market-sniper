@@ -1202,7 +1202,8 @@ const EZ = (function(){
     el.textContent=(dp>=0?'+':'')+dp.toFixed(1)+'%'+((w+l)?`  (${w}W/${l}L)`:'');
     el.className='net'+(dp<0?' neg':'');
     $('blotterRows').innerHTML=(st.blotter||[]).slice().reverse().map(t=>{
-      const up=t.pnl>=0;
+      // Colour from the number actually on screen, not the hidden one.
+      const up=Number(t.pct||0)>=0;
       return `<div class="trow"><span class="t">${t.time}</span><span class="s">${t.desc}</span>
         <span class="mv">${t.move}</span><span class="pl ${up?'up':'dn'}">${up?'+':'−'}${Math.abs(Number(t.pct||0)).toFixed(1)}%</span></div>`;
     }).join('');
