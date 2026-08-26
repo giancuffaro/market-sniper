@@ -65,27 +65,27 @@ DEFAULT_SETTINGS = {
     "strike_mode": "ITM2",
     "tp_enabled": False, "tp_value": 30.0, "tp_unit": "cents",
     "sl_enabled": False, "sl_value": 20.0, "sl_unit": "cents",
-    # ABSOLUTE ENTRY (round-number entry) is ON by default. The buy buttons ARM
-    # and wait for the underlying to reach the nearest whole dollar instead of
-    # firing at the ask. Entry only - the RATCHET below owns the exit.
-    # ONE KEY, not two kept in step. Entry and ratchet were separate flags and
-    # every layer had to remember to move them together - a rule you can forget
-    # in one place and then entry is armed with nothing managing the exit.
-    # There is now a single setting. "ratchet_enabled" no longer exists;
-    # anything that used to read it reads this.
+    # ---- ABSOLUTE ENTRY + RATCHET -----------------------------------------
+    # ONE setting, not two kept in step. Entry and ratchet used to be separate
+    # flags and every layer had to remember to move them together - a rule you
+    # can forget in one place, and then the app is arming entries with nothing
+    # managing the exit. "ratchet_enabled" no longer exists; everything that
+    # used to read it reads this.
     #
-    # ON  = buy buttons ARM and wait for the level, and the ratchet owns the exit
-    # OFF = buy buttons fire at the ask, nothing manages the exit
+    #   ON  = the buy buttons ARM and wait for the underlying to reach the
+    #         level in front of price, and the ratchet owns the exit
+    #   OFF = the buy buttons fire at the ask, and nothing manages the exit
     #
-    # RATCHET: the stop climbs in steps and never comes back down. It always
+    # The RATCHET stop climbs in steps and never comes back down. It always
     # sits one step BELOW the highest rung reached:
-    # Stop always sits one step BELOW the highest rung reached:
     #   best  0%  -> stop -10%   (the opening stop)
     #   best +10% -> stop   0%   (breakeven, now hunting +20%)
     #   best +20% -> stop +10%   (locked in, now hunting +30%)  ... forever
-    # Percent is of the OPTION PREMIUM you paid. When this is on it REPLACES
-    # take-profit and stop-loss: +10% stops being an exit and becomes the
-    # trigger that moves the stop to breakeven.
+    # Percent is of the OPTION PREMIUM you paid. +10% is not somewhere you
+    # sell - it is where the stop moves to breakeven. Which is why this
+    # replaces take-profit and stop-loss rather than sitting alongside them.
+    "my_enabled": True,
+    # Step size, in percent. 10 is the default and what every rung above assumes.
     "ratchet_step_pct": 10.0,
 }
 # Legacy fallback stop, used ONLY if the ratchet is switched off. With the
