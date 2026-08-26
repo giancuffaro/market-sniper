@@ -1151,6 +1151,62 @@ try:
           "btn.title = (qual.warnings||[]).join" in _idx)
     check(35, "the button text is still strike + level",
           "fmtStrike(strike)" in _idx)
+
+    # --- 36. Trade log: how the trade travelled --------------------------
+    import trade_log as _tl2
+    for _f in ("best_pct","worst_pct","best_price","worst_price","gave_back_pct",
+               "ratchet_stop_pct","ratchet_step","strike_mode","held_secs"):
+        check(36, "log has a %s column" % _f, _f in _tl2.FIELDS)
+
+    # High/low water marks, tracked whether or not the ratchet is on.
+    _tr = {"entry": 3.00, "mark": 3.00}
+    for _m in (3.00, 3.30, 2.85, 4.20, 3.60):
+        _tr["mark"] = _m; wb.LiveSession._track_excursion(_tr)
+    check(36, "best is the highest mark seen", _tr["best_price"] == 4.20, str(_tr.get("best_price")))
+    check(36, "worst is the lowest", _tr["worst_price"] == 2.85, str(_tr.get("worst_price")))
+    check(36, "best % is right (+40)", _tr["best_pct"] == 40.0, str(_tr.get("best_pct")))
+    check(36, "worst % is right (-5)", _tr["worst_pct"] == -5.0, str(_tr.get("worst_pct")))
+    # A trade that only ever went up was never down: worst is 0, not the entry.
+    _up = {"entry": 2.00, "mark": 2.00}
+    for _m in (2.00, 2.40, 2.90):
+        _up["mark"] = _m; wb.LiveSession._track_excursion(_up)
+    check(36, "a trade that never went red has worst 0", _up["worst_pct"] == 0.0,
+          str(_up.get("worst_pct")))
+
+    # The header migration: appending 26 columns to an 18-column file without
+    # rewriting the header shifts every value one column left and the file
+    # still opens fine, so it would go unnoticed.
+    import tempfile as _tf2, csv as _csv2
+    _d2 = _tf2.mkdtemp(prefix="tlmig")
+    _tl2.LOG_DIR = _d2
+    _tl2.CSV_PATH = os.path.join(_d2, "trades.csv")
+    _tl2.XLSX_PATH = os.path.join(_d2, "log.xlsx")
+    _old_fields = ["date","time_in","symbol","side","entry","exit","pnl","pnl_pct"]
+    with io.open(_tl2.CSV_PATH, "w", encoding="utf-8", newline="") as _f2:
+        _w2 = _csv2.DictWriter(_f2, fieldnames=_old_fields); _w2.writeheader()
+        _w2.writerow({"date":"2026-08-25","time_in":"10:00","symbol":"QQQ",
+                      "side":"CALLS","entry":"2.00","exit":"2.50","pnl":"50.0",
+                      "pnl_pct":"25.0"})
+    _tl2.record({"date":"2026-08-26","symbol":"SPY","side":"PUTS","entry":1.0,
+                 "exit":1.5,"pnl":50.0,"pnl_pct":50.0,"best_pct":60.0,"worst_pct":-8.0})
+    _got = _tl2._rows()
+    check(36, "the old row survives the upgrade", len(_got) == 2, str(len(_got)))
+    check(36, "and its values stay in their own columns",
+          _got[0]["symbol"] == "QQQ" and _got[0]["pnl_pct"] == "25.0",
+          str(_got[0])[:120])
+    check(36, "the new row keeps the new columns",
+          _got[1]["best_pct"] == "60.0" and _got[1]["worst_pct"] == "-8.0",
+          str(_got[1])[:120])
+    check(36, "migrating twice is harmless",
+          (_tl2._migrate_header() or True) and len(_tl2._rows()) == 2)
+
+    _wc3 = io.open("webull_client.py", encoding="utf-8").read()
+    check(36, "excursions are tracked on every mark refresh",
+          "self._track_excursion(p)" in _wc3)
+    check(36, "the open time is stamped so held time is real",
+          '"opened_ts": time.time(),' in _wc3)
+    check(36, "the precise ratchet reason is no longer clobbered",
+          'if self.position and not self.position.get("exit_reason"):' in _wc3)
     check(29,"and no premium/time value on the button",
           "% time" not in ix6 and "q.ask.toFixed" not in code6)
 
@@ -1196,7 +1252,7 @@ print("\n"+"="*68)
 by={}
 for sc,name,ok,_ in results:
     by.setdefault(sc,[0,0]); by[sc][0]+=1; by[sc][1]+= (1 if ok else 0)
-T={35:"Time value warns not blocks",34:"LOCK/X gone, size warns",33:"Page actually runs",32:"No SAVE / live trade frozen",31:"One switch / still modal",30:"Directional entry levels",29:"Percent only, no cash",28:"Grid/ATM/quality/one-armed",27:"Config screen cleanup",26:"Ratchet stop",25:"Console auto-hide",24:"Options auto-reconcile",23:"Daily trade log",22:"Options phantom clear",21:"Auto-reconcile w/ broker",20:"MY CONFIG always on",19:"Phantom position",18:"Futures hours",17:"Closed market honest",16:"Restart leaves no spinner",15:"One tab only",14:"Git lock self-heal",13:"Broker tabs + tray",12:"Velocity honest when shut",11:"Multi-broker sessions",1:"Futures login survives restart",2:"remember_login default",3:"Options profiles to disk",
+T={36:"Trade log detail",35:"Time value warns not blocks",34:"LOCK/X gone, size warns",33:"Page actually runs",32:"No SAVE / live trade frozen",31:"One switch / still modal",30:"Directional entry levels",29:"Percent only, no cash",28:"Grid/ATM/quality/one-armed",27:"Config screen cleanup",26:"Ratchet stop",25:"Console auto-hide",24:"Options auto-reconcile",23:"Daily trade log",22:"Options phantom clear",21:"Auto-reconcile w/ broker",20:"MY CONFIG always on",19:"Phantom position",18:"Futures hours",17:"Closed market honest",16:"Restart leaves no spinner",15:"One tab only",14:"Git lock self-heal",13:"Broker tabs + tray",12:"Velocity honest when shut",11:"Multi-broker sessions",1:"Futures login survives restart",2:"remember_login default",3:"Options profiles to disk",
    4:"Browser autofill guard",5:"ITM3 strike math",6:"Preview == Arm",7:"Live-only / dead modes",
    8:"Auto-sync safety",9:"Endpoints alive",10:"UI integrity"}
 for sc in sorted(by):
