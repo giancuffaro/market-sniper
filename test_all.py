@@ -856,6 +856,40 @@ try:
     # resolve to 711C and 712C respectively, so mixing them would mislabel it.
     check(29,"strike is taken from the armed trigger, not current spot",
           "pv.strike != null" in code6)
+
+    # --- 30. Directional entry: calls below, puts above ------------------
+    scenario(30, "Directional entry levels")
+    _L = wb.LiveSession
+    for _spot in (713.40, 707.60, 712.30, 709.80, 702.55, 710.00, 707.50):
+        _tc = _L.entry_target(_spot, "CALLS")
+        _tp = _L.entry_target(_spot, "PUTS")
+        check(30, "%.2f calls trigger at or below spot (%.2f)" % (_spot, _tc),
+              _tc <= _spot + 1e-9)
+        check(30, "%.2f puts trigger at or above spot (%.2f)" % (_spot, _tp),
+              _tp >= _spot - 1e-9)
+    # The bug this replaces: with a NEAREST target, arming calls at 709.80 set
+    # the trigger to 710.00, and _maybe_trigger_entry asks spot <= target -
+    # true on the spot, so it bought instantly instead of waiting for 709.
+    check(30, "calls at 709.80 wait for 709.00, not 710.00",
+          abs(_L.entry_target(709.80, "CALLS") - 709.00) < 1e-9)
+    check(30, "puts at 709.80 wait for 710.00",
+          abs(_L.entry_target(709.80, "PUTS") - 710.00) < 1e-9)
+    # Half-levels count for BOTH sides, not just calls.
+    check(30, "puts at 712.30 take the .50 level above (712.50)",
+          abs(_L.entry_target(712.30, "PUTS") - 712.50) < 1e-9)
+    check(30, "calls at 707.60 take the .50 level below (707.50)",
+          abs(_L.entry_target(707.60, "CALLS") - 707.50) < 1e-9)
+    # Sitting exactly ON a level triggers there, both ways - not one step away.
+    check(30, "spot exactly on a level: calls fire there",
+          abs(_L.entry_target(710.00, "CALLS") - 710.00) < 1e-9)
+    check(30, "spot exactly on a level: puts fire there",
+          abs(_L.entry_target(707.50, "PUTS") - 707.50) < 1e-9)
+    # A .50 target printed with %.0f reads as a whole dollar it never was.
+    _wc = io.open("webull_client.py", encoding="utf-8").read()
+    check(30, "trigger is announced to 2dp, not rounded to a dollar",
+          "{a['target']:.0f}" not in _wc)
+    check(30, "arm() asks for a side-specific target",
+          "self.entry_target(spot, side)" in _wc)
     check(29,"and no premium/time value on the button",
           "% time" not in ix6 and "q.ask.toFixed" not in code6)
 
