@@ -329,7 +329,6 @@
       <div class="meta">
         <span class="modepill LIVE" id="modePill">LIVE</span>
         <span class="modepill" id="acctType" style="display:none"></span>
-        <span>BP <b id="bp">$0.00</b></span>
         <span class="setbtn" style="color:var(--blue,#4aa3e0);border-color:var(--blue,#4aa3e0)" onclick="location.href='http://127.0.0.1:8010'">⇄ FUTURES</span>
         <span class="setbtn" onclick="EZ.openSettings()">CONFIGURATION</span>
         <div class="theme-dots" role="group" aria-label="Theme color"><button class="tdot tdot-white" data-set="light" onclick="EZ.setTheme('light')" aria-label="White theme"></button><button class="tdot tdot-gray" data-set="gray" onclick="EZ.setTheme('gray')" aria-label="Gray theme"></button><button class="tdot tdot-black" data-set="dark" onclick="EZ.setTheme('dark')" aria-label="Black theme"></button></div>
@@ -1196,7 +1195,7 @@ const EZ = (function(){
       a.textContent=st.account_type; a.className='modepill LIVE';
     }
     if(st.mirror){ mirrorOn=true; $('footMirror').textContent=' · mirror: '+st.mirror.name; }
-    $('bp').textContent='$'+Number(st.buying_power||0).toLocaleString(undefined,{minimumFractionDigits:2,maximumFractionDigits:2});
+    // Buying power removed - no cash figures on this screen at all.
     const dn=Number(st.day_realized||0);
     const dp=Number(st.day_pct||0), w=st.day_wins||0, l=st.day_losses||0;
     const el=$('dayNet');
