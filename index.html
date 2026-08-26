@@ -934,7 +934,7 @@ const EZ = (function(){
   }
 
   // ---- ENTRY PREVIEW -----------------------------------------------------
-  // Answers "where does this actually fire?" BEFORE you press. A MY CONFIG
+  // Answers "where does this actually fire?" BEFORE you press. An ABSOLUTE ENTRY
   // armed entry waits for the underlying to reach the nearest whole dollar —
   // this shows you that level, how far off it is, and which contract you'd be
   // holding when it triggers. Read-only: nothing is sent to Webull.
@@ -989,7 +989,7 @@ const EZ = (function(){
   }
   async function disarm(){
     await api('/api/order/disarm',{});
-    showEvent('MY CONFIG entry cancelled');
+    showEvent('ABSOLUTE ENTRY cancelled');
     await tick();
   }
   async function close(){

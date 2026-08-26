@@ -370,7 +370,7 @@ class BaseSession:
         self.settings.update({k: v for k, v in uc.load("options_settings", {}).items()
                               if k in config.DEFAULT_SETTINGS})
         self.last_event = None
-        self.armed = None   # MY CONFIG pending round-number entry
+        self.armed = None   # ABSOLUTE ENTRY pending round-number entry
         self.strategies = _restore_strategies(uc.load("options_strategies", None))
         self._fired = set()   # (strategy_id, date) that already entered today
         # ONE order at a time. The screen refreshes every second, and that refresh
@@ -531,7 +531,7 @@ class BaseSession:
         except OrderRejected as e:
             self.last_event = f"{hit} hit but close blocked: {e}"
 
-    # ---- MY CONFIG: round-number armed entry -------------------------------
+    # ---- ABSOLUTE ENTRY: round-number armed entry -------------------------------
     def _underlying(self, symbol):
         """Best available price for the stock itself (not the option)."""
         try:
@@ -582,8 +582,12 @@ class BaseSession:
         }
 
     def arm(self, symbol, side, qty):
-        """Arm a MY CONFIG entry: wait for the underlying to reach the nearest
-        whole dollar, then buy the ask. Auto-sets +$1 (next-whole) TP and 10% SL."""
+        """ABSOLUTE ENTRY: wait for the underlying to reach the nearest whole
+        dollar, then buy.
+
+        Entry only. The exit belongs to the RATCHET - this deliberately does
+        NOT set a take-profit, because a +$1 TP would close the trade at the
+        exact moment the ratchet is trying to let it run."""
         qty = int(qty)
         self._guard_open(qty)               # hours / max-contracts / no open pos
         spot = self._underlying(symbol)

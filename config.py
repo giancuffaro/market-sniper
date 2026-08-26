@@ -65,10 +65,9 @@ DEFAULT_SETTINGS = {
     "strike_mode": "ITM3",
     "tp_enabled": False, "tp_value": 30.0, "tp_unit": "cents",
     "sl_enabled": False, "sl_value": 20.0, "sl_unit": "cents",
-    # MY CONFIG (round-number entry) is ON by default. G trades this way every
-    # time: the buy buttons ARM and wait for the underlying to reach the nearest
-    # whole dollar instead of firing at the ask, and arming auto-sets the
-    # whole-number take-profit and the MY_CONFIG_SL_PCT stop.
+    # ABSOLUTE ENTRY (round-number entry) is ON by default. The buy buttons ARM
+    # and wait for the underlying to reach the nearest whole dollar instead of
+    # firing at the ask. Entry only - the RATCHET below owns the exit.
     "my_enabled": True,
     # RATCHET — the stop climbs in steps and never comes back down.
     # Stop always sits one step BELOW the highest rung reached:
@@ -81,5 +80,6 @@ DEFAULT_SETTINGS = {
     "ratchet_enabled": True,
     "ratchet_step_pct": 10.0,
 }
-# Auto-applied bracket when a MY CONFIG armed entry fires.
+# Legacy fallback stop, used ONLY if the ratchet is switched off. With the
+# ratchet on (the default) nothing reads this.
 MY_CONFIG_SL_PCT = 10.0
