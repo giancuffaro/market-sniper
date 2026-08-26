@@ -365,7 +365,7 @@
     </div>
 
     <div id="pnlBlock" class="pnl hidden">
-      <div><span id="pnlN" class="n">+$0.00</span><span id="pnlPct" class="pct">+0%</span></div>
+      <div><span id="pnlPct" class="n">+0.0%</span></div>
       <div class="spot" id="pnlSpot"></div>
       <div class="spot" id="bracketLine"></div>
     </div>
@@ -415,7 +415,7 @@
     </div>
 
     <div class="blotter">
-      <div class="hd"><span>TODAY</span><span>DAY NET <b class="net" id="dayNet">$0.00</b></span></div>
+      <div class="hd"><span>TODAY</span><span>DAY <b class="net" id="dayNet">+0.0%</b></span></div>
       <div id="blotterRows"></div>
     </div>
 
@@ -539,7 +539,7 @@
 <script>
 const EZ = (function(){
   const LSK="ezexec_creds", LSS="ezexec_settings", LSP="ezexec_profiles", LSPA="ezexec_active_profile", LST="ezexec_theme", LSA="ezexec_autolock", LSST="ezexec_strategies";
-  let connected=false, marketClosed=false;
+  let connected=false, marketClosed=false, lastPreview=null;
   let sym="QQQ", side="CALLS", qty=1, inTrade=false, poll=null, priceTimer=null, trendTimer=null, velTimer=null;
   let profiles=[], activeProf=null, mirrorOn=false;
   let settings={strike_mode:"ITM2",ratchet_enabled:true,ratchet_step_pct:10,tp_enabled:false,tp_value:30,tp_unit:"cents",
@@ -813,7 +813,7 @@ const EZ = (function(){
     if(r.detail){ $('mirrorStatus').textContent=r.detail; return; }
     mirrorOn=true;
     $('mirrorBtn').textContent='DISABLE'; $('mirrorBtn').className='mini off';
-    $('mirrorStatus').textContent=`MIRROR ON → "${name}" (${r.account_type||'?'}, BP $${Number(r.buying_power||0).toFixed(2)}).`;
+    $('mirrorStatus').textContent=`MIRROR ON → "${name}" (${r.account_type||'?'}).`;
     $('footMirror').textContent=' · mirror: '+name;
   }
 
@@ -939,9 +939,11 @@ const EZ = (function(){
       return;
     }
     if(btn){ btn.classList.remove('blocked'); btn.title=''; }
-    if(sub) sub.textContent =
-      `STRIKE ${fmtStrike(q.strike)} · $${q.ask.toFixed(2)} · ${fmtCost(q.ask)}`
-      + (qual.extrinsic_pct!=null ? ` · ${Math.round(qual.extrinsic_pct)}% time` : '');
+    // Strike, and the underlying level it fires at. Nothing else - no premium,
+    // no cost, no time value. Cash figures are deliberately absent everywhere.
+    const trig = lastPreview && lastPreview[q.side];
+    if(sub) sub.textContent = `${fmtStrike(q.strike)}${q.side==='CALLS'?'C':'P'}`
+      + (trig ? `  @  ${trig.toFixed(2)}` : '');
   }
 
   async function refreshQuote(){
@@ -988,7 +990,8 @@ const EZ = (function(){
         api('/api/preview?symbol='+sym+'&side=CALLS'),
         api('/api/preview?symbol='+sym+'&side=PUTS')
       ]);
-      if(!c||!c.ok){ el.innerHTML=''; return; }
+      if(!c||!c.ok){ el.innerHTML=''; lastPreview=null; return; }
+      lastPreview = {CALLS: c.target, PUTS: (p&&p.ok) ? p.target : c.target};
       // 720.0 -> "720", but TSLA's 2.5 step must keep its half: 332.5 -> "332.5"
       const away=Math.abs(c.distance).toFixed(2);
       const where=c.direction==='at' ? 'right here'
@@ -1197,11 +1200,14 @@ const EZ = (function(){
     if(st.mirror){ mirrorOn=true; $('footMirror').textContent=' · mirror: '+st.mirror.name; }
     $('bp').textContent='$'+Number(st.buying_power||0).toLocaleString(undefined,{minimumFractionDigits:2,maximumFractionDigits:2});
     const dn=Number(st.day_realized||0);
-    const el=$('dayNet'); el.textContent=(dn<0?'−$':'$')+Math.abs(dn).toFixed(2); el.className='net'+(dn<0?' neg':'');
+    const dp=Number(st.day_pct||0), w=st.day_wins||0, l=st.day_losses||0;
+    const el=$('dayNet');
+    el.textContent=(dp>=0?'+':'')+dp.toFixed(1)+'%'+((w+l)?`  (${w}W/${l}L)`:'');
+    el.className='net'+(dp<0?' neg':'');
     $('blotterRows').innerHTML=(st.blotter||[]).slice().reverse().map(t=>{
       const up=t.pnl>=0;
       return `<div class="trow"><span class="t">${t.time}</span><span class="s">${t.desc}</span>
-        <span class="mv">${t.move}</span><span class="pl ${up?'up':'dn'}">${up?'+':'−'}$${Math.abs(t.pnl).toFixed(2)}</span></div>`;
+        <span class="mv">${t.move}</span><span class="pl ${up?'up':'dn'}">${up?'+':'−'}${Math.abs(Number(t.pct||0)).toFixed(1)}%</span></div>`;
     }).join('');
 
     const pos=st.position; inTrade=!!pos;
@@ -1221,11 +1227,14 @@ const EZ = (function(){
       const strike=fmtStrike(pos.strike), typ=(pos.side==='CALLS'?'C':'P');
       $('flatActions').classList.add('hidden'); $('tradeActions').classList.remove('hidden'); $('pnlBlock').classList.remove('hidden');
       $('heroBig').textContent='IN '+pos.side;
-      $('heroSub').textContent=`${pos.symbol} ${strike}${typ} × ${pos.qty} · IN ${pos.opened_at} @ ${pos.entry.toFixed(2)}`;
+      // No entry price - it rotates on partial fills and is not actionable.
+      $('heroSub').textContent=`${pos.symbol} ${strike}${typ} × ${pos.qty} · IN ${pos.opened_at}`;
       const pnl=Number(pos.pnl||0);
-      $('pnlN').textContent=money(pnl); $('pnlN').className='n'+(pnl<0?' neg':'');
-      $('pnlPct').textContent=((pos.pnl_pct||0)>=0?'+':'')+(pos.pnl_pct||0)+'%';
-      $('pnlPct').style.color=pnl<0?'var(--red)':'var(--green)';
+      // PERCENT ONLY. No dollar figure anywhere on this screen - it is the
+      // number that moves your decisions, not the one that moves your pulse.
+      const pp=Number(pos.pnl_pct||0);
+      $('pnlPct').textContent=(pp>=0?'+':'')+pp.toFixed(1)+'%';
+      $('pnlPct').className='n'+(pp<0?' neg':'');
       $('pnlSpot').textContent=`${pos.symbol} SPOT ${(pos.spot||0).toFixed(2)} · MARK ${(pos.mark||0).toFixed(3)}`;
       const parts=[];
       if(settings.tp_enabled){
@@ -1244,10 +1253,10 @@ const EZ = (function(){
       if(rt){
         const be = Math.abs(rt.stop_pct) < 0.001;
         $('bracketLine').innerHTML =
-            `STOP <b>${rt.stop_pct>0?'+':''}${rt.stop_pct}%</b> ($${rt.stop_price.toFixed(2)})`
+            `STOP <b>${rt.stop_pct>0?'+':''}${rt.stop_pct}%</b>`
           + (be ? ' <b>BREAKEVEN</b>' : '')
           + ` &nbsp;·&nbsp; best ${rt.pct>=0?'+':''}${Math.round(rt.pct*10)/10}%`
-          + ` &nbsp;·&nbsp; next rung <b>+${rt.next_pct}%</b> ($${rt.next_price.toFixed(2)})`;
+          + ` &nbsp;·&nbsp; next rung <b>+${rt.next_pct}%</b>`;
         $('bracketLine').style.color = rt.stop_pct > 0 ? 'var(--green)'
                                      : (be ? 'var(--amber)' : 'var(--red)');
       }else{
