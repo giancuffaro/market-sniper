@@ -673,6 +673,37 @@ class BaseSession:
             "pnl": pnl,
             "estimated": bool(estimated)})
         self._save_day()
+
+        # Every finished trade funnels through here - manual CLOSE, TP, SL and
+        # the auto-clear when Webull says you are already flat - so this is the
+        # one place the daily log has to be written from.
+        try:
+            import trade_log
+            now = _now_et()
+            opened = p.get("opened_at") or now.strftime("%H:%M")
+            trade_log.record({
+                "date": now.strftime("%Y-%m-%d"),
+                "time_in": opened,
+                "time_out": now.strftime("%H:%M:%S"),
+                "app": "OPTIONS",
+                "broker": "WEBULL",
+                "account": getattr(self, "account_id", ""),
+                "symbol": p.get("symbol"),
+                "side": p.get("side"),
+                "strike": p.get("strike"),
+                "expiry": p.get("expiration"),
+                "qty": p.get("qty"),
+                "entry": round(float(p.get("entry") or 0), 4),
+                "exit": round(float(exit_price), 4),
+                "pnl": pnl,
+                "pnl_pct": (round((float(exit_price) - p["entry"]) / p["entry"] * 100, 2)
+                            if p.get("entry") else ""),
+                "exit_reason": p.get("exit_reason") or ("ESTIMATED" if estimated else "CLOSE"),
+                "held_secs": "",
+                "note": "price estimated until Webull confirms the fill" if estimated else "",
+            })
+        except Exception as e:                               # noqa: BLE001
+            print("[trade_log] not recorded: %s" % str(e)[:120], flush=True)
         return pnl
 
     # ---- Broker truth ------------------------------------------------------
