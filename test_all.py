@@ -196,7 +196,7 @@ try:
     import re as _re
     _code = _re.sub(r"//[^\n]*", "", idx)      # strip comments before searching
     check(10,"strike no longer truncated with |0", "strike|0" not in _code)
-    check(10,"cost shown on buy buttons", "fmtCost" in idx)
+    check(10,"buy button shows the strike", "fmtStrike(q.strike)" in idx)
     check(10,"strike buttons present", "smATM" in idx and "smITM2" in idx)
     fidx = io.open(os.path.join(HERE,"futures_index.html"),encoding="utf-8").read()
     check(10,"no Tradovate UI left", "tvConfig" not in fidx and "tvUser" not in fidx)
@@ -842,7 +842,10 @@ try:
         check(29, f"{what} removed", gone not in code6)
     check(29,"DAY is a percentage, not dollars",
           "DAY <b" in ix6 and "DAY NET" not in ix6)
-    check(29,"blotter rows show %", "t.pct" in code6 and "t.pnl" not in code6)
+    _blot = code6.split('id="blotterRows"',1)[1] if 'id="blotterRows"' in code6 else code6
+    check(29,"blotter rows show %", "t.pct" in code6)
+    check(29,"and no dollar amount in the row template",
+          "$${Math.abs(t.pnl)" not in code6)
     check(29,"ratchet line shows rungs without prices",
           "stop_price" not in code6 and "next_price" not in code6)
     check(29,"hero line drops the rotating fill price",
@@ -855,6 +858,9 @@ try:
     import importlib, webull_client as _w6
     _w6 = importlib.reload(_w6)
     z6 = _w6.make_session("LIVE")
+    # A session loads today's blotter from disk. Start from empty so the counts
+    # measure THIS test, not whatever ran before it.
+    z6.blotter = []; z6.day_realized = 0.0
     for e_, x_ in ((3.00,3.45),(2.40,2.05)):
         z6._record_close({"symbol":"QQQ","side":"CALLS","strike":711.0,"qty":1,
                           "entry":e_,"expiration":"2026-08-26","opened_at":"09:41"},
