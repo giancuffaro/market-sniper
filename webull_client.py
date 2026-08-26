@@ -1138,6 +1138,42 @@ class LiveSession(BaseSession):
                 except Exception:
                     continue
 
+    @staticmethod
+    def contract_quality(spot, strike, option_type, ask, bid):
+        """Is this contract worth owning, or is it scheduled to die?
+
+        Everything here comes from spot / strike / bid / ask - no greeks feed,
+        no implied-vol solve, nothing that can silently go stale. Returns the
+        numbers plus a plain-English reason when it fails.
+        """
+        ask = float(ask or 0)
+        bid = float(bid or 0)
+        intrinsic = (max(0.0, spot - strike) if option_type == "CALL"
+                     else max(0.0, strike - spot))
+        extrinsic = max(0.0, ask - intrinsic)
+        mid = (ask + bid) / 2.0 if (ask and bid) else ask
+        spread_pct = ((ask - bid) / mid * 100.0) if (mid > 0 and bid > 0) else None
+        extrinsic_pct = (extrinsic / ask * 100.0) if ask > 0 else 100.0
+
+        bad = []
+        if ask < config.CONTRACT_MIN_PREMIUM:
+            bad.append("premium $%.2f is under the $%.2f minimum — the spread alone "
+                       "would eat this" % (ask, config.CONTRACT_MIN_PREMIUM))
+        if spread_pct is not None and spread_pct > config.CONTRACT_MAX_SPREAD_PCT:
+            bad.append("bid/ask spread is %.0f%% (max %.0f%%) — you would be down that "
+                       "much the instant you fill" % (spread_pct, config.CONTRACT_MAX_SPREAD_PCT))
+        if extrinsic_pct > config.CONTRACT_MAX_EXTRINSIC_PCT:
+            bad.append("%.0f%% of this premium is time value (max %.0f%%) and it "
+                       "decays to zero at expiry — only $%.2f of the $%.2f is real"
+                       % (extrinsic_pct, config.CONTRACT_MAX_EXTRINSIC_PCT, intrinsic, ask))
+        return {"ok": not bad,
+                "intrinsic": round(intrinsic, 4),
+                "extrinsic": round(extrinsic, 4),
+                "extrinsic_pct": round(extrinsic_pct, 1),
+                "spread_pct": round(spread_pct, 1) if spread_pct is not None else None,
+                "premium": round(ask, 4),
+                "reasons": bad}
+
     def quote(self, symbol, side):
         if not config.SYMBOLS.get(symbol, {}).get("enabled", False):
             raise OrderRejected(
@@ -1152,12 +1188,22 @@ class LiveSession(BaseSession):
             occ_symbol(symbol, _expiry_for(symbol), option_type, strike))
         if not a or a <= 0:
             raise OrderRejected(f"no ask in snapshot — response: {str(row)[:150]}")
+        q = self.contract_quality(spot, strike, option_type, a, b)
         return {"symbol": symbol, "side": side, "spot": spot, "strike": strike,
-                "ask": round(a, 2), "bid": b, "option_type": option_type}
+                "ask": round(a, 2), "bid": b, "option_type": option_type,
+                "quality": q, "tradable": q["ok"]}
 
     def place(self, symbol, side, qty):
         self._guard_open(qty)
         q = self.quote(symbol, side)
+        # Hard stop. A contract that fails the quality filter is not shown and
+        # cannot be bought - checked HERE as well as on screen, because the
+        # screen can be stale and this cannot.
+        if config.CONTRACT_QUALITY_ENFORCED and not q.get("tradable", True):
+            raise OrderRejected(
+                "Blocked — this contract would likely expire worthless.\n\n• "
+                + "\n• ".join(q["quality"]["reasons"])
+                + "\n\nTry a deeper strike (ITM2) or a different symbol.")
         limit = buy_limit(q["ask"])
         orders = config.build_option_order(
             client_order_id=uuid.uuid4().hex[:32], symbol=symbol, strike=q["strike"],

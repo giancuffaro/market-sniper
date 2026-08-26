@@ -83,3 +83,18 @@ DEFAULT_SETTINGS = {
 # Legacy fallback stop, used ONLY if the ratchet is switched off. With the
 # ratchet on (the default) nothing reads this.
 MY_CONFIG_SL_PCT = 10.0
+
+# ---- CONTRACT QUALITY -----------------------------------------------------
+# A hard filter on what the app will let you buy. Fail any of these and the
+# contract is not shown and cannot be ordered.
+#
+# Why these three, and why NOT delta/theta:
+#   Theta is quoted per DAY and 0DTE has hours. What theta actually eats is the
+#   EXTRINSIC (time) part of the premium, and by 4pm that is zero. So extrinsic
+#   as a share of what you pay IS your theta exposure - and unlike delta/theta
+#   it needs no greeks feed and no implied-vol guesswork. A fully OTM 0DTE is
+#   100% extrinsic: every cent scheduled to die.
+CONTRACT_MIN_PREMIUM     = 0.20   # under ~20c the spread alone eats the trade
+CONTRACT_MAX_SPREAD_PCT  = 15.0   # (ask-bid)/mid. 20% spread = down 20% on fill
+CONTRACT_MAX_EXTRINSIC_PCT = 60.0 # more than this is mostly decay, not position
+CONTRACT_QUALITY_ENFORCED = True  # False = warn in the payload but allow it
