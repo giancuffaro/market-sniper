@@ -938,9 +938,12 @@ const EZ = (function(){
     if(btn){ btn.classList.remove('blocked'); btn.title=''; }
     // Strike, and the underlying level it fires at. Nothing else - no premium,
     // no cost, no time value. Cash figures are deliberately absent everywhere.
-    const trig = lastPreview && lastPreview[q.side];
-    if(sub) sub.textContent = `${fmtStrike(q.strike)}${q.side==='CALLS'?'C':'P'}`
-      + (trig ? `  @  ${trig.toFixed(2)}` : '');
+    // While an entry is armed, show the strike THE TRIGGER resolves to. Fall
+    // back to the live quote's strike only when there is no armed level.
+    const pv = lastPreview && lastPreview[q.side];
+    const strike = (pv && pv.strike != null) ? pv.strike : q.strike;
+    if(sub) sub.textContent = `${fmtStrike(strike)}${q.side==='CALLS'?'C':'P'}`
+      + (pv ? `  @  ${pv.target.toFixed(2)}` : '');
   }
 
   async function refreshQuote(){
@@ -988,7 +991,14 @@ const EZ = (function(){
         api('/api/preview?symbol='+sym+'&side=PUTS')
       ]);
       if(!c||!c.ok){ el.innerHTML=''; lastPreview=null; return; }
-      lastPreview = {CALLS: c.target, PUTS: (p&&p.ok) ? p.target : c.target};
+      // Keep the STRIKE as well as the level. /api/quote resolves the strike at
+      // the CURRENT spot, but the order fires at the TRIGGER - at spot 713.40
+      // those are 712C and 711C. Showing one with the other would put a strike
+      // on the button that is not the strike you get.
+      lastPreview = {
+        CALLS: {target: c.target, strike: c.strike},
+        PUTS:  (p&&p.ok) ? {target: p.target, strike: p.strike}
+                         : {target: c.target, strike: null}};
       // 720.0 -> "720", but TSLA's 2.5 step must keep its half: 332.5 -> "332.5"
       const away=Math.abs(c.distance).toFixed(2);
       const where=c.direction==='at' ? 'right here'
