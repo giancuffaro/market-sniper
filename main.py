@@ -66,6 +66,8 @@ class SettingsReq(BaseModel):
     sl_value: Optional[float] = None
     sl_unit: Optional[str] = None
     my_enabled: Optional[bool] = None
+    ratchet_enabled: Optional[bool] = None
+    ratchet_step_pct: Optional[float] = None
 
 
 def _sess():

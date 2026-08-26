@@ -391,6 +391,12 @@ class BaseSession:
         if "tp_enabled" in new: s["tp_enabled"] = bool(new["tp_enabled"])
         if "sl_enabled" in new: s["sl_enabled"] = bool(new["sl_enabled"])
         if "my_enabled" in new: s["my_enabled"] = bool(new["my_enabled"])
+        if "ratchet_enabled" in new: s["ratchet_enabled"] = bool(new["ratchet_enabled"])
+        if "ratchet_step_pct" in new:
+            try:
+                s["ratchet_step_pct"] = max(1.0, min(float(new["ratchet_step_pct"]), 100.0))
+            except (TypeError, ValueError):
+                pass
         if "tp_unit" in new and new["tp_unit"] in ("cents", "usd", "whole"):
             s["tp_unit"] = new["tp_unit"]
         if "sl_unit" in new and new["sl_unit"] in ("cents", "usd", "price", "pct"):

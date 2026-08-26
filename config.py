@@ -70,6 +70,16 @@ DEFAULT_SETTINGS = {
     # whole dollar instead of firing at the ask, and arming auto-sets the
     # whole-number take-profit and the MY_CONFIG_SL_PCT stop.
     "my_enabled": True,
+    # RATCHET — the stop climbs in steps and never comes back down.
+    # Stop always sits one step BELOW the highest rung reached:
+    #   best  0%  -> stop -10%   (the opening stop)
+    #   best +10% -> stop   0%   (breakeven, now hunting +20%)
+    #   best +20% -> stop +10%   (locked in, now hunting +30%)  ... forever
+    # Percent is of the OPTION PREMIUM you paid. When this is on it REPLACES
+    # take-profit and stop-loss: +10% stops being an exit and becomes the
+    # trigger that moves the stop to breakeven.
+    "ratchet_enabled": True,
+    "ratchet_step_pct": 10.0,
 }
 # Auto-applied bracket when a MY CONFIG armed entry fires.
 MY_CONFIG_SL_PCT = 10.0
