@@ -1156,6 +1156,11 @@ class LiveSession(BaseSession):
         extrinsic_pct = (extrinsic / ask * 100.0) if ask > 0 else 100.0
 
         bad = []
+        # The one that actually matters. A fully out-of-the-money 0DTE has NO
+        # real value - 100% of what you pay is scheduled to be gone by 4pm.
+        if getattr(config, "CONTRACT_REQUIRE_INTRINSIC", True) and intrinsic <= 0:
+            bad.append("this strike is OUT of the money — there is no real value in it, "
+                       "100%% of the $%.2f is time premium that expires worthless" % ask)
         if ask < config.CONTRACT_MIN_PREMIUM:
             bad.append("premium $%.2f is under the $%.2f minimum — the spread alone "
                        "would eat this" % (ask, config.CONTRACT_MIN_PREMIUM))
