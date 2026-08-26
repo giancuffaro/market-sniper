@@ -1005,7 +1005,7 @@ class BaseSession:
 
     def state(self):
         self._roll_day()              # a new day starts DAY NET back at zero
-        self._maybe_trigger_entry()   # fire armed MY CONFIG entry if price reached
+        self._maybe_trigger_entry()   # fire armed ABSOLUTE ENTRY if price reached
         self._eval_strategies()       # fire any enabled strategy whose condition is met
         ev, self.last_event = self.last_event, None
         return {"mode": self.mode, "account_id": self.account_id,
@@ -1014,7 +1014,8 @@ class BaseSession:
                 "position": self.position, "armed": self.armed,
                 "day_realized": round(self.day_realized, 2),
                 "blotter": self.blotter[-20:], "settings": self.settings,
-                "strategies": self.strategies, "event": ev}
+                "strategies": self.strategies, "event": ev,
+                "active_mode": getattr(self, "active_mode", None)}
 
 
 class LiveSession(BaseSession):
