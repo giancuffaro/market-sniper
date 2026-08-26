@@ -379,6 +379,7 @@ class BaseSession:
         self.account_type = None
         self.buying_power = 0.0
         self.position = None
+        self.active_mode = {"mode": "manual", "strategy": None, "strategy_name": None}
         # Today's running total and trade list. Loaded from disk so closing the
         # app at lunch and reopening it doesn't wipe the morning's numbers.
         self.day_realized = 0.0
@@ -411,7 +412,11 @@ class BaseSession:
             s["strike_mode"] = "%s%d" % (kind, 1 if kind == "ATM" else depth)
         if "tp_enabled" in new: s["tp_enabled"] = bool(new["tp_enabled"])
         if "sl_enabled" in new: s["sl_enabled"] = bool(new["sl_enabled"])
-        if "my_enabled" in new: s["my_enabled"] = bool(new["my_enabled"])
+        if "my_enabled" in new:
+            s["my_enabled"] = bool(new["my_enabled"])
+            # Turning ABSOLUTE ENTRY on switches every strategy off, and vice
+            # versa. One armed thing at a time, always.
+            self._enforce_single_mode("entry" if s["my_enabled"] else None)
         if "ratchet_enabled" in new: s["ratchet_enabled"] = bool(new["ratchet_enabled"])
         if "ratchet_step_pct" in new:
             try:
@@ -675,12 +680,60 @@ class BaseSession:
             self.last_event = f"MY CONFIG entry blocked at {a['target']:.0f}: {e}"
 
     # ---- Strategy engine: conditions that auto-execute --------------------
+    def _enforce_single_mode(self, prefer=None):
+        """Exactly ONE thing may be armed: ABSOLUTE ENTRY, or one strategy.
+
+        Enforced on the SERVER, not just the screen. Two auto-entries live at
+        once means two positions out of one move, and a checkbox is the last
+        thing that should be trusted to prevent that.
+
+        prefer="entry"      -> keep ABSOLUTE ENTRY, switch every strategy off
+        prefer="<strat id>" -> keep that strategy, switch ENTRY and the rest off
+        prefer=None         -> resolve whatever is already on; entry wins a tie
+        """
+        strats = self.strategies or []
+        on = [st for st in strats if st.get("enabled")]
+
+        if prefer == "entry":
+            for st in strats:
+                st["enabled"] = False
+            self.settings["my_enabled"] = True
+        elif prefer:
+            for st in strats:
+                st["enabled"] = (st.get("id") == prefer)
+            self.settings["my_enabled"] = False
+        elif self.settings.get("my_enabled") and on:
+            for st in strats:
+                st["enabled"] = False
+        elif len(on) > 1:
+            keep = on[0].get("id")
+            for st in strats:
+                st["enabled"] = (st.get("id") == keep)
+
+        active = next((st for st in strats if st.get("enabled")), None)
+        self.active_mode = {
+            "mode": "strategy" if active else
+                    ("entry" if self.settings.get("my_enabled") else "manual"),
+            "strategy": (active or {}).get("id"),
+            "strategy_name": (active or {}).get("name")}
+        return self.active_mode
+
     def update_strategies(self, strategies):
         if not isinstance(strategies, list):
             raise OrderRejected("strategies must be a list")
         cleaned = [c for c in (_coerce_strategy(s) for s in strategies) if c]
+        # Only ONE strategy may be on. If the client sent several, the newly
+        # enabled one wins and the rest are switched off.
+        was_on = {st["id"] for st in (self.strategies or []) if st.get("enabled")}
+        now_on = [st for st in cleaned if st.get("enabled")]
+        newly = next((st for st in now_on if st["id"] not in was_on), None)
         self.strategies = cleaned
-        uc.save("options_strategies", cleaned)   # remembered for next launch
+        if newly:
+            self._enforce_single_mode(newly["id"])
+        else:
+            self._enforce_single_mode(None)
+        uc.save("options_strategies", self.strategies)   # remembered for next launch
+        uc.save("options_settings", self.settings)
         return self.strategies
 
     def _strategy_side(self, st, sym):
