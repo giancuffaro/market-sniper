@@ -781,10 +781,17 @@ try:
     check(28,"grid keeps every whole dollar", all(float(d) in lv for d in range(708,713)))
     check(28,"grid adds X2.50 and X7.50", 707.5 in lv and 712.5 in lv)
     check(28,"grid adds nothing else", not any(abs(x%1-0.5)<1e-9 and int(x)%10 not in (2,7) for x in lv))
-    for spot, want in [(707.40,707.5),(707.60,707.5),(707.10,707.0),
-                       (712.40,712.5),(712.60,712.5),(709.60,710.0)]:
-        check(28,f"spot {spot} fires at {want}", L5.entry_target(spot)==want,
-              str(L5.entry_target(spot)))
+    # These used to assert the NEAREST level regardless of side, which is why
+    # 707.40 expected 707.50 - a level ABOVE spot for a call. Entry is
+    # directional now, so each case names the side it belongs to.
+    for spot, side, want in [(707.40,"CALLS",707.0), (707.40,"PUTS",707.5),
+                             (707.60,"CALLS",707.5), (707.60,"PUTS",708.0),
+                             (707.10,"CALLS",707.0), (707.10,"PUTS",707.5),
+                             (712.40,"CALLS",712.0), (712.40,"PUTS",712.5),
+                             (712.60,"CALLS",712.5), (712.60,"PUTS",713.0),
+                             (709.60,"CALLS",709.0), (709.60,"PUTS",710.0)]:
+        got = L5.entry_target(spot, side)
+        check(28,f"{side} at {spot} fire at {want}", got==want, str(got))
 
     for spot in (713.40, 713.60, 714.00, 713.00):
         c = _w5.pick_strike(spot,"CALLS",1.0,"ATM1")
