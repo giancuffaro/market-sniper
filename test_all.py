@@ -765,6 +765,64 @@ try:
     check(27,"backend tp/sl fields still exist for STRATEGIES",
           '"tp_unit"' in wsrc2 and '"sl_unit"' in wsrc2)
 
+    print("\n[28] ENTRY GRID, ATM, CONTRACT QUALITY, ONE-ARMED-THING")
+    import importlib, config as _c5, webull_client as _w5
+    _c5 = importlib.reload(_c5); _w5 = importlib.reload(_w5)
+    L5 = _w5.LiveSession
+
+    lv = L5.entry_levels_near(710.3, span=3)
+    check(28,"grid keeps every whole dollar", all(float(d) in lv for d in range(708,713)))
+    check(28,"grid adds X2.50 and X7.50", 707.5 in lv and 712.5 in lv)
+    check(28,"grid adds nothing else", not any(abs(x%1-0.5)<1e-9 and int(x)%10 not in (2,7) for x in lv))
+    for spot, want in [(707.40,707.5),(707.60,707.5),(707.10,707.0),
+                       (712.40,712.5),(712.60,712.5),(709.60,710.0)]:
+        check(28,f"spot {spot} fires at {want}", L5.entry_target(spot)==want,
+              str(L5.entry_target(spot)))
+
+    for spot in (713.40, 713.60, 714.00, 713.00):
+        c = _w5.pick_strike(spot,"CALLS",1.0,"ATM1")
+        p_ = _w5.pick_strike(spot,"PUTS",1.0,"ATM1")
+        check(28,f"ATM1 at {spot} is never OTM", c<=spot and p_>=spot, f"{c}/{p_}")
+    check(28,"ATM parses", _w5.parse_strike_mode("ATM1")==("ATM",1))
+    check(28,"garbage falls back to ITM1, not a lottery ticket",
+          _w5.parse_strike_mode("banana")==("ITM",1))
+
+    Q = L5.contract_quality
+    good = Q(713.40, 711.0, "CALL", 3.05, 2.95)
+    check(28,"a real ITM contract is allowed", good["ok"], str(good["reasons"]))
+    atm  = Q(713.40, 713.0, "CALL", 1.10, 1.02)
+    check(28,"ATM is NOT blocked just for having time value", atm["ok"], str(atm["reasons"]))
+    otm  = Q(713.40, 718.0, "CALL", 0.09, 0.05)
+    check(28,"a fully-OTM lottery ticket is blocked", not otm["ok"])
+    check(28,"and it says WHY, in English", any("OUT of the money" in r for r in otm["reasons"]))
+    wide = Q(713.40, 711.0, "CALL", 3.60, 2.90)
+    check(28,"a wide spread is blocked", not wide["ok"])
+    cheap = Q(713.40, 712.9, "CALL", 0.15, 0.14)
+    check(28,"a sub-minimum premium is blocked", not cheap["ok"])
+
+    z = _w5.make_session("LIVE")
+    z.strategies=[{"id":"a","name":"A","enabled":False},{"id":"b","name":"B","enabled":False}]
+    z.settings["my_enabled"]=True; z._enforce_single_mode("entry")
+    check(28,"entry armed -> no strategy on",
+          z.settings["my_enabled"] and not any(x["enabled"] for x in z.strategies))
+    z.update_strategies([{"id":"a","name":"A","enabled":True},{"id":"b","name":"B","enabled":False}])
+    check(28,"arming a strategy switches ENTRY off", z.settings["my_enabled"] is False)
+    check(28,"and it is the only one on",
+          [x["id"] for x in z.strategies if x["enabled"]]==["a"])
+    z.update_strategies([{"id":"a","name":"A","enabled":True},{"id":"b","name":"B","enabled":True}])
+    check(28,"two at once is impossible",
+          len([x for x in z.strategies if x["enabled"]])==1)
+    z.update_settings({"my_enabled":True})
+    check(28,"re-arming ENTRY switches every strategy off",
+          not any(x["enabled"] for x in z.strategies))
+    check(28,"state reports what is armed", z.active_mode["mode"]=="entry")
+
+    ix5 = io.open(os.path.join(HERE,"index.html"),encoding="utf-8").read()
+    check(28,"buttons are ATM1/ITM1/ITM2", all(k in ix5 for k in ("smATM","smITM2")) and "smITM3" not in ix5)
+    check(28,"a retired ITM3 still lights a button", "m==='ITM3'" in ix5)
+    check(28,"blocked contracts are unclickable", ".buy-c.blocked" in ix5 and "pointer-events:none" in ix5)
+    check(28,"armed-mode banner exists", 'id="activeMode"' in ix5)
+
 finally:
     for p_ in (OPT,FUT):
         if p_:
@@ -778,7 +836,7 @@ print("\n"+"="*68)
 by={}
 for sc,name,ok,_ in results:
     by.setdefault(sc,[0,0]); by[sc][0]+=1; by[sc][1]+= (1 if ok else 0)
-T={27:"Config screen cleanup",26:"Ratchet stop",25:"Console auto-hide",24:"Options auto-reconcile",23:"Daily trade log",22:"Options phantom clear",21:"Auto-reconcile w/ broker",20:"MY CONFIG always on",19:"Phantom position",18:"Futures hours",17:"Closed market honest",16:"Restart leaves no spinner",15:"One tab only",14:"Git lock self-heal",13:"Broker tabs + tray",12:"Velocity honest when shut",11:"Multi-broker sessions",1:"Futures login survives restart",2:"remember_login default",3:"Options profiles to disk",
+T={28:"Grid/ATM/quality/one-armed",27:"Config screen cleanup",26:"Ratchet stop",25:"Console auto-hide",24:"Options auto-reconcile",23:"Daily trade log",22:"Options phantom clear",21:"Auto-reconcile w/ broker",20:"MY CONFIG always on",19:"Phantom position",18:"Futures hours",17:"Closed market honest",16:"Restart leaves no spinner",15:"One tab only",14:"Git lock self-heal",13:"Broker tabs + tray",12:"Velocity honest when shut",11:"Multi-broker sessions",1:"Futures login survives restart",2:"remember_login default",3:"Options profiles to disk",
    4:"Browser autofill guard",5:"ITM3 strike math",6:"Preview == Arm",7:"Live-only / dead modes",
    8:"Auto-sync safety",9:"Endpoints alive",10:"UI integrity"}
 for sc in sorted(by):
