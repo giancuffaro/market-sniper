@@ -922,7 +922,7 @@ try:
     # Toggle switches, not checkboxes.
     check(31, "toggle-switch styling exists", ".sw input:checked + i" in _idx)
     check(31, "entry+ratchet uses a switch",
-          '<span class="sw"><input type="checkbox" id="myEnabled">' in _idx)
+          '<span class="sw"><input type="checkbox" id="myEnabled"' in _idx)
     check(31, "strategy cards use a switch",
           _idx.count('class="sw"') >= 2 and 'EZ.toggleStrategy' in _idx)
     # ONE switch for both halves.
@@ -933,6 +933,11 @@ try:
     check(31, "arming a strategy switches the one switch off",
           "api('/api/settings',{my_enabled:false});" in _idx)
     # Server refuses to hold the two apart, whatever arrives.
+    # update_settings() persists to my-settings.json. These are throwaway
+    # objects exercising the logic, so the write is stubbed out - otherwise the
+    # suite leaves the real file holding whatever the last loop iteration set.
+    _real_save = wb.uc.save
+    wb.uc.save = lambda *a, **k: None
     import config as _cfgA
     class _One(wb.LiveSession):
         def __init__(self):
@@ -965,11 +970,16 @@ try:
     _f.settings["my_enabled"] = True
     _f.update_settings({"strike_mode": "ITM1"})
     check(31, "an unrelated setting leaves the switch alone", _f.settings["my_enabled"])
+    wb.uc.save = _real_save
 
     # --- 32. No SAVE button; a live trade keeps its own terms -------------
     import config as _cfg0
     check(32, "the SAVE button is gone", "EZ.saveSettings()" not in _idx)
-    check(32, "and CANCEL with it", ">CANCEL<" not in _idx)
+    # Scoped to the settings footer: CANCEL also names the DISARM button and the
+    # strategy editor's cancel, neither of which is going anywhere.
+    _sact = _idx.split('<div class="sactions">', 1)[1].split('</div>', 1)[0]
+    check(32, "and CANCEL with it", "CANCEL" not in _sact)
+    check(32, "only one button is left in the footer", _sact.count("<button") == 1)
     check(32, "DONE just closes", 'onclick="EZ.closeSettings()">DONE<' in _idx)
     check(32, "the switch writes on change",
           'id="myEnabled"' in _idx and
