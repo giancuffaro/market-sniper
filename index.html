@@ -215,7 +215,7 @@
   .smodal{width:100%;max-width:410px;border:1px solid var(--line);border-radius:16px;background:var(--panel);padding:24px 20px;max-height:90vh;overflow-y:auto}
   .smodal h2{margin:0 0 16px;font-size:15px;letter-spacing:.2em;color:var(--txt);text-align:center}
   .sgroup{border:1px solid var(--line);border-radius:12px;padding:14px;margin-bottom:12px}
-  /* MY CONFIG — deliberately a different typeface so you know it's yours */
+  /* ABSOLUTE ENTRY — deliberately a different typeface so you know it's yours */
   .myfont{font-family:'Space Grotesk','Inter',sans-serif}
   .sgroup.mine{border:1.5px solid var(--green);background:var(--green-deep)}
   .sgroup.mine .glbl{color:var(--green);letter-spacing:.14em}
@@ -393,7 +393,7 @@
         <button class="buy-c" onclick="EZ.buy('CALLS')">BUY CALLS<small id="callSub">loading…</small></button>
         <button class="buy-p" onclick="EZ.buy('PUTS')">BUY PUTS<small id="putSub">loading…</small></button>
       </div>
-      <div id="previewLine" class="prevline" title="Where a MY CONFIG armed entry would fire, and the contract you'd be holding when it does. Nothing is sent until you press ARM."></div>
+      <div id="previewLine" class="prevline" title="Where an ABSOLUTE ENTRY would fire, and the contract you'd be holding when it does. Nothing is sent until you press ARM."></div>
     </div>
 
     <div id="lockNote" class="locknote hidden">🔒 In a trade — CLOSE is the only button until you're out.</div>
@@ -978,7 +978,7 @@ const EZ = (function(){
       const r=await api('/api/order/arm',{symbol:sym,side:s,qty});
       if(!r.ok && r.rejected){ showReject(r.reason,r.phantom); return; }
       hideReject();
-      showEvent('ARMED · MY CONFIG — waiting for '+sym+' to reach '+Number(r.target).toFixed(0)+', then buys the ask');
+      showEvent('ARMED · ABSOLUTE ENTRY — waiting for '+sym+' to reach '+Number(r.target).toFixed(0)+', then buys the ask');
       await tick(); return;
     }
     const r=await api('/api/order/place',{symbol:sym,side:s,qty});
@@ -1140,7 +1140,7 @@ const EZ = (function(){
     const armed=st.armed;
     if(armed && !pos){
       $('armBand').classList.remove('hidden');
-      $('armTitle').textContent='ARMED · MY CONFIG';
+      $('armTitle').textContent='ARMED · ABSOLUTE ENTRY';
       $('armSub').textContent='waiting for '+armed.symbol+' → '+Number(armed.target).toFixed(0)+' · then '+armed.side+' at ask';
     }else{
       $('armBand').classList.add('hidden');
