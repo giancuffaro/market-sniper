@@ -435,8 +435,10 @@
         <div class="srow">
           <label class="tog"><input type="checkbox" id="myEnabled"> ABSOLUTE ENTRY</label>
         </div>
-        <div class="shint myfont">Waits for the underlying to reach the nearest whole
-        dollar, then buys. That is the entry — the exit belongs to the ratchet below.</div>
+        <div class="shint myfont">Waits for the underlying to reach the nearest level,
+        then buys. Levels are <b>every whole dollar</b> plus the <b>X2.50 and X7.50</b>
+        halves — 707.00, 707.50, 708.00, 709.00 … 712.00, <b>712.50</b>, 713.00.
+        That is the entry — the exit belongs to the ratchet below.</div>
 
         <div class="srow" style="margin-top:10px">
           <label class="tog"><input type="checkbox" id="ratchetEnabled"> RATCHET TRAILING</label>
@@ -456,15 +458,16 @@
       <div class="sgroup">
         <div class="glbl">STRIKE SELECTION</div>
         <div class="strikeopts">
-          <button id="smOTM" onclick="EZ.setStrikeMode('OTM1')">1 STRIKE<br>OUT OF THE MONEY<br><span class="risk hi">MORE RISK</span></button>
+          <button id="smATM" onclick="EZ.setStrikeMode('ATM1')">ATM<br>AT THE MONEY<br><span class="risk hi">MORE RISK</span></button>
           <button id="smITM" onclick="EZ.setStrikeMode('ITM1')">1 STRIKE<br>IN THE MONEY<br><span class="risk lo">LESS RISK</span></button>
-          <button id="smITM3" onclick="EZ.setStrikeMode('ITM3')">3 STRIKES<br>IN THE MONEY<br><span class="risk lo">LEAST RISK</span></button>
+          <button id="smITM2" onclick="EZ.setStrikeMode('ITM2')">2 STRIKES<br>IN THE MONEY<br><span class="risk lo">LEAST RISK</span></button>
         </div>
-        <div class="shint">QQQ at 724 buying a CALL: OTM1 picks the <b>725</b>, ITM1 the
-        <b>723</b>, ITM3 the <b>721</b>. PUTS mirror it — ITM3 picks the <b>727</b>.
-        Deeper in the money costs more per contract and moves closer to
-        dollar-for-dollar with the stock. Depth counts <b>strikes</b>, so on TSLA
-        (2.50 steps) 3 deep is $7.50, not $3.</div>
+        <div class="shint">QQQ at 713.40 buying a CALL: <b>ATM</b> picks the 713,
+        <b>ITM1</b> the 713, <b>ITM2</b> the 712. PUTS mirror it.<br>
+        ATM takes the nearest strike but <b>never</b> one that is out of the money —
+        if the nearest lands OTM it steps one in, so there is always real value in it.
+        Deeper in the money costs more and tracks the stock more closely. Depth counts
+        <b>strikes</b>, so on TSLA (2.50 steps) 2 deep is $5.00, not $2.</div>
       </div>
 
       </div><!-- /paneConfig -->
@@ -530,7 +533,7 @@ const EZ = (function(){
   let connected=false, marketClosed=false;
   let sym="QQQ", side="CALLS", qty=1, inTrade=false, poll=null, priceTimer=null, trendTimer=null, velTimer=null;
   let profiles=[], activeProf=null, mirrorOn=false;
-  let settings={strike_mode:"ITM3",ratchet_enabled:true,ratchet_step_pct:10,tp_enabled:false,tp_value:30,tp_unit:"cents",
+  let settings={strike_mode:"ITM2",ratchet_enabled:true,ratchet_step_pct:10,tp_enabled:false,tp_value:30,tp_unit:"cents",
                 sl_enabled:false,sl_value:20,sl_unit:"cents",my_enabled:true};
   let autolock={enabled:false,minutes:10}, lastActivity=Date.now();
   let prefs={}, prefsReady=false, prefsLoaded=null;
@@ -757,9 +760,12 @@ const EZ = (function(){
   // One place decides which strike button is lit, so adding a depth later
   // can't leave two of them highlighted at once.
   function paintStrikeMode(m){
-    $('smOTM').classList.toggle('on',m==='OTM1');
+    // ITM3 was retired when the buttons became ATM1/ITM1/ITM2. A saved ITM3
+    // would light nothing at all, so it maps to its nearest surviving option.
+    if(m==='ITM3'||m==='OTM1') m = (m==='ITM3') ? 'ITM2' : 'ATM1';
+    $('smATM').classList.toggle('on',m==='ATM1');
     $('smITM').classList.toggle('on',m==='ITM1');
-    $('smITM3').classList.toggle('on',m==='ITM3');
+    $('smITM2').classList.toggle('on',m==='ITM2');
   }
   function setStrikeMode(m){
     settings.strike_mode=m;

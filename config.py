@@ -62,7 +62,7 @@ DEFAULT_SETTINGS = {
     # v3.7: the execute button buys 3 strikes IN the money by default.
     # Depth counts STRIKES, not dollars — 3 deep is $3 on SPY/QQQ (step 1.0)
     # and $7.50 on TSLA (step 2.5). Format is ITM<n> / OTM<n>, n up to 20.
-    "strike_mode": "ITM3",
+    "strike_mode": "ITM2",
     "tp_enabled": False, "tp_value": 30.0, "tp_unit": "cents",
     "sl_enabled": False, "sl_value": 20.0, "sl_unit": "cents",
     # ABSOLUTE ENTRY (round-number entry) is ON by default. The buy buttons ARM
