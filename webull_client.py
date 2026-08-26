@@ -26,7 +26,7 @@ except Exception as _e:
     SDK_HINT = f"import failed: {str(_e)[:80]}"
     try:
         import webullsdkcore  # noqa: F401
-        SDK_HINT = "an OLDER Webull SDK is installed — double-click 🧰 INSTALL.bat, then relaunch"
+        SDK_HINT = "an OLDER Webull SDK is installed — restart with START MARKET SNIPER (it reinstalls the SDK)"
     except Exception:
         pass
 
@@ -247,7 +247,7 @@ class OptionData:
     def _client(self):
         if self._dc is None:
             if DataClient is None:
-                raise OrderRejected("webull.data.DataClient not importable — run 🧰 INSTALL.bat again.")
+                raise OrderRejected("webull.data.DataClient not importable — restart with START MARKET SNIPER.")
             self._dc = DataClient(self._api)
         return self._dc
 
@@ -287,7 +287,7 @@ class OptionData:
         if code == 403:
             raise OrderRejected(
                 "Webull returned 403 for market data — the $4.99/mo OPRA OpenAPI "
-                "subscription is missing/inactive (see TUTORIAL.html Part 3).")
+                "subscription is missing/inactive — add it at developer.webull.com.")
         if code != 200:
             try:
                 body = str(res.json())[:150]
@@ -715,7 +715,11 @@ class BaseSession:
     # Webull app and this app never hears about it - it keeps managing a trade
     # that no longer exists, and a TP/SL firing then sends a SELL for contracts
     # you do not hold, which does not flatten anything.
-    RECONCILE_EVERY = 12.0            # seconds
+    # How often to ask Webull "what do I actually hold". The whole poll runs
+    # once a second anyway, so this is the only thing deciding how long a
+    # phantom position sits on screen. 3s costs one small API call and makes it
+    # feel instant.
+    RECONCILE_EVERY = 3.0
 
     def _position_fns(self):
         """Find the SDK's 'list my positions' call at runtime.
@@ -872,7 +876,7 @@ class LiveSession(BaseSession):
     def connect(self, app_key, app_secret, account_id=None):
         if not SDK_AVAILABLE:
             detail = f" ({SDK_HINT})" if SDK_HINT else ""
-            raise OrderRejected("Webull SDK not usable" + detail + " — run 🧰 INSTALL.bat, then relaunch.")
+            raise OrderRejected("Webull SDK not usable" + detail + " — restart with START MARKET SNIPER.")
         self._require_live_env()
         api_client = ApiClient(app_key, app_secret, config.REGION)
         api_client.add_endpoint(config.REGION, self._endpoint)

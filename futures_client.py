@@ -1012,7 +1012,7 @@ class TopstepSession(BaseFuturesSession):
     # trade that no longer exists, and a TP/SL firing then sends a CLOSE for
     # contracts you do not hold, which OPENS a position the other way.
     # ProjectX can just tell us, so ask it.
-    RECONCILE_EVERY = 10.0            # seconds; the API is not free
+    RECONCILE_EVERY = 3.0             # seconds - fast enough to feel instant
 
     def broker_positions(self):
         """Open positions ACCORDING TO TOPSTEP. None means 'could not ask'.
@@ -1223,7 +1223,7 @@ class WebullFuturesSession(BaseFuturesSession):
             from webull.trade.trade_client import TradeClient
             from webull.data.data_client import DataClient
         except Exception as e:                              # noqa: BLE001
-            raise OrderRejected("Webull SDK not installed — run INSTALL.bat, then "
+            raise OrderRejected("Webull SDK not installed — restart with START MARKET SNIPER, then "
                                 "relaunch. (%s)" % str(e)[:120])
         self._require_live_env()                # real-money gate, no way around it
         if not app_key or not app_secret:

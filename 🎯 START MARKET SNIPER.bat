@@ -12,7 +12,12 @@ if exist ".git\packed-refs.lock"  del /f /q ".git\packed-refs.lock"  >nul 2>&1
 if exist ".git\ORIG_HEAD.lock"    del /f /q ".git\ORIG_HEAD.lock"    >nul 2>&1
 del /f /q /s ".git\refs\*.lock" >nul 2>&1
 
-rem  One-time leftovers. Harmless once they are gone.
+rem  Housekeeping. _trash is where retired files are parked for deletion;
+rem  __pycache__ and _archive are both regenerated or already superseded.
+rem  None of this is ever needed to run the app.
+if exist "_trash"             rd  /s /q "_trash"             >nul 2>&1
+if exist "_archive"           rd  /s /q "_archive"           >nul 2>&1
+if exist "__pycache__"        rd  /s /q "__pycache__"        >nul 2>&1
 if exist "_probe_delete.txt"  del /f /q "_probe_delete.txt"  >nul 2>&1
 if exist "_probe_dir"         rd  /s /q "_probe_dir"         >nul 2>&1
 if exist ".git\_probe"        del /f /q ".git\_probe"        >nul 2>&1
@@ -27,7 +32,27 @@ rem  the venv first on PATH is not dependable - on this machine bare `pip` was
 rem  resolving to the system Python 3.14 install, so packages went there while
 rem  the app kept running from .venv and never saw them.
 set "VPY=%~dp0.venv\Scripts\python.exe"
-"%VPY%" -m pip install -q -r requirements.txt
+
+rem  Only touch pip when something is actually MISSING. This used to run
+rem  `pip install -r requirements.txt` on every single launch, which means a
+rem  round trip to PyPI every time just to be told the same four packages were
+rem  already there. An import check answers the same question locally.
+"%VPY%" -c "import fastapi, uvicorn, pydantic, openpyxl" >nul 2>&1
+if errorlevel 1 (
+  echo       Installing app dependencies...
+  "%VPY%" -m pip install -q -r requirements.txt
+  "%VPY%" -c "import fastapi, uvicorn, pydantic, openpyxl" >nul 2>&1
+  if errorlevel 1 (
+    echo.
+    echo       ############################################################
+    echo       #  Core dependencies failed to install. The app cannot run.
+    echo       #  Check your internet connection and run this again.
+    echo       ############################################################
+    echo.
+    pause
+    exit /b 1
+  )
+)
 
 rem  Tray icon deps: installed ONCE, and only when actually missing. Kept out of
 rem  requirements.txt so this file, which runs every launch, does not re-check
@@ -41,6 +66,26 @@ if errorlevel 1 (
     echo       Tray icon unavailable - app still works fine without it.
   ) else (
     echo       Tray icon installed.
+  )
+)
+
+rem  The Webull SDK. This used to live only in INSTALL.bat, which meant deleting
+rem  that file would have quietly broken a fresh setup. Checked by import, so on
+rem  every normal launch this costs one line and no network.
+"%VPY%" -c "from webull.core.client import ApiClient" >nul 2>&1
+if errorlevel 1 (
+  echo       First run: installing the Webull SDK, this takes a minute...
+  "%VPY%" -m pip install -q --upgrade webull-openapi-python-sdk
+  "%VPY%" -c "from webull.core.client import ApiClient" >nul 2>&1
+  if errorlevel 1 (
+    echo.
+    echo       ############################################################
+    echo       #  The Webull SDK did not install. The app will start but
+    echo       #  cannot connect or trade. Check your internet and rerun.
+    echo       ############################################################
+    echo.
+  ) else (
+    echo       Webull SDK installed.
   )
 )
 
@@ -99,7 +144,9 @@ echo   and pushed on its own - no git, no UPDATE.bat, no push.
 echo   It refuses to push code that does not compile, and never
 echo   commits my-settings.json. Log: logs\auto-sync.log
 echo.
-echo   THIS is the only window now. Closing it stops everything.
+echo   This window hides itself once everything is up - the green
+echo   crosshair in your system tray takes over. Right-click it for
+echo   Show / hide console, or Quit.
 echo ==============================================================
 
 rem  Open the browser after a beat, without blocking the console below.

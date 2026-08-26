@@ -201,6 +201,38 @@ def sweep_logs():
         pass
     if moved:
         log("tidied %d log file(s) into logs/" % moved)
+    prune_logs()
+
+
+# The Webull SDK rotates its log on every run and never cleans up. Left alone
+# that reached 4.5 MB across 23 dead files in a month, one of them 3.2 MB. Keep
+# a week - enough to debug something that happened recently, nothing more.
+KEEP_LOG_DAYS = 7
+NEVER_PRUNE = ("auto-sync.log", "trades.csv", ".xlsx")
+
+
+def prune_logs():
+    """Delete rotated SDK logs older than KEEP_LOG_DAYS. Never touches the
+    trade log or the sync log - those are records, not debris."""
+    cutoff = time.time() - KEEP_LOG_DAYS * 86400
+    gone = 0
+    try:
+        for fn in os.listdir(LOG_DIR):
+            if any(k in fn for k in NEVER_PRUNE):
+                continue
+            if not (fn.startswith("webull_") and ".log." in fn):
+                continue                      # only ROTATED logs, never the live one
+            path = os.path.join(LOG_DIR, fn)
+            try:
+                if os.path.getmtime(path) < cutoff:
+                    os.remove(path)
+                    gone += 1
+            except OSError:
+                pass                          # in use - next time
+    except OSError:
+        pass
+    if gone:
+        log("pruned %d SDK log(s) older than %d days" % (gone, KEEP_LOG_DAYS))
 
 
 def clear_stale_lock():

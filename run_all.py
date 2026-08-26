@@ -36,6 +36,10 @@ try:
 except Exception:
     TRAY_AVAILABLE = False
 
+# Show the console while everything boots, then hide it. You get to see the
+# startup (and any error) and still end up with a clean desktop.
+HIDE_AFTER_SECONDS = 6
+
 HERE = os.path.dirname(os.path.abspath(__file__))
 PY = sys.executable                      # the venv's python, since that is what launched us
 
@@ -66,6 +70,10 @@ def stop_all(reason=""):
     if stopping.is_set():
         return
     stopping.set()
+    # Bring the window back on the way out, so a shutdown message is never
+    # delivered to a window nobody can see.
+    if _console_hidden:
+        _show_console(True)
     if reason:
         print("\n=== shutting everything down: %s ===" % reason, flush=True)
     for tag, p in procs:
@@ -84,6 +92,56 @@ def stop_all(reason=""):
                 p.kill()
             except Exception:
                 pass
+
+
+# ---- Console show/hide (Windows) -----------------------------------------
+_console_hidden = False
+
+def _console_hwnd():
+    """Handle of our own console window, or None if we do not have one."""
+    try:
+        import ctypes
+        hwnd = ctypes.windll.kernel32.GetConsoleWindow()
+        return hwnd or None
+    except Exception:
+        return None                            # not Windows, or no console
+
+
+def _show_console(show=True):
+    global _console_hidden
+    hwnd = _console_hwnd()
+    if not hwnd:
+        return False
+    try:
+        import ctypes
+        ctypes.windll.user32.ShowWindow(hwnd, 5 if show else 0)   # SW_SHOW / SW_HIDE
+        _console_hidden = not show
+        return True
+    except Exception:
+        return False
+
+
+def hide_console_when_ready(tray):
+    """Hide the window a few seconds after startup - but ONLY if the tray icon
+    is actually running.
+
+    That condition is the whole safety of this feature. Hiding the console
+    without a tray would leave the app running with no window and no menu: no
+    way to stop it, no way to see what it is doing. If the tray failed for any
+    reason the console stays put, and says why.
+    """
+    if tray is None:
+        print("[TRAY   ] no tray icon, so the window stays visible - it would "
+              "otherwise be your only way to stop the app.", flush=True)
+        return
+
+    def _later():
+        time.sleep(HIDE_AFTER_SECONDS)
+        if stopping.is_set():
+            return
+        if _show_console(False):
+            print("[TRAY   ] console hidden - use the tray icon from here on.", flush=True)
+    threading.Thread(target=_later, daemon=True).start()
 
 
 def _icon_image():
@@ -127,6 +185,9 @@ def start_tray():
         except Exception:
             webbrowser.open("file:///" + path.replace("\\", "/"))
 
+    def _toggle_console(icon, item):
+        _show_console(_console_hidden)
+
     def _quit(icon, item):
         icon.visible = False
         icon.stop()
@@ -138,6 +199,7 @@ def start_tray():
         pystray.Menu.SEPARATOR,
         pystray.MenuItem("Open trade log (Excel)", _open_trades),
         pystray.MenuItem("View sync log", _open_log),
+        pystray.MenuItem("Show / hide console", _toggle_console),
         pystray.Menu.SEPARATOR,
         pystray.MenuItem("Quit Market Sniper", _quit),
     )
@@ -175,6 +237,7 @@ def main():
         print("[%-7s] started (pid %d)" % (tag, p.pid), flush=True)
 
     tray = start_tray()
+    hide_console_when_ready(tray)
 
     try:
         while True:

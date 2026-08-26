@@ -298,21 +298,24 @@ try:
     import run_all
     check(13,"tray is optional, not required", hasattr(run_all,"TRAY_AVAILABLE"))
     check(13,"missing tray libs do NOT crash the launcher", run_all.start_tray() is None)
-    check(13,"silent .vbs launcher exists",
-          any("START HIDDEN" in f for f in os.listdir(HERE)))
-    inst = [f for f in os.listdir(HERE) if f.endswith("INSTALL.bat")]
-    itxt = io.open(os.path.join(HERE,inst[0]),encoding="utf-8").read() if inst else ""
+    # START HIDDEN.vbs, INSTALL.bat, STOP EVERYTHING.bat, TUTORIAL.html and
+    # CHECK-SETUP.bat were deleted on request. The launcher absorbed the one
+    # thing INSTALL did that nothing else did: installing the Webull SDK.
+    _lb0 = [f for f in os.listdir(HERE) if f.endswith("START MARKET SNIPER.bat")]
+    _l0 = io.open(os.path.join(HERE,_lb0[0]),encoding="utf-8").read() if _lb0 else ""
+    check(13,"launcher installs the Webull SDK itself",
+          "webull-openapi-python-sdk" in _l0)
+    check(13,"and verifies it imported", _l0.count("from webull.core.client import ApiClient") >= 2)
+    itxt = _l0
     req  = io.open(os.path.join(HERE,"requirements.txt"),encoding="utf-8").read()
-    check(13,"installer installs the tray deps", "pystray" in itxt)
+    check(13,"launcher installs the tray deps", "pystray" in itxt)
     check(13,"tray deps NOT in requirements (runs every launch)",
           not any(l.strip()=="pystray" for l in req.splitlines()))
-    check(13,"installer clears Mark-of-the-Web", "Unblock-File" in itxt)
-    check(13,"installer survives optional tray failure",
-          "app runs fine" in itxt or "Not a problem" in itxt)
-    check(13,"installer fails LOUDLY on core deps", "coredeps_failed" in itxt)
-    check(13,"installer warns about SmartScreen", "SmartScreen" in itxt)
-    check(13,"installer names the real launcher files",
-          "START MARKET SNIPER.bat" in itxt and "START HIDDEN" in itxt)
+    check(13,"launcher clears Mark-of-the-Web", "Unblock-File" in itxt)
+    check(13,"survives an optional tray failure", "still works fine" in itxt)
+    check(13,"launcher warns if the SDK fails", "cannot connect or trade" in itxt)
+    check(13,"no dead references to deleted files",
+          not any(x in itxt for x in ("INSTALL.bat\"", "CHECK-SETUP", "TUTORIAL.html")))
 
     print("\n[14] AUTO-SYNC HEALS A STALE GIT LOCK")
     import subprocess as _sp, tempfile, shutil as _sh
@@ -632,6 +635,36 @@ try:
           < wsrc.split("def refresh_mark",1)[1].split("def close",1)[0].index("_maybe_auto_close"))
     check(24,"finds the SDK call at runtime, not hardcoded", "_position_fns" in wsrc)
 
+    print("\n[25] CONSOLE AUTO-HIDE + no pointless installs")
+    _lb2 = [f for f in os.listdir(HERE) if f.endswith("START MARKET SNIPER.bat")]
+    L = io.open(os.path.join(HERE,_lb2[0]),encoding="utf-8").read() if _lb2 else ""
+    check(25,"deps are import-checked before pip runs",
+          'import fastapi, uvicorn, pydantic, openpyxl' in L)
+    # Look at the real command lines, not the comments that mention them.
+    _cmds = [l.strip() for l in L.splitlines() if not l.strip().lower().startswith("rem")]
+    _i_chk = next(i for i,l in enumerate(_cmds) if "import fastapi" in l)
+    _i_pip = next(i for i,l in enumerate(_cmds) if "-r requirements.txt" in l)
+    check(25,"pip only runs inside that failure branch", _i_chk < _i_pip)
+    check(25,"and it is guarded by errorlevel",
+          any("errorlevel 1" in l for l in _cmds[_i_chk:_i_pip]))
+    check(25,"SDK likewise only installs when missing",
+          L.index("from webull.core.client import ApiClient") < L.index("webull-openapi-python-sdk"))
+    check(25,"tray likewise", L.index("import pystray, PIL") < L.index("pystray pillow"))
+    check(25,"core dep failure stops the launch", "cannot run" in L)
+
+    import run_all as _ra, importlib
+    _ra = importlib.reload(_ra)
+    check(25,"hide is delayed, not instant", getattr(_ra,"HIDE_AFTER_SECONDS",0) >= 3)
+    check(25,"NO tray -> console never hides", _ra.hide_console_when_ready(None) is None)
+    check(25,"hiding is a no-op off Windows", _ra._show_console(False) is False)
+    check(25,"tray can bring it back", "_toggle_console" in io.open(
+          os.path.join(HERE,"run_all.py"),encoding="utf-8").read())
+    rsrc = io.open(os.path.join(HERE,"run_all.py"),encoding="utf-8").read()
+    check(25,"shutdown un-hides first, so you see why it stopped",
+          "_show_console(True)" in rsrc.split("def stop_all",1)[1][:400])
+    check(25,"the hide is conditional on the tray, in code",
+          "if tray is None" in rsrc)
+
 finally:
     for p_ in (OPT,FUT):
         if p_:
@@ -645,7 +678,7 @@ print("\n"+"="*68)
 by={}
 for sc,name,ok,_ in results:
     by.setdefault(sc,[0,0]); by[sc][0]+=1; by[sc][1]+= (1 if ok else 0)
-T={24:"Options auto-reconcile",23:"Daily trade log",22:"Options phantom clear",21:"Auto-reconcile w/ broker",20:"MY CONFIG always on",19:"Phantom position",18:"Futures hours",17:"Closed market honest",16:"Restart leaves no spinner",15:"One tab only",14:"Git lock self-heal",13:"Broker tabs + tray",12:"Velocity honest when shut",11:"Multi-broker sessions",1:"Futures login survives restart",2:"remember_login default",3:"Options profiles to disk",
+T={25:"Console auto-hide",24:"Options auto-reconcile",23:"Daily trade log",22:"Options phantom clear",21:"Auto-reconcile w/ broker",20:"MY CONFIG always on",19:"Phantom position",18:"Futures hours",17:"Closed market honest",16:"Restart leaves no spinner",15:"One tab only",14:"Git lock self-heal",13:"Broker tabs + tray",12:"Velocity honest when shut",11:"Multi-broker sessions",1:"Futures login survives restart",2:"remember_login default",3:"Options profiles to disk",
    4:"Browser autofill guard",5:"ITM3 strike math",6:"Preview == Arm",7:"Live-only / dead modes",
    8:"Auto-sync safety",9:"Endpoints alive",10:"UI integrity"}
 for sc in sorted(by):

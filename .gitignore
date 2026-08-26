@@ -16,3 +16,6 @@ _archive/
 
 # One-shot throwaway that deletes itself after a successful start.
 *CLEAN RESTART*.bat
+
+# Files parked for deletion. The launcher removes this folder on start.
+_trash/
