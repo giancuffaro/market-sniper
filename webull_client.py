@@ -1048,6 +1048,16 @@ class LiveSession(BaseSession):
                 self._try_update_fill(p)
             except Exception:
                 pass
+
+        # Ask Webull what we actually hold BEFORE any bracket can fire. If you
+        # closed by hand, the position below is fiction and a TP/SL firing
+        # against it would send a SELL for contracts you do not own.
+        try:
+            if self.reconcile() is not None:
+                return None                   # just cleared it; nothing to manage
+        except Exception:
+            pass                              # never let this break the poll
+
         try:
             a, b, m, _ = self._od.ask_bid_mark(
                 occ_symbol(p["symbol"], p["expiration"], p["option_type"], p["strike"]))
