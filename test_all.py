@@ -689,7 +689,7 @@ try:
 
     def _rt(marks, step=10.0, entry=3.00):
         z=_w4.make_session("LIVE")
-        z.settings.update({"ratchet_enabled":True,"ratchet_step_pct":step})
+        z.settings.update({"my_enabled":True,"ratchet_step_pct":step})
         z.position={"symbol":"QQQ","side":"CALLS","strike":711.0,"qty":1,
                     "entry":entry,"mark":entry,"expiration":"2026-08-26"}
         out=[]
@@ -724,20 +724,20 @@ try:
 
     # ratchet replaces TP/SL
     z4=_w4.make_session("LIVE")
-    z4.settings.update({"ratchet_enabled":True,"tp_enabled":True,"tp_unit":"cents",
+    z4.settings.update({"my_enabled":True,"tp_enabled":True,"tp_unit":"cents",
                         "tp_value":1,"sl_enabled":True,"sl_unit":"pct","sl_value":1})
     z4.position={"symbol":"QQQ","side":"CALLS","strike":711.0,"qty":1,
                  "entry":3.00,"mark":3.06,"expiration":"2026-08-26"}
     check(26,"a 1c take-profit can NOT close a ratcheted trade", z4._bracket_hit() is None)
 
     z5=_w4.make_session("LIVE"); z5._guard_open=lambda q: None
-    z5.settings["ratchet_enabled"]=True
+    z5.settings["my_enabled"]=True
     z5._underlying=lambda sym: 713.0
     z5.arm("QQQ","CALLS",1)
     check(26,"arming does not re-enable a take-profit", z5.settings["tp_enabled"] is False)
 
     cfg = io.open(os.path.join(HERE,"config.py"),encoding="utf-8").read()
-    check(26,"on by default", "\"ratchet_enabled\": True" in cfg)
+    check(26,"on by default", '"my_enabled": True' in cfg)
     idx4 = io.open(os.path.join(HERE,"index.html"),encoding="utf-8").read()
     check(26,"live stop shown while in a trade", "next rung" in idx4)
     # The separate RATCHET checkbox is gone - it is one switch with the entry
@@ -773,7 +773,7 @@ try:
 
     wsrc2 = io.open(os.path.join(HERE,"webull_client.py"),encoding="utf-8").read()
     check(27,"arming is entry-ONLY when the ratchet is on",
-          "if not s.get(\"ratchet_enabled\"):" in wsrc2)
+          "if not s.get(\"my_enabled\"):" in wsrc2)
     check(27,"backend tp/sl fields still exist for STRATEGIES",
           '"tp_unit"' in wsrc2 and '"sl_unit"' in wsrc2)
 
@@ -928,41 +928,46 @@ try:
     # ONE switch for both halves.
     check(31, "the separate RATCHET checkbox is gone", "ratchetEnabled" not in _idx)
     check(31, "the step % input survived", 'id="ratchetStep"' in _idx)
-    check(31, "saving ties ratchet to the one switch",
-          "settings.ratchet_enabled=settings.my_enabled" in _idx)
-    check(31, "arming a strategy switches BOTH halves off",
-          "ratchet_enabled:false" in _idx)
+    check(31, "the browser stores ONE key, not two",
+          "settings.ratchet_enabled" not in _idx)
+    check(31, "arming a strategy switches the one switch off",
+          "api('/api/settings',{my_enabled:false});" in _idx)
     # Server refuses to hold the two apart, whatever arrives.
+    import config as _cfgA
     class _One(wb.LiveSession):
         def __init__(self):
             import config as _cfg
             self.settings = dict(_cfg.DEFAULT_SETTINGS); self.strategies = []
         def _enforce_single_mode(self, prefer=None): pass
     _f = _One()
+    check(31, "ratchet_enabled is not a setting any more",
+          "ratchet_enabled" not in _cfgA.DEFAULT_SETTINGS)
+    check(31, "my_enabled is", _cfgA.DEFAULT_SETTINGS["my_enabled"] is True)
     for _start in (True, False):
-        for _send in ({"my_enabled": True}, {"my_enabled": False},
-                      {"ratchet_enabled": True}, {"ratchet_enabled": False},
-                      {"my_enabled": True, "ratchet_enabled": False},
-                      {"my_enabled": False, "ratchet_enabled": True}):
-            _f.settings.update({"my_enabled": _start, "ratchet_enabled": _start})
+        for _send, _want in (({"my_enabled": True}, True),
+                             ({"my_enabled": False}, False),
+                             # legacy key, still accepted, folded into the one
+                             ({"ratchet_enabled": True}, True),
+                             ({"ratchet_enabled": False}, False),
+                             # both sent: the live key wins, no ambiguity
+                             ({"my_enabled": True, "ratchet_enabled": False}, True),
+                             ({"my_enabled": False, "ratchet_enabled": True}, False)):
+            _f.settings["my_enabled"] = _start
             _f.update_settings(dict(_send))
-            _e = _f.settings["my_enabled"]; _r = _f.settings["ratchet_enabled"]
-            _want = bool(_send["my_enabled"] if "my_enabled" in _send
-                         else _send["ratchet_enabled"])
-            check(31, "from %s, %s -> both %s" % (_start, _send, _want),
-                  _e == _r == _want, "%s/%s" % (_e, _r))
-    # The specific trap: OR-ing the two makes OFF impossible to send.
-    _f.settings.update({"my_enabled": True, "ratchet_enabled": True})
+            check(31, "from %s, %s -> %s" % (_start, _send, _want),
+                  _f.settings["my_enabled"] is _want, str(_f.settings["my_enabled"]))
+            check(31, "and the retired key is never stored (%s)" % _send,
+                  "ratchet_enabled" not in _f.settings)
+    # The trap the old two-key version had: OR-ing them made OFF unsendable.
+    _f.settings["my_enabled"] = True
     _f.update_settings({"my_enabled": False})
-    check(31, "entry can actually be switched OFF",
-          _f.settings["my_enabled"] is False and _f.settings["ratchet_enabled"] is False)
-    # An unrelated POST must not flip either half.
-    _f.settings.update({"my_enabled": True, "ratchet_enabled": True})
+    check(31, "it can actually be switched OFF", _f.settings["my_enabled"] is False)
+    _f.settings["my_enabled"] = True
     _f.update_settings({"strike_mode": "ITM1"})
-    check(31, "an unrelated setting leaves the switch alone",
-          _f.settings["my_enabled"] and _f.settings["ratchet_enabled"])
+    check(31, "an unrelated setting leaves the switch alone", _f.settings["my_enabled"])
 
     # --- 32. No SAVE button; a live trade keeps its own terms -------------
+    import config as _cfg0
     check(32, "the SAVE button is gone", "EZ.saveSettings()" not in _idx)
     check(32, "and CANCEL with it", ">CANCEL<" not in _idx)
     check(32, "DONE just closes", 'onclick="EZ.closeSettings()">DONE<' in _idx)
@@ -979,7 +984,7 @@ try:
           "parseFloat($('ratchetStep').value)||10" in _idx)
     check(32, "and the box is written back so it matches storage",
           "$('ratchetStep').value=settings.ratchet_step_pct" in _idx)
-    check(32, "10% is the shipped default", config.DEFAULT_SETTINGS["ratchet_step_pct"] == 10.0)
+    check(32, "10% is the shipped default", _cfg0.DEFAULT_SETTINGS["ratchet_step_pct"] == 10.0)
     check(32, "and the input agrees", 'id="ratchetStep" type="number" min="1" max="100" step="1" value="10"' in _idx)
     check(32, "an open trade is called out on screen", 'id="liveNote"' in _idx and "NEXT trade" in _idx)
 
@@ -987,7 +992,7 @@ try:
     # server at once. A live trade must not be re-tuned underneath itself.
     _wc2 = io.open("webull_client.py", encoding="utf-8").read()
     check(32, "terms are frozen onto the position at open",
-          '"ratchet_on": bool(self.settings.get("ratchet_enabled"))' in _wc2 and
+          '"ratchet_on": bool(self.settings.get("my_enabled"))' in _wc2 and
           '"ratchet_step": float(self.settings.get("ratchet_step_pct")' in _wc2)
     check(32, "the ratchet reads the position, not live settings",
           'p.get("ratchet_on"' in _wc2 and 'p.get("ratchet_step"' in _wc2)
@@ -1008,14 +1013,14 @@ try:
     check(32, "changing the step mid-trade does NOT move a live stop",
           _stop_before == _stop_after == 0.0, "%s -> %s" % (_stop_before, _stop_after))
     # Switching the whole feature off mid-trade must not abandon the open stop.
-    _lv.settings["ratchet_enabled"] = False
+    _lv.settings["my_enabled"] = False
     _lv._update_ratchet()
     check(32, "switching it off mid-trade does not abandon the open stop",
           _lv.position.get("ratchet") is not None)
     # And the NEXT trade does pick the new terms up.
-    _lv.settings.update({"ratchet_enabled": True, "ratchet_step_pct": 50.0})
+    _lv.settings.update({"my_enabled": True, "ratchet_step_pct": 50.0})
     _lv.position = {"entry": 3.00, "mark": 4.80, "qty": 1,
-                    "ratchet_on": bool(_lv.settings["ratchet_enabled"]),
+                    "ratchet_on": bool(_lv.settings["my_enabled"]),
                     "ratchet_step": float(_lv.settings["ratchet_step_pct"])}
     _lv._update_ratchet()
     check(32, "the next trade uses the new step (+60% -> stop +0%)",
