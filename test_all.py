@@ -1036,6 +1036,40 @@ try:
     check(32, "the next trade uses the new step (+60% -> stop +0%)",
           _lv.position["ratchet"]["stop_pct"] == 0.0,
           str(_lv.position["ratchet"]["stop_pct"]))
+
+    # --- 33. The page actually RUNS ---------------------------------------
+    # node --check parses; it does not execute. paintLiveNote() read a variable
+    # named `position` that was never declared - a ReferenceError thrown one
+    # line before the modal was shown, so SETTINGS silently stopped opening and
+    # every syntax check still passed. ui_smoke.js evaluates the real script and
+    # calls the handlers a user can reach.
+    import subprocess as _sp
+    _sm = _sp.run(["node", "ui_smoke.js", "index.html"],
+                  cwd=HERE, capture_output=True, text=True, timeout=60)
+    check(33, "the options page runs and its handlers do not throw",
+          _sm.returncode == 0, (_sm.stdout + _sm.stderr).strip()[:400])
+
+    # And prove the harness can still see that exact failure, or it is theatre.
+    _broken = io.open(os.path.join(HERE, "index.html"), encoding="utf-8").read() \
+        .replace("    const live=!!inTrade;", "    const live=!!position;", 1) \
+        .replace("    $('setScrim').classList.add('show');\n    try{\n    showTab('config')",
+                 "    showTab('config')", 1)
+    _bp = os.path.join(HERE, "_ui_smoke_selftest.html")
+    io.open(_bp, "w", encoding="utf-8").write(_broken)
+    try:
+        _bad = _sp.run(["node", "ui_smoke.js", "_ui_smoke_selftest.html"],
+                       cwd=HERE, capture_output=True, text=True, timeout=60)
+        check(33, "the smoke test still catches an undeclared variable",
+              _bad.returncode != 0 and "is not defined" in (_bad.stdout + _bad.stderr))
+    finally:
+        try: os.remove(_bp)
+        except OSError: pass
+
+    # The guard that keeps one bad painter from locking you out of settings.
+    check(33, "settings open BEFORE anything is painted",
+          "$('setScrim').classList.add('show');\n    try{" in _idx)
+    check(33, "a painter that throws is logged, not fatal",
+          "catch(e){ console.error('settings paint failed:', e); }" in _idx)
     check(29,"and no premium/time value on the button",
           "% time" not in ix6 and "q.ask.toFixed" not in code6)
 
@@ -1072,7 +1106,7 @@ print("\n"+"="*68)
 by={}
 for sc,name,ok,_ in results:
     by.setdefault(sc,[0,0]); by[sc][0]+=1; by[sc][1]+= (1 if ok else 0)
-T={32:"No SAVE / live trade frozen",31:"One switch / still modal",30:"Directional entry levels",29:"Percent only, no cash",28:"Grid/ATM/quality/one-armed",27:"Config screen cleanup",26:"Ratchet stop",25:"Console auto-hide",24:"Options auto-reconcile",23:"Daily trade log",22:"Options phantom clear",21:"Auto-reconcile w/ broker",20:"MY CONFIG always on",19:"Phantom position",18:"Futures hours",17:"Closed market honest",16:"Restart leaves no spinner",15:"One tab only",14:"Git lock self-heal",13:"Broker tabs + tray",12:"Velocity honest when shut",11:"Multi-broker sessions",1:"Futures login survives restart",2:"remember_login default",3:"Options profiles to disk",
+T={33:"Page actually runs",32:"No SAVE / live trade frozen",31:"One switch / still modal",30:"Directional entry levels",29:"Percent only, no cash",28:"Grid/ATM/quality/one-armed",27:"Config screen cleanup",26:"Ratchet stop",25:"Console auto-hide",24:"Options auto-reconcile",23:"Daily trade log",22:"Options phantom clear",21:"Auto-reconcile w/ broker",20:"MY CONFIG always on",19:"Phantom position",18:"Futures hours",17:"Closed market honest",16:"Restart leaves no spinner",15:"One tab only",14:"Git lock self-heal",13:"Broker tabs + tray",12:"Velocity honest when shut",11:"Multi-broker sessions",1:"Futures login survives restart",2:"remember_login default",3:"Options profiles to disk",
    4:"Browser autofill guard",5:"ITM3 strike math",6:"Preview == Arm",7:"Live-only / dead modes",
    8:"Auto-sync safety",9:"Endpoints alive",10:"UI integrity"}
 for sc in sorted(by):
