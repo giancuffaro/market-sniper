@@ -66,6 +66,8 @@ class SettingsReq(BaseModel):
     sl_value: Optional[float] = None
     sl_unit: Optional[str] = None
     my_enabled: Optional[bool] = None
+    # Retired: entry and ratchet are one setting (my_enabled). Still accepted
+    # so an old cached page cannot 422 - update_settings folds it in.
     ratchet_enabled: Optional[bool] = None
     ratchet_step_pct: Optional[float] = None
 

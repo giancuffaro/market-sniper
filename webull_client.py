@@ -389,8 +389,14 @@ class BaseSession:
         # Start from whatever you had switched on last time (my-settings.json),
         # not from the factory defaults.
         self.settings = dict(config.DEFAULT_SETTINGS)
-        self.settings.update({k: v for k, v in uc.load("options_settings", {}).items()
+        _saved = uc.load("options_settings", {}) or {}
+        self.settings.update({k: v for k, v in _saved.items()
                               if k in config.DEFAULT_SETTINGS})
+        # A file written before entry and ratchet became one setting. The filter
+        # above drops the retired key silently, which would quietly switch the
+        # feature off for anyone upgrading mid-position, so fold it in first.
+        if "my_enabled" not in _saved and "ratchet_enabled" in _saved:
+            self.settings["my_enabled"] = bool(_saved["ratchet_enabled"])
         self.last_event = None
         self.armed = None   # ABSOLUTE ENTRY pending round-number entry
         self.strategies = _restore_strategies(uc.load("options_strategies", None))

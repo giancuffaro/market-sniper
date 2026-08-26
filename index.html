@@ -577,7 +577,7 @@ const EZ = (function(){
   let connected=false, marketClosed=false, lastPreview=null;
   let sym="QQQ", side="CALLS", qty=1, inTrade=false, poll=null, priceTimer=null, trendTimer=null, velTimer=null;
   let profiles=[], activeProf=null, mirrorOn=false;
-  let settings={strike_mode:"ITM2",ratchet_enabled:true,ratchet_step_pct:10,tp_enabled:false,tp_value:30,tp_unit:"cents",
+  let settings={strike_mode:"ITM2",ratchet_step_pct:10,tp_enabled:false,tp_value:30,tp_unit:"cents",
                 sl_enabled:false,sl_value:20,sl_unit:"cents",my_enabled:true};
   let autolock={enabled:false,minutes:10}, lastActivity=Date.now();
   let prefs={}, prefsReady=false, prefsLoaded=null;
@@ -791,10 +791,8 @@ const EZ = (function(){
     paintStrikeMode(settings.strike_mode);
     paintActiveMode();
     $('ratchetStep').value=settings.ratchet_step_pct||10;
-    // ONE switch now. Entry and ratchet are a single feature, so a saved file
-    // where only one of them is true still lights the switch - and saving
-    // writes them back in step.
-    $('myEnabled').checked = !!(settings.my_enabled || settings.ratchet_enabled);
+    // ONE setting, not two held in step. my_enabled IS the ratchet.
+    $('myEnabled').checked = !!settings.my_enabled;
     // TAKE PROFIT / STOP LOSS / AUTO-LOCK were removed from the screen: the
     // ratchet owns the exit now. The settings still exist server-side because
     // STRATEGIES uses tp/sl per strategy - they are simply not hand-edited.
@@ -847,7 +845,6 @@ const EZ = (function(){
       strategies.forEach(x=>x.enabled=false);   // entry wins; server agrees
       persistStrategies(); renderStrategies();
     }
-    settings.ratchet_enabled=settings.my_enabled;   // one switch, both halves
     // Empty or junk in the step box falls back to 10, and the box is written
     // back so what you read is what is stored.
     settings.ratchet_step_pct=Math.max(1,Math.min(parseFloat($('ratchetStep').value)||10,100));
@@ -1183,9 +1180,8 @@ const EZ = (function(){
     if(turningOn){
       strategies.forEach(x=>{ x.enabled = (x.id===id); });
       settings.my_enabled = false;
-      settings.ratchet_enabled = false;
       $('myEnabled').checked = false;
-      api('/api/settings',{my_enabled:false, ratchet_enabled:false});
+      api('/api/settings',{my_enabled:false});
     }else{
       s.enabled = false;
     }
