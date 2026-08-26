@@ -745,6 +745,34 @@ class BaseFuturesSession:
                 return "TRAIL"
         return None
 
+    def _log_trade(self, p, exit_price, pnl, reason="CLOSE"):
+        """Write a finished futures trade to the daily log. Never raises."""
+        try:
+            import trade_log, datetime as _dt
+            now = _dt.datetime.now()
+            trade_log.record({
+                "date": now.strftime("%Y-%m-%d"),
+                "time_in": p.get("opened_at") or "",
+                "time_out": now.strftime("%H:%M:%S"),
+                "app": "FUTURES",
+                "broker": getattr(self, "mode", ""),
+                "account": getattr(self, "account_id", ""),
+                "symbol": p.get("symbol"),
+                "side": p.get("side"),
+                "strike": "",
+                "expiry": "",
+                "qty": p.get("qty"),
+                "entry": p.get("entry"),
+                "exit": exit_price,
+                "pnl": pnl,
+                "pnl_pct": "",
+                "exit_reason": reason,
+                "held_secs": "",
+                "note": "",
+            })
+        except Exception as e:                               # noqa: BLE001
+            print("[trade_log] futures not recorded: %s" % str(e)[:120], flush=True)
+
     def forget_position(self):
         """Escape hatch for a position the app thinks you hold but the broker
         does not - typically because you closed it by hand in the platform.
@@ -897,6 +925,8 @@ class NinjaTraderSession(BaseFuturesSession):
         pv = FUT[p["symbol"]]["point_value"]
         pnl = round(self._points_pnl() * pv * p["qty"], 2)
         self.day_realized += pnl
+        self._log_trade(p, locals().get("px") or p.get("mark"), pnl,
+                        getattr(self, "_exit_reason", "CLOSE"))
         self.buying_power += pnl
         self.blotter.append({"time": p["opened_at"],
                              "desc": "%s %s x%d (NT)" % (p["symbol"], p["side"], p["qty"]),
@@ -1124,6 +1154,8 @@ class TopstepSession(BaseFuturesSession):
         pv = FUT[p["symbol"]]["point_value"]
         pnl = round(self._points_pnl() * pv * p["qty"], 2)
         self.day_realized += pnl; self.buying_power += pnl
+        self._log_trade(p, locals().get("px") or p.get("mark"), pnl,
+                        getattr(self, "_exit_reason", "CLOSE"))
         self.blotter.append({"time": p["opened_at"],
                              "desc": "%s %s x%d (TS)" % (p["symbol"], p["side"], p["qty"]),
                              "move": "%.2f -> %.2f" % (p["entry"], p["mark"]), "pnl": pnl})
