@@ -432,7 +432,12 @@ class BaseSession:
         step = float(step) if step else 10.0
         if step <= 0:
             step = 10.0
-        rung = math.floor(max(0.0, float(peak_pct)) / step) * step
+        # Nudge before flooring. (3.30-3.00)/3.00*100 is 9.999999999999993, not
+        # 10, so an exact +10% touch would floor to rung 0 and leave the stop at
+        # -10% instead of moving to breakeven. A trade landing exactly on a rung
+        # is the normal case, not an edge case.
+        peak = max(0.0, float(peak_pct))
+        rung = math.floor(peak / step + 1e-9) * step
         return {"rung": round(rung, 4),
                 "stop_pct": round(rung - step, 4),
                 "next_pct": round(rung + step, 4)}
