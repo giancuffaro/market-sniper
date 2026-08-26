@@ -787,6 +787,11 @@ const EZ = (function(){
   }
 
   function openSettings(){
+    // Show the window FIRST. Every line below is decoration, and decoration
+    // must never be able to keep you out of your own settings - a throw in any
+    // one of them used to abort the whole function before .show was added.
+    $('setScrim').classList.add('show');
+    try{
     showTab('config'); cancelStrategyEdit(); renderStrategies();
     paintStrikeMode(settings.strike_mode);
     paintActiveMode();
@@ -801,7 +806,7 @@ const EZ = (function(){
     $('mirrorBtn').textContent=mirrorOn?'DISABLE':'ENABLE';
     $('mirrorBtn').className='mini'+(mirrorOn?' off':'');
     paintLiveNote();
-    $('setScrim').classList.add('show');
+    }catch(e){ console.error('settings paint failed:', e); }
   }
   // One place decides which strike button is lit, so adding a depth later
   // can't leave two of them highlighted at once.
@@ -824,7 +829,10 @@ const EZ = (function(){
   // the ratchet terms it opened with. Say so, plainly, while it is open.
   function paintLiveNote(){
     const n=$('liveNote'); if(!n) return;
-    const live=!!position;
+    // inTrade, not `position` - there is no such variable, and referencing it
+    // threw a ReferenceError right here, one line before the modal was shown.
+    // That is why SETTINGS stopped opening at all.
+    const live=!!inTrade;
     n.hidden=!live;
     if(live) n.textContent='A trade is live. It keeps the settings it was opened '
       +'with — anything you change here applies to your NEXT trade.';
