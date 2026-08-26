@@ -896,6 +896,65 @@ try:
           "{a['target']:.0f}" not in _wc)
     check(30, "arm() asks for a side-specific target",
           "self.entry_target(spot, side)" in _wc)
+
+    # --- 31. One switch, still window, toggle switches -------------------
+    _idx = io.open("index.html", encoding="utf-8").read()
+    # The modal is vertically centred; a content-height box re-centres on every
+    # tab change and the whole frame jumps.
+    check(31, "settings modal has a fixed height", "height:min(90vh,760px)" in _idx)
+    check(31, "modal is a flex column so the frame cannot resize",
+          "flex-direction:column" in _idx.split(".smodal{",1)[1][:400])
+    check(31, "only the pane area scrolls", ".panes{" in _idx and "overflow-y:auto" in _idx)
+    check(31, "title/tabs/actions are pinned",
+          ".smodal h2,.smodal .tabs,.smodal .activemode,.smodal .sactions{flex:none}" in _idx)
+    check(31, "every pane lives inside the scroller",
+          all(('id="%s"' % p) in _idx.split('<div class="panes">',1)[1]
+                                   .split('<!-- /panes -->',1)[0]
+              for p in ("paneConfig","paneStrat","paneMirror")))
+    check(31, "save/cancel do NOT scroll away",
+          "sactions" not in _idx.split('<div class="panes">',1)[1]
+                                .split('<!-- /panes -->',1)[0])
+    # Toggle switches, not checkboxes.
+    check(31, "toggle-switch styling exists", ".sw input:checked + i" in _idx)
+    check(31, "entry+ratchet uses a switch",
+          '<span class="sw"><input type="checkbox" id="myEnabled">' in _idx)
+    check(31, "strategy cards use a switch",
+          _idx.count('class="sw"') >= 2 and 'EZ.toggleStrategy' in _idx)
+    # ONE switch for both halves.
+    check(31, "the separate RATCHET checkbox is gone", "ratchetEnabled" not in _idx)
+    check(31, "the step % input survived", 'id="ratchetStep"' in _idx)
+    check(31, "saving ties ratchet to the one switch",
+          "settings.ratchet_enabled=settings.my_enabled" in _idx)
+    check(31, "arming a strategy switches BOTH halves off",
+          "ratchet_enabled:false" in _idx)
+    # Server refuses to hold the two apart, whatever arrives.
+    class _One(wb.LiveSession):
+        def __init__(self):
+            self.settings = dict(config.DEFAULT_SETTINGS); self.strategies = []
+        def _enforce_single_mode(self, prefer=None): pass
+    _f = _One()
+    for _start in (True, False):
+        for _send in ({"my_enabled": True}, {"my_enabled": False},
+                      {"ratchet_enabled": True}, {"ratchet_enabled": False},
+                      {"my_enabled": True, "ratchet_enabled": False},
+                      {"my_enabled": False, "ratchet_enabled": True}):
+            _f.settings.update({"my_enabled": _start, "ratchet_enabled": _start})
+            _f.update_settings(dict(_send))
+            _e = _f.settings["my_enabled"]; _r = _f.settings["ratchet_enabled"]
+            _want = bool(_send["my_enabled"] if "my_enabled" in _send
+                         else _send["ratchet_enabled"])
+            check(31, "from %s, %s -> both %s" % (_start, _send, _want),
+                  _e == _r == _want, "%s/%s" % (_e, _r))
+    # The specific trap: OR-ing the two makes OFF impossible to send.
+    _f.settings.update({"my_enabled": True, "ratchet_enabled": True})
+    _f.update_settings({"my_enabled": False})
+    check(31, "entry can actually be switched OFF",
+          _f.settings["my_enabled"] is False and _f.settings["ratchet_enabled"] is False)
+    # An unrelated POST must not flip either half.
+    _f.settings.update({"my_enabled": True, "ratchet_enabled": True})
+    _f.update_settings({"strike_mode": "ITM1"})
+    check(31, "an unrelated setting leaves the switch alone",
+          _f.settings["my_enabled"] and _f.settings["ratchet_enabled"])
     check(29,"and no premium/time value on the button",
           "% time" not in ix6 and "q.ask.toFixed" not in code6)
 
@@ -932,7 +991,7 @@ print("\n"+"="*68)
 by={}
 for sc,name,ok,_ in results:
     by.setdefault(sc,[0,0]); by[sc][0]+=1; by[sc][1]+= (1 if ok else 0)
-T={30:"Directional entry levels",29:"Percent only, no cash",28:"Grid/ATM/quality/one-armed",27:"Config screen cleanup",26:"Ratchet stop",25:"Console auto-hide",24:"Options auto-reconcile",23:"Daily trade log",22:"Options phantom clear",21:"Auto-reconcile w/ broker",20:"MY CONFIG always on",19:"Phantom position",18:"Futures hours",17:"Closed market honest",16:"Restart leaves no spinner",15:"One tab only",14:"Git lock self-heal",13:"Broker tabs + tray",12:"Velocity honest when shut",11:"Multi-broker sessions",1:"Futures login survives restart",2:"remember_login default",3:"Options profiles to disk",
+T={31:"One switch / still modal",30:"Directional entry levels",29:"Percent only, no cash",28:"Grid/ATM/quality/one-armed",27:"Config screen cleanup",26:"Ratchet stop",25:"Console auto-hide",24:"Options auto-reconcile",23:"Daily trade log",22:"Options phantom clear",21:"Auto-reconcile w/ broker",20:"MY CONFIG always on",19:"Phantom position",18:"Futures hours",17:"Closed market honest",16:"Restart leaves no spinner",15:"One tab only",14:"Git lock self-heal",13:"Broker tabs + tray",12:"Velocity honest when shut",11:"Multi-broker sessions",1:"Futures login survives restart",2:"remember_login default",3:"Options profiles to disk",
    4:"Browser autofill guard",5:"ITM3 strike math",6:"Preview == Arm",7:"Live-only / dead modes",
    8:"Auto-sync safety",9:"Endpoints alive",10:"UI integrity"}
 for sc in sorted(by):
