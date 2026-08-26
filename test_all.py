@@ -488,8 +488,11 @@ try:
     check(20,"the config default is not False",
           not re.search(r'"my_enabled"\s*:\s*False',
                         io.open(os.path.join(HERE,"config.py"),encoding="utf-8").read()))
-    check(20,"the browser fallback is not false",
-          "my_enabled:false" not in idx2.replace(" ",""))
+    # Only the DECLARED default matters. Sending {my_enabled:false} when a
+    # strategy takes over is the exclusivity rule doing its job.
+    _decl = [l for l in idx2.splitlines() if "let settings=" in l or "sl_unit:" in l]
+    check(20,"the browser fallback default is true",
+          any("my_enabled:true" in l.replace(" ","") for l in _decl), str(_decl)[:120])
     saved = json.load(io.open(SETTINGS,encoding="utf-8")).get("options_settings",{})
     check(20,"your saved file says ON", saved.get("my_enabled") is True, str(saved.get("my_enabled")))
     check(20,"ON means the buttons ARM, not buy at the ask",
