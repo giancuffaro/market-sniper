@@ -559,7 +559,14 @@ class BaseSession:
         try:
             # Stamp the reason on the position BEFORE closing, so the trade log
             # records TP / SL rather than a generic manual CLOSE.
-            if self.position:
+            #
+            # Do NOT overwrite a reason that is already there. The ratchet sets
+            # the precise one - RATCHET-BE, RATCHET+20%, SL - and this used to
+            # clobber it with the coarse TP/SL code on the way out. The log then
+            # said "TP" for every ratchet exit, so the one question the log
+            # exists to answer, "did the ratchet fire and at which rung", could
+            # not be answered from it.
+            if self.position and not self.position.get("exit_reason"):
                 self.position["exit_reason"] = hit
             res = self.close()
             pnl = float(res.get("pnl") or 0.0)
