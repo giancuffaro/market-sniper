@@ -735,6 +735,36 @@ try:
     check(26,"live stop shown while in a trade", "next rung" in idx4)
     check(26,"settings expose it", "ratchetEnabled" in idx4 and "ratchetStep" in idx4)
 
+    print("\n[27] CONFIG SCREEN: one combined strategy, dead sections gone")
+    ix = io.open(os.path.join(HERE,"index.html"),encoding="utf-8").read()
+    cfg_pane = ix[ix.index('id="paneConfig"'):ix.index("/paneConfig")]
+    check(27,"renamed to ABSOLUTE ENTRY with RATCHET TRAILING",
+          "ABSOLUTE ENTRY with RATCHET TRAILING" in cfg_pane)
+    check(27,"the old +$1 TP / 10% stop blurb is gone",
+          "Auto-sets a" not in ix and "Overrides the TP/SL" not in ix)
+    check(27,"entry and ratchet sit in ONE section",
+          "myEnabled" in cfg_pane and "ratchetEnabled" in cfg_pane)
+    for gone in ("TAKE PROFIT — closes","STOP LOSS — closes","AUTO-LOCK"):
+        check(27,f"{gone.split(chr(8212))[0].strip()} removed from CONFIGURATION",
+              gone not in cfg_pane)
+    check(27,"MIRROR moved out of CONFIGURATION", "MIRROR TRADING" not in cfg_pane)
+    check(27,"MIRROR has its own tab",
+          'id="tabMirror"' in ix and 'id="paneMirror"' in ix
+          and "MIRROR TRADING" in ix[ix.index('id="paneMirror"'):ix.index("/paneMirror")])
+    check(27,"showTab handles all three panes",
+          all(k in ix.split("function showTab",1)[1][:400]
+              for k in ("paneConfig","paneStrat","paneMirror")))
+    check(27,"no JS still reads the deleted controls",
+          not any(x in ix for x in ("$('tpEnabled')","$('slEnabled')","$('alEnabled')",
+                                    "$('tpUnit')","$('alMinutes')")))
+    check(27,"tpUnitChanged fully removed", "tpUnitChanged" not in ix)
+
+    wsrc2 = io.open(os.path.join(HERE,"webull_client.py"),encoding="utf-8").read()
+    check(27,"arming is entry-ONLY when the ratchet is on",
+          "if not s.get(\"ratchet_enabled\"):" in wsrc2)
+    check(27,"backend tp/sl fields still exist for STRATEGIES",
+          '"tp_unit"' in wsrc2 and '"sl_unit"' in wsrc2)
+
 finally:
     for p_ in (OPT,FUT):
         if p_:
@@ -748,7 +778,7 @@ print("\n"+"="*68)
 by={}
 for sc,name,ok,_ in results:
     by.setdefault(sc,[0,0]); by[sc][0]+=1; by[sc][1]+= (1 if ok else 0)
-T={26:"Ratchet stop",25:"Console auto-hide",24:"Options auto-reconcile",23:"Daily trade log",22:"Options phantom clear",21:"Auto-reconcile w/ broker",20:"MY CONFIG always on",19:"Phantom position",18:"Futures hours",17:"Closed market honest",16:"Restart leaves no spinner",15:"One tab only",14:"Git lock self-heal",13:"Broker tabs + tray",12:"Velocity honest when shut",11:"Multi-broker sessions",1:"Futures login survives restart",2:"remember_login default",3:"Options profiles to disk",
+T={27:"Config screen cleanup",26:"Ratchet stop",25:"Console auto-hide",24:"Options auto-reconcile",23:"Daily trade log",22:"Options phantom clear",21:"Auto-reconcile w/ broker",20:"MY CONFIG always on",19:"Phantom position",18:"Futures hours",17:"Closed market honest",16:"Restart leaves no spinner",15:"One tab only",14:"Git lock self-heal",13:"Broker tabs + tray",12:"Velocity honest when shut",11:"Multi-broker sessions",1:"Futures login survives restart",2:"remember_login default",3:"Options profiles to disk",
    4:"Browser autofill guard",5:"ITM3 strike math",6:"Preview == Arm",7:"Live-only / dead modes",
    8:"Auto-sync safety",9:"Endpoints alive",10:"UI integrity"}
 for sc in sorted(by):
