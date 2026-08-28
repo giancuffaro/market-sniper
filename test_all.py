@@ -888,38 +888,68 @@ try:
     check(29,"strike is taken from the armed trigger, not current spot",
           "pv.strike != null" in code6)
 
-    # --- 30. Directional entry: calls below, puts above ------------------
+    # --- 30. Entry fires on a pullback OR a breakout ---------------------
+    # Pullback-only could not fill in a trend. Measured live 2026-08-26 13:13
+    # ET: QQQ at 715.90, call trigger 715.00, and 715 had not been touched once
+    # all session. G sat armed and nothing happened.
     _L = wb.LiveSession
     for _spot in (713.40, 707.60, 712.30, 709.80, 702.55, 710.00, 707.50):
-        _tc = _L.entry_target(_spot, "CALLS")
-        _tp = _L.entry_target(_spot, "PUTS")
-        check(30, "%.2f calls trigger at or below spot (%.2f)" % (_spot, _tc),
-              _tc <= _spot + 1e-9)
-        check(30, "%.2f puts trigger at or above spot (%.2f)" % (_spot, _tp),
-              _tp >= _spot - 1e-9)
-    # The bug this replaces: with a NEAREST target, arming calls at 709.80 set
-    # the trigger to 710.00, and _maybe_trigger_entry asks spot <= target -
-    # true on the spot, so it bought instantly instead of waiting for 709.
-    check(30, "calls at 709.80 wait for 709.00, not 710.00",
-          abs(_L.entry_target(709.80, "CALLS") - 709.00) < 1e-9)
-    check(30, "puts at 709.80 wait for 710.00",
-          abs(_L.entry_target(709.80, "PUTS") - 710.00) < 1e-9)
-    # Half-levels count for BOTH sides, not just calls.
-    check(30, "puts at 712.30 take the .50 level above (712.50)",
-          abs(_L.entry_target(712.30, "PUTS") - 712.50) < 1e-9)
-    check(30, "calls at 707.60 take the .50 level below (707.50)",
-          abs(_L.entry_target(707.60, "CALLS") - 707.50) < 1e-9)
-    # Sitting exactly ON a level triggers there, both ways - not one step away.
-    check(30, "spot exactly on a level: calls fire there",
-          abs(_L.entry_target(710.00, "CALLS") - 710.00) < 1e-9)
-    check(30, "spot exactly on a level: puts fire there",
-          abs(_L.entry_target(707.50, "PUTS") - 707.50) < 1e-9)
-    # A .50 target printed with %.0f reads as a whole dollar it never was.
+        _pc, _bc = _L.entry_window(_spot, "CALLS")
+        _pp, _bp2 = _L.entry_window(_spot, "PUTS")
+        check(30, "%.2f calls pull back to or below spot" % _spot, _pc <= _spot + 1e-9)
+        check(30, "%.2f calls break out above spot" % _spot, _bc > _spot + 1e-9)
+        check(30, "%.2f puts pull back to or above spot" % _spot, _pp >= _spot - 1e-9)
+        check(30, "%.2f puts break out below spot" % _spot, _bp2 < _spot - 1e-9)
+        check(30, "%.2f the two levels are never the same" % _spot, _pc != _bc)
+
+    def _fires(side, target, brk, spot):
+        if side == "CALLS":
+            return (spot <= target) or (brk is not None and spot >= brk)
+        return (spot >= target) or (brk is not None and spot <= brk)
+
+    _p, _b = _L.entry_window(715.90, "CALLS")
+    check(30, "the live case: 715.90 calls pull back at 715", abs(_p - 715.0) < 1e-9, str(_p))
+    check(30, "and break out at 716", abs(_b - 716.0) < 1e-9, str(_b))
+    check(30, "a fall to 715 fills", _fires("CALLS", _p, _b, 715.00))
+    check(30, "a push to 716 fills", _fires("CALLS", _p, _b, 716.00))
+    check(30, "drifting in between does NOT fill", not _fires("CALLS", _p, _b, 715.60))
+
+    # Armed while sitting exactly ON a level must not fire on the spot - the
+    # breakout side would already be satisfied and it would be a market order.
+    for _on in (715.00, 712.50, 707.50):
+        _pl, _bk = _L.entry_window(_on, "CALLS")
+        check(30, "armed at %.2f does not fire instantly" % _on,
+              not _fires("CALLS", _pl, _bk, _on), "%s/%s" % (_pl, _bk))
+        _pl2, _bk2 = _L.entry_window(_on, "PUTS")
+        check(30, "puts armed at %.2f do not fire instantly" % _on,
+              not _fires("PUTS", _pl2, _bk2, _on))
+
+    check(30, "half levels are still in play",
+          abs(_L.entry_window(712.30, "CALLS")[1] - 712.50) < 1e-9 or
+          abs(_L.entry_window(712.30, "PUTS")[0] - 712.50) < 1e-9)
     _wc = io.open("webull_client.py", encoding="utf-8").read()
-    check(30, "trigger is announced to 2dp, not rounded to a dollar",
+    check(30, "the trigger is announced to 2dp, not rounded to a dollar",
           "{a['target']:.0f}" not in _wc)
-    check(30, "arm() asks for a side-specific target",
-          "self.entry_target(spot, side)" in _wc)
+    check(30, "arm() records both levels", '"breakout": brk' in _wc)
+    check(30, "the fill says which way it came", 'ENTRY TRIGGERED ({how})' in _wc)
+
+    # The ratchet must protect EVERY fill. Tying it to the entry switch meant
+    # that switching to instant fills - the only way in when no pullback came -
+    # also left the position with no stop.
+    check(30, "the ratchet is armed on every position, not just armed entries",
+          '"ratchet_on": True,' in _wc)
+    _cls = wb.LiveSession
+    _fake = {"entry": 3.00, "mark": 3.00, "qty": 1, "ratchet_on": True, "ratchet_step": 10.0}
+    class _R(_cls):
+        def __init__(self):
+            import config as _c
+            self.settings = dict(_c.DEFAULT_SETTINGS); self.strategies = []
+    _r = _R(); _r.settings["my_enabled"] = False       # entry switch OFF
+    _r.position = dict(_fake)
+    _r._update_ratchet()
+    check(30, "a manual fill still gets a stop with the switch off",
+          (_r.position.get("ratchet") or {}).get("stop_pct") == -10.0,
+          str((_r.position.get("ratchet") or {}).get("stop_pct")))
 
     # --- 31. One switch, still window, toggle switches -------------------
     _idx = io.open("index.html", encoding="utf-8").read()
