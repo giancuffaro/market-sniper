@@ -623,13 +623,40 @@ class BaseSession:
         preview_entry() uses it to show that trigger beforehand, so the number
         on screen can never drift from the number that fires.
         """
+        return LiveSession.entry_window(spot, side)[0]
+
+    @staticmethod
+    def entry_window(spot, side="CALLS"):
+        """(pullback_level, breakout_level) for this side.
+
+        A pullback-only trigger cannot fire in a trend, and that is not a
+        theoretical worry - measured live at 13:13 ET with QQQ at 715.90, the
+        call trigger sat at 715.00 and 715 had not been touched ONCE all
+        session. Armed calls would have waited all afternoon.
+
+        So an armed entry now watches both sides of price:
+            CALLS  fill on a fall to the level BELOW  (buy the dip)
+                   or a push up through the level ABOVE (buy the break)
+            PUTS   mirror it.
+        Whichever comes first wins, and the level still sets the price - this
+        adds a second place to fill, it does not turn the entry into a market
+        order.
+        """
         spot = float(spot)
         levels = LiveSession.entry_levels_near(spot, span=4)
-        if str(side).upper() == "CALLS":
-            at_or_below = [lv for lv in levels if lv <= spot + 1e-9]
-            return at_or_below[-1] if at_or_below else levels[0]
-        at_or_above = [lv for lv in levels if lv >= spot - 1e-9]
-        return at_or_above[0] if at_or_above else levels[-1]
+        below = [lv for lv in levels if lv <= spot + 1e-9]
+        above = [lv for lv in levels if lv >= spot - 1e-9]
+        lo = below[-1] if below else levels[0]
+        hi = above[0] if above else levels[-1]
+        # The breakout level must be strictly beyond price, or "cross through
+        # it" is already true and the entry fires the instant it is armed.
+        if abs(hi - spot) < 1e-9:
+            beyond = [lv for lv in levels if lv > spot + 1e-9]
+            hi = beyond[0] if beyond else hi
+        if abs(lo - spot) < 1e-9:
+            under = [lv for lv in levels if lv < spot - 1e-9]
+            lo = under[-1] if under else lo
+        return (lo, hi) if str(side).upper() == "CALLS" else (hi, lo)
 
     def preview_entry(self, symbol, side):
         """What an armed entry WOULD do at the current price. Sends nothing.
@@ -674,7 +701,8 @@ class BaseSession:
         spot = self._underlying(symbol)
         if spot is None:
             raise OrderRejected("no underlying price available to arm the entry")
-        target = self.entry_target(spot, side)   # the level in FRONT of price
+        pull, brk = self.entry_window(spot, side)
+        target = pull                            # the level price is walking toward
         s = self.settings
         s["my_enabled"] = True
         # The RATCHET owns the exit when it is on, so do not also arm a
@@ -684,7 +712,8 @@ class BaseSession:
             s["tp_enabled"] = True; s["tp_unit"] = "whole"
             s["sl_enabled"] = True; s["sl_unit"] = "pct"; s["sl_value"] = config.MY_CONFIG_SL_PCT
         self.armed = {"symbol": symbol, "side": side, "qty": qty,
-                      "target": target, "spot_at_arm": round(spot, 2)}
+                      "target": target, "breakout": brk,
+                      "spot_at_arm": round(spot, 2)}
         return dict(self.armed)
 
     def disarm(self):
@@ -698,9 +727,19 @@ class BaseSession:
         spot = self._underlying(a["symbol"])
         if spot is None:
             return
-        reached = (spot <= a["target"]) if a["side"] == "CALLS" else (spot >= a["target"])
-        if not reached:
+        # Either side fills it. The pullback level is behind price, the
+        # breakout level in front, and whichever price reaches first wins.
+        brk = a.get("breakout")
+        if a["side"] == "CALLS":
+            pulled = spot <= a["target"]
+            broke = brk is not None and spot >= brk
+        else:
+            pulled = spot >= a["target"]
+            broke = brk is not None and spot <= brk
+        if not (pulled or broke):
             return
+        hit_level = a["target"] if pulled else brk
+        how = "pullback" if pulled else "breakout"
         self.armed = None                   # clear first so we never double-fire
         try:
             self.place(a["symbol"], a["side"], a["qty"])
@@ -708,12 +747,12 @@ class BaseSession:
             if p:
                 # Anchor TP to the ROUND NUMBER (+$1 up for calls, −$1 for puts),
                 # not the noisy fill price — that's the whole point of MY CONFIG.
-                p["entry_round"] = a["target"]
-                p["tp_spot"] = a["target"] + 1.0 if a["side"] == "CALLS" else a["target"] - 1.0
+                p["entry_round"] = hit_level
+                p["tp_spot"] = hit_level + 1.0 if a["side"] == "CALLS" else hit_level - 1.0
             # .2f, not .0f: half-levels are real targets and 707.50 printed as
             # "708" is a different price than the one that actually fired.
-            self.last_event = (f"ENTRY TRIGGERED — {a['symbol']} reached "
-                               f"{a['target']:.2f}, bought {a['side']} at the ask")
+            self.last_event = (f"ENTRY TRIGGERED ({how}) — {a['symbol']} reached "
+                               f"{hit_level:.2f}, bought {a['side']} at the ask")
         except OrderRejected as e:
             self.last_event = f"ABSOLUTE ENTRY blocked at {a['target']:.2f}: {e}"
 
@@ -1405,7 +1444,13 @@ class LiveSession(BaseSession):
                          # this, nudging the step from 10 to 25 while a trade
                          # was live would move the stop underneath a position
                          # already running. Settings change the NEXT trade.
-                         "ratchet_on": bool(self.settings.get("my_enabled")),
+                         # ALWAYS on. The switch decides whether entries WAIT
+                         # for a level; it does not decide whether a live
+                         # position has a stop. Tying the two together meant
+                         # that switching to instant fills - the only way to
+                         # get in when a pullback never came - also left the
+                         # trade with nothing managing the exit.
+                         "ratchet_on": True,
                          "ratchet_step": float(self.settings.get("ratchet_step_pct") or 10.0)}
         self._decorate_position(q)
         self.last_event = (f"ORDER SENT — BUY {qty} × {symbol} {int(q['strike'])}"
