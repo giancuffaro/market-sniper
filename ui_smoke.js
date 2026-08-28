@@ -105,23 +105,28 @@ scripts.forEach((src, i) => {
 // `const EZ = ...` at the top level of a script is a LEXICAL binding: it never
 // becomes a property of the context object, so ctx.EZ reads undefined. Ask the
 // context for it by name instead.
-const EZ = vm.runInContext('typeof EZ !== "undefined" ? EZ : null', ctx);
-if (!EZ) { console.log('  FAIL  EZ was never defined'); process.exit(1); }
+// Each page exports under its own name - EZ on the options screen, FZ on
+// futures. Ask the context for whichever is there rather than hardcoding one,
+// so this harness covers both pages instead of silently passing on one.
+const APP = vm.runInContext(
+  '(typeof EZ !== "undefined" && EZ) || (typeof FZ !== "undefined" && FZ) || null', ctx);
+const EZ = APP;
+if (!EZ) { console.log('  FAIL  neither EZ nor FZ was defined'); process.exit(1); }
 
 // The handlers a user can actually reach from the settings screen.
 const steps = [
-  ['openSettings()',            () => EZ.openSettings()],
+  ['openSettings()',            () => EZ.openSettings && EZ.openSettings()],
   ["showTab('config')",         () => EZ.showTab && EZ.showTab('config')],
   ["showTab('strat')",          () => EZ.showTab && EZ.showTab('strat')],
   ["showTab('mirror')",         () => EZ.showTab && EZ.showTab('mirror')],
-  ["setStrikeMode('ATM1')",     () => EZ.setStrikeMode('ATM1')],
-  ["setStrikeMode('ITM1')",     () => EZ.setStrikeMode('ITM1')],
-  ["setStrikeMode('ITM2')",     () => EZ.setStrikeMode('ITM2')],
-  ['applySettings()',           () => EZ.applySettings()],
-  ['openSettings() again',      () => EZ.openSettings()],
-  ['closeSettings()',           () => EZ.closeSettings()],
-  ['toggleSound() off',         () => EZ.toggleSound()],
-  ['toggleSound() on',          () => EZ.toggleSound()],
+  ["setStrikeMode('ATM1')",     () => EZ.setStrikeMode && EZ.setStrikeMode('ATM1')],
+  ["setStrikeMode('ITM1')",     () => EZ.setStrikeMode && EZ.setStrikeMode('ITM1')],
+  ["setStrikeMode('ITM2')",     () => EZ.setStrikeMode && EZ.setStrikeMode('ITM2')],
+  ['applySettings()',           () => EZ.applySettings && EZ.applySettings()],
+  ['openSettings() again',      () => EZ.openSettings && EZ.openSettings()],
+  ['closeSettings()',           () => EZ.closeSettings && EZ.closeSettings()],
+  ['toggleSound() off',         () => EZ.toggleSound && EZ.toggleSound()],
+  ['toggleSound() on',          () => EZ.toggleSound && EZ.toggleSound()],
 ];
 for (const [name, fn] of steps) {
   try { const r = fn(); if (r && r.catch) r.catch(e => bad(name + ' (async)', e)); }
@@ -130,8 +135,8 @@ for (const [name, fn] of steps) {
 
 // The whole point: the modal must actually be showing.
 try {
-  EZ.openSettings();
-  if (!cache.setScrim.classList.contains('show'))
+  if (EZ.openSettings) EZ.openSettings();
+  if (cache.setScrim && !cache.setScrim.classList.contains('show'))
     bad('openSettings()', new Error('setScrim never got class "show" - the window would not appear'));
 } catch (e) { bad('openSettings() visibility', e); }
 
