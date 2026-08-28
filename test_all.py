@@ -1050,8 +1050,12 @@ try:
     # The reason this matters: with no SAVE button, every keystroke reaches the
     # server at once. A live trade must not be re-tuned underneath itself.
     _wc2 = io.open("webull_client.py", encoding="utf-8").read()
+    # ratchet_on is now unconditionally True - the switch decides whether the
+    # ENTRY waits for a level, never whether a live trade has a stop. The step
+    # is still frozen at open, which is the part that must not move underneath
+    # a running position.
     check(32, "terms are frozen onto the position at open",
-          '"ratchet_on": bool(self.settings.get("my_enabled"))' in _wc2 and
+          '"ratchet_on": True,' in _wc2 and
           '"ratchet_step": float(self.settings.get("ratchet_step_pct")' in _wc2)
     check(32, "the ratchet reads the position, not live settings",
           'p.get("ratchet_on"' in _wc2 and 'p.get("ratchet_step"' in _wc2)
