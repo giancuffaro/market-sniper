@@ -51,13 +51,24 @@ FIELDS = [
     # too far behind the move.
     "best_pct", "worst_pct", "best_price", "worst_price", "gave_back_pct",
     "ratchet_stop_pct", "ratchet_step",
+    # WHAT THE MARKET LOOKED LIKE WHEN YOU GOT IN.
+    # Recorded so wins and losses can be attributed AFTER the fact. Nothing
+    # reads these to make a decision and nothing tunes itself on them - with a
+    # handful of trades any rule fitted to this would be fitted to noise. The
+    # point is to have the data when there is enough of it to mean something.
+    "in_trend", "in_trend_agree", "in_breadth", "in_velocity", "in_vel_score",
+    "in_dwell_above", "in_dwell_below", "in_pinned",
+    "in_vol_pctl", "in_rv_pct", "in_iv_pct",
+    "in_counter_trend", "in_round_level", "in_round_clock", "in_parked_rule",
     "exit_reason", "note",
 ]
 
 # Columns that should be numbers in Excel, not text.
 _NUM = {"strike", "qty", "entry", "exit", "pnl", "pnl_pct", "held_secs",
         "best_pct", "worst_pct", "best_price", "worst_price", "gave_back_pct",
-        "ratchet_stop_pct", "ratchet_step"}
+        "ratchet_stop_pct", "ratchet_step",
+        "in_trend_agree", "in_breadth", "in_vel_score", "in_dwell_above",
+        "in_dwell_below", "in_vol_pctl", "in_rv_pct", "in_iv_pct"}
 
 
 def _rows():

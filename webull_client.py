@@ -968,6 +968,7 @@ class BaseSession:
                 "strike_mode": self.settings.get("strike_mode", ""),
                 "held_secs": (int(time.time() - p["opened_ts"])
                               if p.get("opened_ts") else ""),
+                **(p.get("entry_ctx") or {}),
                 "note": "price estimated until Webull confirms the fill" if estimated else "",
             })
         except Exception as e:                               # noqa: BLE001
@@ -1349,6 +1350,99 @@ class LiveSession(BaseSession):
                 "premium": round(ask, 4),
                 "reasons": bad}
 
+    def entry_conditions(self, symbol, side, spot=None):
+        """A snapshot of the market at the moment of entry. Never raises.
+
+        TELEMETRY ONLY. Nothing here gates an order and nothing tunes itself on
+        it. That is deliberate: with a handful of trades, any rule fitted to
+        this data would be fitted to noise. Measure first, decide later, and
+        only once there is enough of it to mean something.
+
+        Every reading is wrapped separately - a trend fetch timing out must
+        never be the reason a trade fails to record.
+        """
+        out = {}
+        try:
+            spot = spot if spot is not None else self._underlying(symbol)
+        except Exception:
+            spot = None
+        ysym = symbol
+        try:
+            import quotes as _q
+            ysym = _q.YSYM.get(symbol, symbol)
+        except Exception:
+            pass
+
+        try:
+            import trend as _t
+            d = _t.for_symbol(ysym, "1m")
+            if d.get("ok"):
+                out["in_trend"] = d.get("state")
+                out["in_trend_agree"] = d.get("agree")
+                # Was this entry AGAINST the 1-minute trend? The single most
+                # useful thing to be able to group the blotter by later.
+                st = d.get("state")
+                if st in ("up", "down"):
+                    against = (side == "PUTS" and st == "up") or \
+                              (side == "CALLS" and st == "down")
+                    out["in_counter_trend"] = "yes" if against else "no"
+                else:
+                    out["in_counter_trend"] = "chop"
+            b = _t.basket(ysym, "1m")
+            if b.get("ok"):
+                out["in_breadth"] = b.get("breadth")
+        except Exception:
+            pass
+
+        try:
+            import tape as _tp
+            v = _tp.velocity(ysym)
+            if v.get("ok"):
+                out["in_velocity"] = v.get("state")
+                out["in_vel_score"] = v.get("score")
+        except Exception:
+            pass
+
+        try:
+            import levels as _lv, tape as _tp2
+            d = _lv.dwell(_tp2._bars(ysym), price=spot)
+            if d.get("ok"):
+                out["in_dwell_above"] = d.get("mins_above")
+                out["in_dwell_below"] = d.get("mins_below")
+                out["in_pinned"] = "yes" if d.get("pinned") else "no"
+        except Exception:
+            pass
+
+        try:
+            import gauges as _g
+            vol = _g.volume(ysym)
+            if vol.get("ok") and vol.get("percentile") is not None:
+                out["in_vol_pctl"] = vol.get("percentile")
+            rv = _g.realized(ysym)
+            if rv.get("ok"):
+                out["in_rv_pct"] = rv.get("rv_pct")
+        except Exception:
+            pass
+
+        # THE PARKED RULE, measured but never enforced.
+        # "Counter-trend only near a level ending in 0 or 5, and only on a
+        # round clock time." It is untested, so it is logged as telemetry and
+        # gates nothing - once there are enough trades either side of it, the
+        # blotter can say whether it was ever worth obeying.
+        try:
+            if spot is not None:
+                last_digit = int(abs(spot)) % 10
+                out["in_round_level"] = "yes" if last_digit in (0, 5) else "no"
+            now = _now_et()
+            out["in_round_clock"] = "yes" if now.minute in (0, 30) else "no"
+            out["in_parked_rule"] = (
+                "would-allow" if (out.get("in_round_level") == "yes"
+                                  and out.get("in_round_clock") == "yes")
+                else "would-block")
+        except Exception:
+            pass
+        return out
+
     def atm_option_for_vol(self, symbol):
         """An at-the-money quote for the volatility gauge, from the LIVE chain.
 
@@ -1451,7 +1545,10 @@ class LiveSession(BaseSession):
                          # get in when a pullback never came - also left the
                          # trade with nothing managing the exit.
                          "ratchet_on": True,
-                         "ratchet_step": float(self.settings.get("ratchet_step_pct") or 10.0)}
+                         "ratchet_step": float(self.settings.get("ratchet_step_pct") or 10.0),
+                         # Captured HERE, at the fill, not at close: by the time
+                         # a trade ends the market that produced it is gone.
+                         "entry_ctx": self.entry_conditions(symbol, side, spot=q.get("spot"))}
         self._decorate_position(q)
         self.last_event = (f"ORDER SENT — BUY {qty} × {symbol} {int(q['strike'])}"
                            f"{'C' if side=='CALLS' else 'P'} limit ${limit:.2f} "
