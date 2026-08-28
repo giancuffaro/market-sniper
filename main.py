@@ -124,6 +124,39 @@ def tape_speed(symbol: str = "QQQ"):
     return {"symbol": symbol, **tape.velocity(ysym)}
 
 
+@app.get("/api/dwell")
+def dwell_time(symbol: str = "QQQ"):
+    """Minutes since price traded the whole dollar above, and the one below.
+
+    Both stale means price is pinned. Read-only and broker-free, and it reuses
+    the bars tape.py already caches, so it costs no extra request.
+
+    It also reports whether dwell and velocity agree. They answer different
+    questions - "is price going anywhere" versus "is the tape busy" - and can
+    legitimately differ, but pinned-and-violent is a contradiction worth
+    seeing rather than quietly averaging away."""
+    if levels is None or tape is None:
+        return {"symbol": symbol, "ok": False, "reason": "module unavailable"}
+    if symbol not in config.SYMBOLS:
+        raise HTTPException(400, f"{symbol} isn't one of the tradable symbols.")
+    ysym = quotes.YSYM.get(symbol, symbol) if quotes else symbol
+    price = None
+    try:
+        price = quotes.get_price(symbol)["price"]
+    except Exception:
+        pass                       # dwell() falls back to the last bar's close
+    try:
+        d = levels.dwell(tape._bars(ysym), price=price)
+    except Exception as e:                                   # noqa: BLE001
+        return {"symbol": symbol, "ok": False, "reason": str(e)[:120]}
+    out = {"symbol": symbol, **d, "label": levels.label(d)}
+    try:
+        out["agreement"] = levels.agreement(d, tape.velocity(ysym))
+    except Exception:
+        pass                       # the cross-check is a bonus, never a blocker
+    return out
+
+
 @app.get("/api/preview")
 def preview(symbol: str = "QQQ", side: str = "CALLS"):
     """Where an armed entry would trigger, and which strike you'd end up with.
