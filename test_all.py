@@ -1264,7 +1264,10 @@ try:
           "$ErrorActionPreference = 'Stop'" in _sh)
     check(37, "it tells you how to pin it", "Pin to taskbar" in _sh)
     check(37, "it applies the icon", "sniper.ico" in _sh)
-    check(37, "it explains the manual fallback", "Send to" in _sh and "Change Icon" in _sh)
+    check(37, "it explains the manual fallback",
+          "New ^> Shortcut" in _sh and "Change Icon" in _sh)
+    check(37, "and the manual route is the pinnable one too",
+          'cmd.exe /c "%~dp0MARKET SNIPER.bat"' in _sh)
     # The stub adds nothing: the real launcher already opens the browser, so
     # the Desktop icon needs no extra step to get you to the trading screen.
     _real = [os.path.join(HERE, f) for f in os.listdir(HERE)
