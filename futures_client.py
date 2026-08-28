@@ -39,6 +39,25 @@ DEFAULT_SETTINGS = {
     "tp_enabled": False, "tp_points": 10.0,
     "sl_enabled": False, "sl_points": 5.0,
     "trail_enabled": False, "trail_points": 5.0,
+    # RATCHET — the same system as the options side, in POINTS.
+    #
+    # Percent does not carry across. On an option, +10% of premium is a small
+    # move in the underlying because the premium is leveraged; on a future you
+    # are linear, and 10% of MNQ is over 2000 points. What DOES carry across is
+    # the SHAPE: on options the step equals the opening risk (enter at -10%,
+    # first rung at +10%), so the rule is really "one unit of risk per rung".
+    # Here that unit is a number of points.
+    #
+    #   ratchet_points = 10 on MNQ:
+    #     open           stop -10
+    #     touch +10      stop  0    (breakeven, hunting +20)
+    #     touch +20      stop +10
+    #     touch +30      stop +20   ... no cap
+    #
+    # This REPLACES trail_points when it is on. The old trailing stop slides
+    # continuously - best minus five, moving on every tick - which is a
+    # different instrument and gets shaken out by noise the ratchet ignores.
+    "ratchet_enabled": False, "ratchet_points": 10.0,
     "round_enabled": False, "round_step": 50.0,
 }
 
@@ -615,7 +634,7 @@ class BaseFuturesSession:
             if self.position:
                 self.position["entry_round"] = a["target"]
                 self.position["entry"] = a["target"]   # a limit fills AT its price or better
-                self._update_trail()
+                self._update_trail(); self._update_ratchet()
             self.last_event = (f"LIMIT FILLED — {a['symbol']} {a['side']} {a['qty']} "
                                f"at {a['target']:g}")
         except OrderRejected as e:
@@ -626,7 +645,7 @@ class BaseFuturesSession:
         self.position = {"symbol": a["symbol"], "side": a["side"], "qty": a["qty"],
                          "entry": a["target"], "mark": get_price(a["symbol"])["price"],
                          "opened_at": dt.datetime.now().strftime("%H:%M")}
-        self._update_trail()
+        self._update_trail(); self._update_ratchet()
 
     def update_strategies(self, strategies):
         if not isinstance(strategies, list):
@@ -718,6 +737,40 @@ class BaseFuturesSession:
         d = p["mark"] - p["entry"]
         return d if p["side"] == "LONG" else -d
 
+    def _update_ratchet(self):
+        """Discrete rungs, in points. The stop climbs and never comes back.
+
+        Deliberately shares ratchet_levels() with the options side rather than
+        reimplementing the rung arithmetic. That function already carries the
+        floating-point fix - an exact touch of +10.0 used to compute as
+        9.999999999999993 and leave the stop a rung too low - and landing
+        exactly on a rung is the normal case, not the edge case.
+        """
+        p, s = self.position, self.settings
+        if not p:
+            return
+        if not p.get("ratchet_on", s.get("ratchet_enabled")):
+            return
+        step = float(p.get("ratchet_step") or s.get("ratchet_points") or 10.0)
+        pts = self._points_pnl()
+        p["peak_points"] = max(p.get("peak_points", 0.0), pts)
+        try:
+            from webull_client import LiveSession as _LS
+            lv = _LS.ratchet_levels(p["peak_points"], step)
+        except Exception:
+            rung = math.floor(p["peak_points"] / step + 1e-9) * step
+            lv = {"rung": rung, "stop_pct": rung - step, "next_pct": rung + step}
+        stop_pts = lv["stop_pct"]
+        sign = 1.0 if p["side"] == "LONG" else -1.0
+        p["ratchet"] = {
+            "points": round(pts, 2),
+            "peak_points": round(p["peak_points"], 2),
+            "stop_points": round(stop_pts, 2),
+            "next_points": round(lv["next_pct"], 2),
+            "stop_price": to_tick(p["symbol"], p["entry"] + sign * stop_pts),
+            "step": step,
+        }
+
     def _update_trail(self):
         p, s = self.position, self.settings
         if not (p and s["trail_enabled"]):
@@ -734,6 +787,22 @@ class BaseFuturesSession:
         if not p:
             return None
         pts = self._points_pnl()
+
+        # RATCHET OWNS THE EXIT when it is on, and returns early. Same rule as
+        # the options side: under a ratchet, +10 is no longer somewhere you
+        # sell, it is where the stop moves to breakeven. Leaving a take-profit
+        # live alongside it would close the trade at the exact moment the
+        # ratchet is trying to let it run.
+        if p.get("ratchet_on", s.get("ratchet_enabled")):
+            self._update_ratchet()
+            r = p.get("ratchet") or {}
+            if r and r["points"] <= r["stop_points"]:
+                sp = r["stop_points"]
+                p["exit_reason"] = ("RATCHET-BE" if abs(sp) < 1e-9
+                                    else ("RATCHET+%g" % sp if sp > 0 else "SL"))
+                return "SL" if sp < 0 else "TP"
+            return None
+
         if s["tp_enabled"] and pts >= s["tp_points"]:
             return "TP"
         if s["sl_enabled"] and pts <= -s["sl_points"]:
@@ -881,7 +950,7 @@ class NinjaTraderSession(BaseFuturesSession):
         self.position = {"symbol": symbol, "side": side, "qty": int(qty),
                          "entry": px, "mark": get_price(symbol)["price"],
                          "opened_at": dt.datetime.now().strftime("%H:%M")}
-        self._update_trail()
+        self._update_trail(); self._update_ratchet()
         self.last_event = "SENT to NinjaTrader (%s): %s %d %s %s" % (
             self.account, action, int(qty), symbol, kind)
         return self.position
@@ -915,7 +984,7 @@ class NinjaTraderSession(BaseFuturesSession):
         pv = FUT[p["symbol"]]["point_value"]
         p["pnl"] = round(self._points_pnl() * pv * p["qty"], 2)
         p["points"] = round(self._points_pnl(), 2)
-        self._update_trail()
+        self._update_trail(); self._update_ratchet()
         self._maybe_auto_close()
         return self.position
 
@@ -1103,7 +1172,7 @@ class TopstepSession(BaseFuturesSession):
         self.position = {"symbol": symbol, "side": side, "qty": int(qty), "entry": px,
                          "mark": get_price(symbol)["price"],
                          "opened_at": dt.datetime.now().strftime("%H:%M"), "contract": contract}
-        self._update_trail()
+        self._update_trail(); self._update_ratchet()
         self.last_event = "Topstep: %s %d %s %s" % (
             "BUY" if side == "LONG" else "SELL", int(qty), contract,
             ("LIMIT %s" % _fmt_px(px)) if limit else "MARKET")
@@ -1139,7 +1208,7 @@ class TopstepSession(BaseFuturesSession):
         pv = FUT[p["symbol"]]["point_value"]
         p["pnl"] = round(self._points_pnl() * pv * p["qty"], 2)
         p["points"] = round(self._points_pnl(), 2)
-        self._update_trail()
+        self._update_trail(); self._update_ratchet()
         # Ask the broker BEFORE any bracket can fire. If you closed by hand,
         # the position below is fiction and firing a stop against it would
         # open a brand new trade the other way.
@@ -1382,7 +1451,7 @@ class WebullFuturesSession(BaseFuturesSession):
                          "entry": round(entry, 2), "mark": px, "contract": contract,
                          "client_order_id": o["client_order_id"],
                          "opened_at": dt.datetime.now().strftime("%H:%M")}
-        self._update_trail()
+        self._update_trail(); self._update_ratchet()
         self.last_event = "SENT to Webull %s: %s %d %s (%s)" % (
             "LIVE", side, int(qty), symbol, contract)
         return self.position
@@ -1397,7 +1466,7 @@ class WebullFuturesSession(BaseFuturesSession):
         pv = FUT[p["symbol"]]["point_value"]
         p["pnl"] = round(self._points_pnl() * pv * p["qty"], 2)
         p["points"] = round(self._points_pnl(), 2)
-        self._update_trail()
+        self._update_trail(); self._update_ratchet()
         self._maybe_auto_close()
         return self.position
 
