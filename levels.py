@@ -113,9 +113,14 @@ def label(d):
     """One line for the screen."""
     if not d or not d.get("ok"):
         return "—"
+    # ">Nm" must quote the bars we ACTUALLY had, not the cap we would have
+    # liked. Early in a session there are only a few, and claiming ">180m" off
+    # 40 bars of data is a number the app cannot stand behind.
+    horizon = d.get("lookback_bars") or MAX_LOOKBACK_BARS
+
     def fmt(m):
         if m is None:
-            return ">%dm" % MAX_LOOKBACK_BARS
+            return ">%dm" % horizon
         if m < 1:
             return "now"
         return "%dm" % round(m)
