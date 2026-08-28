@@ -126,6 +126,40 @@ def _bars(ysym):
     return bars
 
 
+def _median(vals):
+    v = sorted(x for x in vals if x is not None)
+    if not v:
+        return 0.0
+    n = len(v)
+    return float(v[n // 2]) if n % 2 else (v[n // 2 - 1] + v[n // 2]) / 2.0
+
+
+# Yahoo's 1-minute feed intermittently publishes ONE bar carrying a cumulative
+# volume figure instead of that minute's own. Measured live on 2026-08-26:
+# QQQ 12:41 printed 18,887,220 against neighbours of 30-70k, and SPY 12:07
+# printed 15,501,626 against 50-90k. A single such bar is ~300x its neighbours.
+#
+# Averaged in, one of them owns the answer completely: land it in the recent
+# window and the meter pins to "violent", land it in the baseline and the same
+# tape reads "calm". Both happened on the same afternoon, on the two symbols
+# most traded here, which is how it was found.
+#
+# So the windows are compared on MEDIANS, and volumes are capped at a multiple
+# of the session median before anything is computed. Capping rather than
+# dropping keeps a genuine news burst looking big without letting a feed
+# artifact be 300x.
+OUTLIER_CAP_X = 12.0     # x the session median volume
+
+
+def _cap_volumes(bars):
+    """Return volumes with feed artifacts clipped to OUTLIER_CAP_X x median."""
+    med = _median([b["v"] for b in bars if b["v"] > 0])
+    if med <= 0:
+        return [b["v"] for b in bars]
+    ceiling = med * OUTLIER_CAP_X
+    return [min(b["v"], ceiling) for b in bars]
+
+
 def _mean(vals):
     vals = [v for v in vals if v is not None]
     return sum(vals) / len(vals) if vals else 0.0
@@ -163,10 +197,20 @@ def compute(bars):
     if not baseline:
         return {"ok": False, "reason": "not enough bars yet this session"}
 
-    vol_recent = _mean([b["v"] for b in recent])
-    vol_base = _mean([b["v"] for b in baseline])
-    rng_recent = _mean([b["h"] - b["l"] for b in recent])
-    rng_base = _mean([b["h"] - b["l"] for b in baseline])
+    # Cap against the WHOLE window under consideration, not each half, or a
+    # burst that fills the recent window would raise its own ceiling.
+    window = baseline + recent
+    capped = _cap_volumes(window)
+    v_base = capped[:len(baseline)]
+    v_recent = capped[len(baseline):]
+
+    # Medians, not means: one artifact bar cannot move a median, and neither
+    # can one genuine outlier minute, which is the honest reading of "how fast
+    # is the tape" - a burst shows up as several fast bars, not one.
+    vol_recent = _median(v_recent)
+    vol_base = _median(v_base)
+    rng_recent = _median([b["h"] - b["l"] for b in recent])
+    rng_base = _median([b["h"] - b["l"] for b in baseline])
 
     # Nothing traded in either window — a closed or halted market. Report that
     # honestly as dead rather than as "normal", which a neutral 1.0 ratio would
@@ -189,7 +233,7 @@ def compute(bars):
 
     # Acceleration: is the newest bar faster than the rest of the recent window?
     # Positive means still building, negative means the burst is fading.
-    last_v = recent[-1]["v"]
+    last_v = v_recent[-1] if v_recent else recent[-1]["v"]   # capped, same as the rest
     accel = ((last_v / vol_recent) - 1.0) * 100.0 if vol_recent > 0 else 0.0
 
     # Which way the recent window actually went.
