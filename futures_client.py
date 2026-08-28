@@ -711,7 +711,8 @@ class BaseFuturesSession:
 
     def update_settings(self, new):
         s = self.settings
-        for k in ("tp_enabled", "sl_enabled", "trail_enabled", "round_enabled"):
+        for k in ("tp_enabled", "sl_enabled", "trail_enabled", "round_enabled",
+                  "ratchet_enabled"):
             if k in new:
                 s[k] = bool(new[k])
         if "round_step" in new:
@@ -721,7 +722,7 @@ class BaseFuturesSession:
                     s["round_step"] = v
             except (TypeError, ValueError):
                 pass
-        for k in ("tp_points", "sl_points", "trail_points"):
+        for k in ("tp_points", "sl_points", "trail_points", "ratchet_points"):
             if k in new:
                 try:
                     v = float(new[k])
