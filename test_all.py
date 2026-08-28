@@ -1207,6 +1207,62 @@ try:
           '"opened_ts": time.time(),' in _wc3)
     check(36, "the precise ratchet reason is no longer clobbered",
           'if self.position and not self.position.get("exit_reason"):' in _wc3)
+
+    # --- 37. Desktop icon --------------------------------------------------
+    _ico = os.path.join(HERE, "sniper.ico")
+    check(37, "the icon file exists", os.path.exists(_ico))
+    try:
+        from PIL import Image as _Im
+        _sz = sorted(_Im.open(_ico).ico.sizes())
+        check(37, "it carries a 16px and a 256px frame",
+              (16, 16) in _sz and (256, 256) in _sz, str(_sz))
+    except Exception as _e:
+        check(37, "icon is readable", False, str(_e)[:80])
+
+    # A shortcut CANNOT point at the real launcher: its name starts with an
+    # emoji, and WScript.Shell rejects any TargetPath holding a character
+    # outside the Basic Multilingual Plane - "Value does not fall within the
+    # expected range" - leaving an icon on the desktop that does nothing.
+    # So an ASCII-named stub sits in between.
+    _stub = os.path.join(HERE, "MARKET SNIPER.bat")
+    check(37, "the ASCII launcher stub exists", os.path.exists(_stub))
+    _st = io.open(_stub, encoding="utf-8").read()
+    check(37, "the stub is pure ASCII", all(ord(c) < 128 for c in _st))
+    check(37, "the stub finds the real launcher by wildcard",
+          '("*START MARKET SNIPER.bat")' in _st)
+    check(37, "the stub does not match its own wildcard (no loop)",
+          not __import__("fnmatch").fnmatch("MARKET SNIPER.bat",
+                                            "*START MARKET SNIPER.bat"))
+    check(37, "the stub CALLs, so closing the window still stops the servers",
+          'call "%LAUNCHER%"' in _st)
+    check(37, "the stub says so when the launcher is missing", "Could not find" in _st)
+
+    _shortcut = os.path.join(HERE, "CREATE DESKTOP ICON.bat")
+    check(37, "the one-time setup file exists", os.path.exists(_shortcut))
+    _sh = io.open(_shortcut, encoding="utf-8").read()
+    check(37, "the setup file is pure ASCII", all(ord(c) < 128 for c in _sh))
+    check(37, "the shortcut targets the ASCII stub, never the emoji file",
+          "Join-Path $dir 'MARKET SNIPER.bat'" in _sh and "START MARKET SNIPER" not in _sh)
+    check(37, "it refuses to run if the stub is missing",
+          'if not exist "%~dp0MARKET SNIPER.bat"' in _sh)
+    check(37, "it clears a stale icon first", "Remove-Item $link -Force" in _sh)
+    # The first version reported success while leaving a dead icon behind,
+    # because assigning TargetPath threw and nothing checked afterwards.
+    check(37, "it reads the shortcut BACK and proves the target exists",
+          "$check = $ws.CreateShortcut($link)" in _sh and
+          "Test-Path $check.TargetPath" in _sh)
+    check(37, "it stops on the first PowerShell error",
+          "$ErrorActionPreference = 'Stop'" in _sh)
+    check(37, "it applies the icon", "sniper.ico" in _sh)
+    check(37, "it explains the manual fallback", "Send to" in _sh and "Change Icon" in _sh)
+    # The stub adds nothing: the real launcher already opens the browser, so
+    # the Desktop icon needs no extra step to get you to the trading screen.
+    _real = [os.path.join(HERE, f) for f in os.listdir(HERE)
+             if f.endswith("START MARKET SNIPER.bat")]
+    check(37, "the real launcher is still there", len(_real) == 1, str(_real))
+    _lb = io.open(_real[0], encoding="utf-8", errors="replace").read()
+    check(37, "the launcher still opens the browser itself",
+          "http://127.0.0.1:8000" in _lb and "start" in _lb)
     check(29,"and no premium/time value on the button",
           "% time" not in ix6 and "q.ask.toFixed" not in code6)
 
@@ -1252,7 +1308,7 @@ print("\n"+"="*68)
 by={}
 for sc,name,ok,_ in results:
     by.setdefault(sc,[0,0]); by[sc][0]+=1; by[sc][1]+= (1 if ok else 0)
-T={36:"Trade log detail",35:"Time value warns not blocks",34:"LOCK/X gone, size warns",33:"Page actually runs",32:"No SAVE / live trade frozen",31:"One switch / still modal",30:"Directional entry levels",29:"Percent only, no cash",28:"Grid/ATM/quality/one-armed",27:"Config screen cleanup",26:"Ratchet stop",25:"Console auto-hide",24:"Options auto-reconcile",23:"Daily trade log",22:"Options phantom clear",21:"Auto-reconcile w/ broker",20:"MY CONFIG always on",19:"Phantom position",18:"Futures hours",17:"Closed market honest",16:"Restart leaves no spinner",15:"One tab only",14:"Git lock self-heal",13:"Broker tabs + tray",12:"Velocity honest when shut",11:"Multi-broker sessions",1:"Futures login survives restart",2:"remember_login default",3:"Options profiles to disk",
+T={37:"Desktop icon",36:"Trade log detail",35:"Time value warns not blocks",34:"LOCK/X gone, size warns",33:"Page actually runs",32:"No SAVE / live trade frozen",31:"One switch / still modal",30:"Directional entry levels",29:"Percent only, no cash",28:"Grid/ATM/quality/one-armed",27:"Config screen cleanup",26:"Ratchet stop",25:"Console auto-hide",24:"Options auto-reconcile",23:"Daily trade log",22:"Options phantom clear",21:"Auto-reconcile w/ broker",20:"MY CONFIG always on",19:"Phantom position",18:"Futures hours",17:"Closed market honest",16:"Restart leaves no spinner",15:"One tab only",14:"Git lock self-heal",13:"Broker tabs + tray",12:"Velocity honest when shut",11:"Multi-broker sessions",1:"Futures login survives restart",2:"remember_login default",3:"Options profiles to disk",
    4:"Browser autofill guard",5:"ITM3 strike math",6:"Preview == Arm",7:"Live-only / dead modes",
    8:"Auto-sync safety",9:"Endpoints alive",10:"UI integrity"}
 for sc in sorted(by):
