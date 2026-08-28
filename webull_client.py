@@ -1310,6 +1310,45 @@ class LiveSession(BaseSession):
                 "premium": round(ask, 4),
                 "reasons": bad}
 
+    def atm_option_for_vol(self, symbol):
+        """An at-the-money quote for the volatility gauge, from the LIVE chain.
+
+        Webull is the only implied-vol source available. Yahoo's options
+        endpoint answers 401 without a crumb, and the NinjaTrader link is a
+        one-way file drop - it takes orders, it returns nothing - so neither
+        can price an option.
+
+        If Webull's snapshot already carries implied vol or greeks, they are
+        used as-is; a broker's own number beats anything inverted from a mid
+        price. Otherwise the mid is handed back for Black-Scholes inversion.
+        """
+        spot = self._underlying(symbol)
+        if spot is None:
+            return None
+        step = config.SYMBOLS.get(symbol, {}).get("strike_step", 1.0)
+        strike = pick_strike(spot, "CALLS", step, "ATM1")
+        a, b, m, row = self._od.ask_bid_mark(
+            occ_symbol(symbol, _expiry_for(symbol), "CALL", strike))
+        mid = m or ((a + b) / 2.0 if (a and b) else (a or b))
+        if not mid:
+            return None
+        # Webull renames these between SDK versions, so match on any of them.
+        def _num(*names):
+            v = _find_key(row, *names)
+            try:
+                return float(v)
+            except (TypeError, ValueError):
+                return None
+        iv = _num("implied_volatility", "impliedVolatility", "impVol", "iv")
+        # Some feeds quote IV as a fraction, some as a percent. 3.0 would be a
+        # 300% vol, which does happen on 0DTE, so the split is at 5.
+        if iv is not None and iv < 5.0:
+            iv *= 100.0
+        return {"spot": float(spot), "strike": float(strike), "price": float(mid),
+                "is_call": True, "iv_native": iv,
+                "delta": _num("delta"), "theta": _num("theta"),
+                "gamma": _num("gamma"), "vega": _num("vega")}
+
     def quote(self, symbol, side):
         if not config.SYMBOLS.get(symbol, {}).get("enabled", False):
             raise OrderRejected(

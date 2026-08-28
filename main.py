@@ -184,6 +184,45 @@ def volume_gauge(symbol: str = "QQQ"):
     return {"symbol": symbol, **v, "label": gauges.label(v)}
 
 
+@app.get("/api/volatility")
+def volatility_gauge(symbol: str = "QQQ"):
+    """Realized and implied volatility, kept separate on purpose.
+
+    Realized is broker-free and ranked against two years of this symbol's own
+    history. Implied needs a live option chain: Webull is the only source that
+    can price one - Yahoo's options endpoint answers 401, and the NinjaTrader
+    link is a one-way file drop. Not connected means implied says so rather
+    than guessing."""
+    if gauges is None:
+        return {"symbol": symbol, "ok": False, "reason": "gauges unavailable"}
+    if symbol not in config.SYMBOLS:
+        raise HTTPException(400, f"{symbol} isn't one of the tradable symbols.")
+    ysym = quotes.YSYM.get(symbol, symbol) if quotes else symbol
+    opt = None
+    e = SESSION.get("live")
+    if e is not None:
+        try:
+            opt = e.atm_option_for_vol(symbol)
+        except Exception:
+            opt = None                 # a chain hiccup must not kill realized
+    v = gauges.volatility(ysym, option=opt)
+    # A broker's own implied vol beats one inverted from a mid price.
+    if opt and opt.get("iv_native") and v.get("implied", {}).get("ok"):
+        v["implied"]["iv_pct"] = round(opt["iv_native"], 1)
+        v["implied"]["source"] = "webull"
+        rv = (v.get("realized") or {}).get("rv_pct")
+        if rv:
+            r = round(opt["iv_native"] / rv, 2)
+            v["implied"]["vs_realized"] = r
+            v["implied"]["state"] = ("rich" if r >= gauges.IV_RICH_RATIO else
+                                     "cheap" if r <= gauges.IV_CHEAP_RATIO else "fair")
+    elif v.get("implied", {}).get("ok"):
+        v["implied"]["source"] = "inverted from the Webull mid"
+    if opt:
+        v["greeks"] = {k: opt.get(k) for k in ("delta", "theta", "gamma", "vega")}
+    return {"symbol": symbol, **v, "label": gauges.vol_label(v)}
+
+
 @app.get("/api/preview")
 def preview(symbol: str = "QQQ", side: str = "CALLS"):
     """Where an armed entry would trigger, and which strike you'd end up with.
