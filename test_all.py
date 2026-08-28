@@ -1333,6 +1333,65 @@ try:
           "vol_recent = _median(v_recent)" in io.open("tape.py", encoding="utf-8").read())
     check(38, "acceleration is clamped to a believable range",
           "min(accel, 400.0)" in io.open("tape.py", encoding="utf-8").read())
+
+    # --- 39. Dwell time -----------------------------------------------------
+    import levels as _lv2
+    _lv2 = importlib.reload(_lv2)
+    _n = int(time.time())
+
+    def _lb(i, lo, hi, v=50000, total=60):
+        return {"t": _n - (total - i) * 60, "o": (lo + hi) / 2,
+                "h": hi, "l": lo, "c": (lo + hi) / 2, "v": v}
+
+    for _p, _want in ((713.40, (713.0, 714.0)), (713.99, (713.0, 714.0)),
+                      (702.55, (702.0, 703.0))):
+        check(39, "%.2f brackets to %s" % (_p, _want),
+              _lv2.bracketing_levels(_p) == _want, str(_lv2.bracketing_levels(_p)))
+    # Price exactly ON a dollar: the pair must never collapse to one number.
+    _b, _a = _lv2.bracketing_levels(713.00)
+    check(39, "price on the dollar still gives two distinct levels", _b != _a and _a - _b == 1.0)
+
+    # 60 minutes stuck inside 713.20-713.80: neither dollar is ever touched.
+    _pin = [_lb(i, 713.20, 713.80) for i in range(60)]
+    _d = _lv2.dwell(_pin, now=_n)
+    check(39, "a pinned market reports pinned", _d["pinned"] is True)
+    check(39, "an untouched level is None, not 0",
+          _d["mins_below"] is None and _d["mins_above"] is None)
+    check(39, "None and 0 stay different", 0 is not None)
+
+    # One bar pokes through 714, two minutes ago.
+    _mv = [_lb(i, 713.20, 713.80) for i in range(58)] + \
+          [_lb(58, 713.5, 714.10), _lb(59, 713.4, 713.9)]
+    _d2 = _lv2.dwell(_mv, now=_n)
+    check(39, "a touch clears pinned", _d2["pinned"] is False)
+    check(39, "and is timed correctly (2m)", abs(_d2["mins_above"] - 2.0) < 0.6,
+          str(_d2["mins_above"]))
+
+    # Highs/lows, not closes: a wick through a level IS a touch. Using closes
+    # would miss the rejection wick, which is the touch that matters most.
+    check(39, "a wick through the level counts as a touch",
+          _lv2._touched({"h": 714.02, "l": 713.40}, 714.0) is True)
+    check(39, "a bar that never reached it does not",
+          _lv2._touched({"h": 713.90, "l": 713.40}, 714.0) is False)
+
+    # The label must quote the bars actually available, not the 180 cap.
+    check(39, "label quotes the real lookback, not the cap",
+          ">60m" in _lv2.label(_d), _lv2.label(_d))
+
+    # Dwell and velocity answer different questions. Pinned AND violent is a
+    # contradiction and must be surfaced, not averaged away.
+    _ag = _lv2.agreement({"ok": True, "pinned": True}, {"ok": True, "state": "violent"})
+    check(39, "pinned + violent is flagged as disagreement", _ag["agree"] is False)
+    _ag2 = _lv2.agreement({"ok": True, "pinned": True}, {"ok": True, "state": "calm"})
+    check(39, "pinned + calm agrees", _ag2["agree"] is True)
+
+    check(39, "no bars is handled, not crashed", _lv2.dwell([])["ok"] is False)
+    _mainsrc = io.open("main.py", encoding="utf-8").read()
+    check(39, "the endpoint exists", '@app.get("/api/dwell")' in _mainsrc)
+    check(39, "levels is imported defensively like tape",
+          "import levels\nexcept Exception:\n    levels = None" in _mainsrc)
+    check(39, "the endpoint rejects untradable symbols",
+          "isn't one of the tradable symbols" in _mainsrc.split('/api/dwell', 1)[1][:900])
     check(29,"and no premium/time value on the button",
           "% time" not in ix6 and "q.ask.toFixed" not in code6)
 
@@ -1385,7 +1444,7 @@ print("\n"+"="*68)
 by={}
 for sc,name,ok,_ in results:
     by.setdefault(sc,[0,0]); by[sc][0]+=1; by[sc][1]+= (1 if ok else 0)
-T={38:"Velocity vs feed artifacts",37:"Desktop icon",36:"Trade log detail",35:"Time value warns not blocks",34:"LOCK/X gone, size warns",33:"Page actually runs",32:"No SAVE / live trade frozen",31:"One switch / still modal",30:"Directional entry levels",29:"Percent only, no cash",28:"Grid/ATM/quality/one-armed",27:"Config screen cleanup",26:"Ratchet stop",25:"Console auto-hide",24:"Options auto-reconcile",23:"Daily trade log",22:"Options phantom clear",21:"Auto-reconcile w/ broker",20:"MY CONFIG always on",19:"Phantom position",18:"Futures hours",17:"Closed market honest",16:"Restart leaves no spinner",15:"One tab only",14:"Git lock self-heal",13:"Broker tabs + tray",12:"Velocity honest when shut",11:"Multi-broker sessions",1:"Futures login survives restart",2:"remember_login default",3:"Options profiles to disk",
+T={39:"Dwell time",38:"Velocity vs feed artifacts",37:"Desktop icon",36:"Trade log detail",35:"Time value warns not blocks",34:"LOCK/X gone, size warns",33:"Page actually runs",32:"No SAVE / live trade frozen",31:"One switch / still modal",30:"Directional entry levels",29:"Percent only, no cash",28:"Grid/ATM/quality/one-armed",27:"Config screen cleanup",26:"Ratchet stop",25:"Console auto-hide",24:"Options auto-reconcile",23:"Daily trade log",22:"Options phantom clear",21:"Auto-reconcile w/ broker",20:"MY CONFIG always on",19:"Phantom position",18:"Futures hours",17:"Closed market honest",16:"Restart leaves no spinner",15:"One tab only",14:"Git lock self-heal",13:"Broker tabs + tray",12:"Velocity honest when shut",11:"Multi-broker sessions",1:"Futures login survives restart",2:"remember_login default",3:"Options profiles to disk",
    4:"Browser autofill guard",5:"ITM3 strike math",6:"Preview == Arm",7:"Live-only / dead modes",
    8:"Auto-sync safety",9:"Endpoints alive",10:"UI integrity"}
 for sc in sorted(by):
