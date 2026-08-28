@@ -644,7 +644,11 @@ class BaseFuturesSession:
         """Record the position for a limit that was already working at the broker."""
         self.position = {"symbol": a["symbol"], "side": a["side"], "qty": a["qty"],
                          "entry": a["target"], "mark": get_price(a["symbol"])["price"],
-                         "opened_at": dt.datetime.now().strftime("%H:%M")}
+                         "opened_at": dt.datetime.now().strftime("%H:%M"),
+                         # Frozen at the fill. Nudging the step mid-trade must
+                         # not move the stop under a position already running.
+                         "ratchet_on": bool(self.settings.get("ratchet_enabled")),
+                         "ratchet_step": float(self.settings.get("ratchet_points") or 10.0)}
         self._update_trail(); self._update_ratchet()
 
     def update_strategies(self, strategies):
@@ -950,7 +954,11 @@ class NinjaTraderSession(BaseFuturesSession):
             kind = "MARKET"
         self.position = {"symbol": symbol, "side": side, "qty": int(qty),
                          "entry": px, "mark": get_price(symbol)["price"],
-                         "opened_at": dt.datetime.now().strftime("%H:%M")}
+                         "opened_at": dt.datetime.now().strftime("%H:%M"),
+                         # Frozen at the fill. Nudging the step mid-trade must
+                         # not move the stop under a position already running.
+                         "ratchet_on": bool(self.settings.get("ratchet_enabled")),
+                         "ratchet_step": float(self.settings.get("ratchet_points") or 10.0)}
         self._update_trail(); self._update_ratchet()
         self.last_event = "SENT to NinjaTrader (%s): %s %d %s %s" % (
             self.account, action, int(qty), symbol, kind)
@@ -1172,7 +1180,9 @@ class TopstepSession(BaseFuturesSession):
         px = float(limit) if limit else get_price(symbol)["price"]
         self.position = {"symbol": symbol, "side": side, "qty": int(qty), "entry": px,
                          "mark": get_price(symbol)["price"],
-                         "opened_at": dt.datetime.now().strftime("%H:%M"), "contract": contract}
+                         "opened_at": dt.datetime.now().strftime("%H:%M"), "contract": contract,
+                         "ratchet_on": bool(self.settings.get("ratchet_enabled")),
+                         "ratchet_step": float(self.settings.get("ratchet_points") or 10.0)}
         self._update_trail(); self._update_ratchet()
         self.last_event = "Topstep: %s %d %s %s" % (
             "BUY" if side == "LONG" else "SELL", int(qty), contract,
@@ -1451,7 +1461,11 @@ class WebullFuturesSession(BaseFuturesSession):
         self.position = {"symbol": symbol, "side": side, "qty": int(qty),
                          "entry": round(entry, 2), "mark": px, "contract": contract,
                          "client_order_id": o["client_order_id"],
-                         "opened_at": dt.datetime.now().strftime("%H:%M")}
+                         "opened_at": dt.datetime.now().strftime("%H:%M"),
+                         # Frozen at the fill. Nudging the step mid-trade must
+                         # not move the stop under a position already running.
+                         "ratchet_on": bool(self.settings.get("ratchet_enabled")),
+                         "ratchet_step": float(self.settings.get("ratchet_points") or 10.0)}
         self._update_trail(); self._update_ratchet()
         self.last_event = "SENT to Webull %s: %s %d %s (%s)" % (
             "LIVE", side, int(qty), symbol, contract)
