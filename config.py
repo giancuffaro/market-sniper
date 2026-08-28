@@ -1,6 +1,6 @@
 """MARKET SNIPER — central config. v3.1"""
 
-APP_VERSION = "4.0"
+APP_VERSION = "4.2"
 APP_NAME = "MARKET SNIPER"
 REGION = "us"
 
