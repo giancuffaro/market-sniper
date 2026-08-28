@@ -1392,6 +1392,57 @@ try:
           "import levels\nexcept Exception:\n    levels = None" in _mainsrc)
     check(39, "the endpoint rejects untradable symbols",
           "isn't one of the tradable symbols" in _mainsrc.split('/api/dwell', 1)[1][:900])
+
+    # --- 40. Volume gauge ---------------------------------------------------
+    import gauges as _g
+    _g = importlib.reload(_g)
+
+    # THE TRAP: comparing volume-so-far against whole past days makes every
+    # morning read as dead. The profile is learned from real bars, and it is
+    # nothing like a straight line - measured on QQQ, 12:30 is 64% of a day
+    # done where a flat clock says 46%.
+    _prof = [(570 + i * 5, min(1.0, (i * 5 / 390.0) ** 0.75)) for i in range(79)]
+    check(40, "the profile is used, not a flat clock",
+          _g.expected_fraction(_prof, 630) > (630 - 570) / 390.0)
+    check(40, "before the open, nothing is done", _g.expected_fraction(_prof, 500) == 0.0)
+    check(40, "with no profile it degrades to a clock, not a crash",
+          0.0 < _g.expected_fraction([], 750) < 1.0)
+
+    # Percentile, not a ratio: a few huge days must not move where today sits.
+    _series = [100.0] * 90 + [5000.0] * 10
+    check(40, "ten monster days do not drag the ranking",
+          _g.percentile_of(101.0, _series) == 90.0, str(_g.percentile_of(101.0, _series)))
+    check(40, "an empty history returns None, not a fake number",
+          _g.percentile_of(1.0, []) is None)
+    check(40, "low/high bands sit where the spec says",
+          _g._band(10) == "low" and _g._band(50) == "normal" and _g._band(90) == "high")
+
+    # Yahoo's intraday volume cannot be summed. Measured 2026-08-26 12:55 ET:
+    # QQQ's 5-min bars summed to 277,170,149 against a 43,645,800 median day,
+    # because six bars carried 26-47x the median. Today's total therefore comes
+    # from the daily bar, which agreed with the cleaned sum to within 1%.
+    _gsrc = io.open("gauges.py", encoding="utf-8").read()
+    check(40, "today's volume comes from the daily bar, not a sum of 5m bars",
+          '_chart(ysym, "1d", "1d")' in _gsrc and "regularMarketVolume" in _gsrc)
+    check(40, "profile bars are cleaned of artifacts", "cleaned = _clean(" in _gsrc)
+    _cl = _g._clean([100, 100, 100, 100, 100, 28000000])
+    check(40, "a 280,000x artifact is clipped", max(_cl) == 100 * _g.OUTLIER_X, str(max(_cl)))
+    check(40, "and honest volume is untouched", _cl[:5] == [100, 100, 100, 100, 100])
+
+    # Ranking today against a list containing today drags every reading to the
+    # middle, and on a record day the record pulls its own percentile down.
+    check(40, "today is excluded from its own history", "if d >= today:" in _gsrc)
+    # The clock must come from the feed. -4 is right from March to November and
+    # an hour wrong the rest of the year - a fifth of a session.
+    check(40, "the exchange timezone is read from the feed, not hardcoded",
+          "gmtoffset" in _gsrc and "def _tz_for" in _gsrc)
+    # Dividing by a near-zero fraction at 09:31 turns noise into a wild number.
+    check(40, "it refuses to project in the first minutes", "too early to project" in _gsrc)
+
+    _mainsrc2 = io.open("main.py", encoding="utf-8").read()
+    check(40, "the endpoint exists", '@app.get("/api/volume")' in _mainsrc2)
+    check(40, "gauges is imported defensively",
+          "import gauges\nexcept Exception:\n    gauges = None" in _mainsrc2)
     check(29,"and no premium/time value on the button",
           "% time" not in ix6 and "q.ask.toFixed" not in code6)
 
@@ -1444,7 +1495,7 @@ print("\n"+"="*68)
 by={}
 for sc,name,ok,_ in results:
     by.setdefault(sc,[0,0]); by[sc][0]+=1; by[sc][1]+= (1 if ok else 0)
-T={39:"Dwell time",38:"Velocity vs feed artifacts",37:"Desktop icon",36:"Trade log detail",35:"Time value warns not blocks",34:"LOCK/X gone, size warns",33:"Page actually runs",32:"No SAVE / live trade frozen",31:"One switch / still modal",30:"Directional entry levels",29:"Percent only, no cash",28:"Grid/ATM/quality/one-armed",27:"Config screen cleanup",26:"Ratchet stop",25:"Console auto-hide",24:"Options auto-reconcile",23:"Daily trade log",22:"Options phantom clear",21:"Auto-reconcile w/ broker",20:"MY CONFIG always on",19:"Phantom position",18:"Futures hours",17:"Closed market honest",16:"Restart leaves no spinner",15:"One tab only",14:"Git lock self-heal",13:"Broker tabs + tray",12:"Velocity honest when shut",11:"Multi-broker sessions",1:"Futures login survives restart",2:"remember_login default",3:"Options profiles to disk",
+T={40:"Volume gauge",39:"Dwell time",38:"Velocity vs feed artifacts",37:"Desktop icon",36:"Trade log detail",35:"Time value warns not blocks",34:"LOCK/X gone, size warns",33:"Page actually runs",32:"No SAVE / live trade frozen",31:"One switch / still modal",30:"Directional entry levels",29:"Percent only, no cash",28:"Grid/ATM/quality/one-armed",27:"Config screen cleanup",26:"Ratchet stop",25:"Console auto-hide",24:"Options auto-reconcile",23:"Daily trade log",22:"Options phantom clear",21:"Auto-reconcile w/ broker",20:"MY CONFIG always on",19:"Phantom position",18:"Futures hours",17:"Closed market honest",16:"Restart leaves no spinner",15:"One tab only",14:"Git lock self-heal",13:"Broker tabs + tray",12:"Velocity honest when shut",11:"Multi-broker sessions",1:"Futures login survives restart",2:"remember_login default",3:"Options profiles to disk",
    4:"Browser autofill guard",5:"ITM3 strike math",6:"Preview == Arm",7:"Live-only / dead modes",
    8:"Auto-sync safety",9:"Endpoints alive",10:"UI integrity"}
 for sc in sorted(by):

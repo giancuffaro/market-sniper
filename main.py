@@ -26,6 +26,10 @@ try:
     import levels
 except Exception:
     levels = None
+try:
+    import gauges
+except Exception:
+    gauges = None
 
 _EXEC = ThreadPoolExecutor(max_workers=3)
 CONNECT_TIMEOUT_S = 25
@@ -161,6 +165,23 @@ def dwell_time(symbol: str = "QQQ"):
     except Exception:
         pass                       # the cross-check is a bonus, never a blocker
     return out
+
+
+@app.get("/api/volume")
+def volume_gauge(symbol: str = "QQQ"):
+    """Today's volume ranked against ~500 sessions, corrected for time of day.
+
+    The correction is the whole point: comparing volume-so-far against whole
+    past days makes every morning read as dead. Today is projected to a full
+    session first, using a profile learned from real 5-minute bars, and only
+    then ranked."""
+    if gauges is None:
+        return {"symbol": symbol, "ok": False, "reason": "gauges unavailable"}
+    if symbol not in config.SYMBOLS:
+        raise HTTPException(400, f"{symbol} isn't one of the tradable symbols.")
+    ysym = quotes.YSYM.get(symbol, symbol) if quotes else symbol
+    v = gauges.volume(ysym)
+    return {"symbol": symbol, **v, "label": gauges.label(v)}
 
 
 @app.get("/api/preview")
