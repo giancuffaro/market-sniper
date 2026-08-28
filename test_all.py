@@ -1768,6 +1768,52 @@ try:
           _v3["vix"].get("level") is not None and "level" not in (_v3["implied"] or {}))
     check(45, "the endpoint exists", '@app.get("/api/market")' in
           io.open("main.py", encoding="utf-8").read())
+
+    # --- 46. NinjaScript port stays in step with the Python ---------------
+    # The two are duplicated because NinjaScript cannot call Python. Duplicated
+    # constants drift, so the suite compares them rather than trusting anyone
+    # to remember.
+    _cs_path = os.path.join(HERE, "ninjatrader", "MarketSniperTrend.cs")
+    check(46, "the indicator exists", os.path.exists(_cs_path))
+    if os.path.exists(_cs_path):
+        _cs = io.open(_cs_path, encoding="utf-8").read()
+        import re as _re
+        def _const(name):
+            m = _re.search(r"const\s+\w+\s+" + name + r"\s*=\s*([0-9.]+)", _cs)
+            return float(m.group(1)) if m else None
+        _pairs = [("EMA_PERIOD", float(_tr.EMA_PERIOD)),
+                  ("SLOPE_BARS", float(_tr.SLOPE_BARS)),
+                  ("SLOPE_MIN", float(_tr.SLOPE_MIN)),
+                  ("STRUCTURE_BARS", float(_tr.STRUCTURE_BARS)),
+                  ("SWING", float(_tr.SWING)),
+                  ("VOLUME_BARS", float(_tr.VOLUME_BARS)),
+                  ("VOL_CONFIRM", float(_tr.VOL_CONFIRM))]
+        for _n, _pyval in _pairs:
+            check(46, "%s matches trend.py (%s)" % (_n, _pyval),
+                  _const(_n) == _pyval, "cs=%s py=%s" % (_const(_n), _pyval))
+        check(46, "the outlier cap matches too", _const("OUTLIER_X") == 12.0)
+
+        # The combining rule must be the same one, not merely similar.
+        check(46, "two-of-three with nothing against it",
+              "totalScore >= 2 && !anyDown" in _cs and "totalScore <= -2 && !anyUp" in _cs)
+        check(46, "chop is the default, not an error", 'state = "chop"' in _cs)
+        # NinjaScript indexes bars backwards; getting that wrong reverses the
+        # structure test silently and it would still compile and plot.
+        check(46, "the backwards bar indexing is handled",
+              "Insert(0," in _cs and "indexed backwards" in _cs)
+        # Slope normalised by range, same as the Python - a fixed point band
+        # means something different on every instrument.
+        check(46, "slope is normalised by average range", "perBar / avgRange" in _cs)
+        check(46, "and price position is required too",
+              "lastSlope >= SLOPE_MIN && above" in _cs)
+        # The export is what makes the one-way NinjaTrader link two-way.
+        check(46, "state can be exported for the Sniper to read", "ExportState" in _cs)
+        check(46, "written atomically so a half-written line cannot be read",
+              ".tmp" in _cs and "File.Move(tmp" in _cs)
+        check(46, "a file error can never take the chart down",
+              "catch (Exception)" in _cs and "Swallowed on purpose" in _cs)
+        check(46, "install notes ship with it",
+              os.path.exists(os.path.join(HERE, "ninjatrader", "INSTALL - read me.md")))
     check(29,"and no premium/time value on the button",
           "% time" not in ix6 and "q.ask.toFixed" not in code6)
 
@@ -1820,7 +1866,7 @@ print("\n"+"="*68)
 by={}
 for sc,name,ok,_ in results:
     by.setdefault(sc,[0,0]); by[sc][0]+=1; by[sc][1]+= (1 if ok else 0)
-T={45:"Breadth + VIX",44:"Entry telemetry",43:"Trend module",42:"Audio cues",41:"Volatility gauges",40:"Volume gauge",39:"Dwell time",38:"Velocity vs feed artifacts",37:"Desktop icon",36:"Trade log detail",35:"Time value warns not blocks",34:"LOCK/X gone, size warns",33:"Page actually runs",32:"No SAVE / live trade frozen",31:"One switch / still modal",30:"Directional entry levels",29:"Percent only, no cash",28:"Grid/ATM/quality/one-armed",27:"Config screen cleanup",26:"Ratchet stop",25:"Console auto-hide",24:"Options auto-reconcile",23:"Daily trade log",22:"Options phantom clear",21:"Auto-reconcile w/ broker",20:"MY CONFIG always on",19:"Phantom position",18:"Futures hours",17:"Closed market honest",16:"Restart leaves no spinner",15:"One tab only",14:"Git lock self-heal",13:"Broker tabs + tray",12:"Velocity honest when shut",11:"Multi-broker sessions",1:"Futures login survives restart",2:"remember_login default",3:"Options profiles to disk",
+T={46:"NinjaScript in step",45:"Breadth + VIX",44:"Entry telemetry",43:"Trend module",42:"Audio cues",41:"Volatility gauges",40:"Volume gauge",39:"Dwell time",38:"Velocity vs feed artifacts",37:"Desktop icon",36:"Trade log detail",35:"Time value warns not blocks",34:"LOCK/X gone, size warns",33:"Page actually runs",32:"No SAVE / live trade frozen",31:"One switch / still modal",30:"Directional entry levels",29:"Percent only, no cash",28:"Grid/ATM/quality/one-armed",27:"Config screen cleanup",26:"Ratchet stop",25:"Console auto-hide",24:"Options auto-reconcile",23:"Daily trade log",22:"Options phantom clear",21:"Auto-reconcile w/ broker",20:"MY CONFIG always on",19:"Phantom position",18:"Futures hours",17:"Closed market honest",16:"Restart leaves no spinner",15:"One tab only",14:"Git lock self-heal",13:"Broker tabs + tray",12:"Velocity honest when shut",11:"Multi-broker sessions",1:"Futures login survives restart",2:"remember_login default",3:"Options profiles to disk",
    4:"Browser autofill guard",5:"ITM3 strike math",6:"Preview == Arm",7:"Live-only / dead modes",
    8:"Auto-sync safety",9:"Endpoints alive",10:"UI integrity"}
 for sc in sorted(by):
