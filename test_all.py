@@ -1276,6 +1276,58 @@ try:
     _lb = io.open(_real[0], encoding="utf-8", errors="replace").read()
     check(37, "the launcher still opens the browser itself",
           "http://127.0.0.1:8000" in _lb and "start" in _lb)
+
+    # --- 38. Velocity survives Yahoo's cumulative-volume bars -------------
+    # Measured live 2026-08-26 12:42 ET: QQQ's 12:41 bar carried 18,887,220
+    # against neighbours of 30-70k, and SPY's 12:07 bar carried 15,501,626
+    # against 50-90k. Yahoo intermittently publishes a cumulative figure in a
+    # single 1-minute bar. Averaged in, ONE such bar decides the reading: in
+    # the recent window the meter pinned to "violent", in the baseline the
+    # identical tape read "calm". Both were on screen the same afternoon.
+    import tape as _tp
+    _tp = importlib.reload(_tp)
+
+    def _bar(t, v, c=500.0, rng=0.10):
+        return {"t": t, "o": c, "h": c + rng / 2, "l": c - rng / 2, "c": c, "v": v}
+
+    _clean = [_bar(i, 55000) for i in range(34)] + [_bar(34, 55000)]
+    _in_recent = [_bar(i, 55000) for i in range(34)] + [_bar(34, 18887220)]
+    _in_base = [_bar(0, 15501626)] + [_bar(i, 55000) for i in range(1, 35)]
+
+    _rc = _tp.compute(_clean)
+    _rr = _tp.compute(_in_recent)
+    _rb = _tp.compute(_in_base)
+    check(38, "clean tape reads normal", _rc["state"] == "normal", str(_rc["score"]))
+    check(38, "a 300x artifact in the RECENT window no longer reads violent",
+          _rr["state"] == "normal", "%s / %s" % (_rr["state"], _rr["score"]))
+    check(38, "a 300x artifact in the BASELINE no longer reads calm",
+          _rb["state"] == "normal", "%s / %s" % (_rb["state"], _rb["score"]))
+    check(38, "and all three agree, because the tape is the same tape",
+          _rc["score"] == _rr["score"] == _rb["score"],
+          "%s %s %s" % (_rc["score"], _rr["score"], _rb["score"]))
+    check(38, "the artifact is counted, not hidden", _rr.get("clipped_bars", 0) == 1)
+    check(38, "an artifact as the NEWEST bar suppresses acceleration",
+          _rr["accel_pct"] == 0.0 and "artifact" in (_rr.get("note") or ""),
+          "%s / %s" % (_rr["accel_pct"], _rr.get("note")))
+
+    # A REAL burst must still register - the cap must not flatten genuine speed.
+    _burst = [_bar(i, 50000) for i in range(30)] + [_bar(30 + i, 260000) for i in range(5)]
+    _rbu = _tp.compute(_burst)
+    check(38, "a real 5x burst still reads fast or violent",
+          _rbu["state"] in ("fast", "violent"), "%s / %s" % (_rbu["state"], _rbu["score"]))
+    # And a genuinely dead tape must still read dead, or "silent tape = do not
+    # enter" stops working.
+    _dead = [_bar(i, 55000) for i in range(30)] + [_bar(30 + i, 2000) for i in range(5)]
+    check(38, "a dying tape still reads calm", _tp.compute(_dead)["state"] == "calm",
+          str(_tp.compute(_dead)["score"]))
+    _shut = [_bar(i, 0) for i in range(35)]
+    check(38, "a closed market still reads closed",
+          "closed" in (_tp.compute(_shut).get("note") or ""))
+
+    check(38, "medians, not means, decide the ratios",
+          "vol_recent = _median(v_recent)" in io.open("tape.py", encoding="utf-8").read())
+    check(38, "acceleration is clamped to a believable range",
+          "min(accel, 400.0)" in io.open("tape.py", encoding="utf-8").read())
     check(29,"and no premium/time value on the button",
           "% time" not in ix6 and "q.ask.toFixed" not in code6)
 
@@ -1321,7 +1373,7 @@ print("\n"+"="*68)
 by={}
 for sc,name,ok,_ in results:
     by.setdefault(sc,[0,0]); by[sc][0]+=1; by[sc][1]+= (1 if ok else 0)
-T={37:"Desktop icon",36:"Trade log detail",35:"Time value warns not blocks",34:"LOCK/X gone, size warns",33:"Page actually runs",32:"No SAVE / live trade frozen",31:"One switch / still modal",30:"Directional entry levels",29:"Percent only, no cash",28:"Grid/ATM/quality/one-armed",27:"Config screen cleanup",26:"Ratchet stop",25:"Console auto-hide",24:"Options auto-reconcile",23:"Daily trade log",22:"Options phantom clear",21:"Auto-reconcile w/ broker",20:"MY CONFIG always on",19:"Phantom position",18:"Futures hours",17:"Closed market honest",16:"Restart leaves no spinner",15:"One tab only",14:"Git lock self-heal",13:"Broker tabs + tray",12:"Velocity honest when shut",11:"Multi-broker sessions",1:"Futures login survives restart",2:"remember_login default",3:"Options profiles to disk",
+T={38:"Velocity vs feed artifacts",37:"Desktop icon",36:"Trade log detail",35:"Time value warns not blocks",34:"LOCK/X gone, size warns",33:"Page actually runs",32:"No SAVE / live trade frozen",31:"One switch / still modal",30:"Directional entry levels",29:"Percent only, no cash",28:"Grid/ATM/quality/one-armed",27:"Config screen cleanup",26:"Ratchet stop",25:"Console auto-hide",24:"Options auto-reconcile",23:"Daily trade log",22:"Options phantom clear",21:"Auto-reconcile w/ broker",20:"MY CONFIG always on",19:"Phantom position",18:"Futures hours",17:"Closed market honest",16:"Restart leaves no spinner",15:"One tab only",14:"Git lock self-heal",13:"Broker tabs + tray",12:"Velocity honest when shut",11:"Multi-broker sessions",1:"Futures login survives restart",2:"remember_login default",3:"Options profiles to disk",
    4:"Browser autofill guard",5:"ITM3 strike math",6:"Preview == Arm",7:"Live-only / dead modes",
    8:"Auto-sync safety",9:"Endpoints alive",10:"UI integrity"}
 for sc in sorted(by):
