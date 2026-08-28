@@ -270,8 +270,13 @@ try:
     stale=[_bar(now_-3*86400+i*60, 1000, 0.5) for i in range(35)]
     stale.append(_bar(now_-3*86400+35*60, 90000, 6.0))
     raw = tape.compute(stale)
-    check(12,"raw compute on a close spike DOES read violent (the trap)",
-          raw["state"]=="violent", raw["state"])
+    # This used to assert the spike DID read "violent" - that was the trap the
+    # staleness guard existed to cover. The outlier cap now defuses it one
+    # layer earlier, so a lone closing-auction print no longer fools the score
+    # either. Both guards are kept: the cap handles feed artifacts mid-session,
+    # staleness handles a market that is simply shut.
+    check(12,"a lone closing-auction spike no longer reads violent",
+          raw["state"] != "violent", raw["state"])
     tape._CACHE.clear()
     tape._bars = lambda ysym, b=stale: b
     v = tape.velocity("TEST")
