@@ -443,11 +443,30 @@
         <div class="shint">Closes when the trade is down this many points. Works for both LONG and SHORT.</div>
       </div>
 
+      <div class="sgroup mine">
+        <div class="glbl">★ RATCHET (points)</div>
+        <div class="srow"><label><input type="checkbox" id="raE"> ON</label>
+          <input type="number" id="raV" min="0.25" step="0.25" placeholder="10"></div>
+        <div class="shint">The same system as the options side, in points instead of percent.
+        The stop climbs a rung at a time and <b>never comes back down</b>, always sitting
+        <b>one step below the best you have seen</b>.<br><br>
+        MNQ LONG from 23000 with a 10-point step:<br>
+        open → stop <b>22990</b> · touch +10 → <b>breakeven</b> · touch +20 → <b>23010</b> ·
+        touch +30 → <b>23020</b> … no cap.<br><br>
+        <b>This replaces the trailing stop and the take-profit while it is on.</b> A trailing
+        stop slides on every tick and gets shaken out by noise; the ratchet only moves when a
+        whole rung is taken. A take-profit alongside it would close the trade at the exact
+        moment the ratchet is trying to let it run.<br><br>
+        <b>Matching your options risk:</b> MNQ is $2 a point, MES is $5. A 10% stop on a
+        $2.75 option risks about $27.50 a contract — that is <b>≈14 points on MNQ</b> or
+        <b>≈5.5 on MES</b>.</div>
+      </div>
+
       <div class="sgroup">
         <div class="glbl">TRAILING STOP (points)</div>
         <div class="srow"><label><input type="checkbox" id="trE"> ON</label>
           <input type="number" id="trV" min="0.25" step="0.25" placeholder="5"></div>
-        <div class="shint">The stop follows the best price by this distance. Ex: LONG from 23150 with a
+        <div class="shint">Ignored while the RATCHET above is on. The stop follows the best price by this distance. Ex: LONG from 23150 with a
         5-pt trail — price runs to 23170, the stop rides up to 23165; a pullback there closes you out,
         keeping most of the move. Shown live under your P&amp;L while in a trade.</div>
       </div>
@@ -512,6 +531,7 @@ const FZ = (function(){
   let marketClosed=false;
   let mode="WEBULL", sym="MNQ", qty=1, inTrade=false, poll=null, priceTimer=null, trendTimer=null, velTimer=null;
   let settings={tp_enabled:false,tp_points:10,sl_enabled:false,sl_points:5,trail_enabled:false,trail_points:5,
+                ratchet_enabled:false,ratchet_points:10,
                 round_enabled:false,round_step:50};
   let prefs={}, prefsReady=false, prefsLoaded=null;
   const $=id=>document.getElementById(id);
@@ -960,7 +980,17 @@ const FZ = (function(){
       const parts=[];
       if(settings.tp_enabled) parts.push('TP +'+settings.tp_points+' pts');
       if(settings.sl_enabled) parts.push('SL −'+settings.sl_points+' pts');
-      if(settings.trail_enabled && pos.trail_stop!=null) parts.push('TRAIL @ '+pos.trail_stop.toFixed(2));
+      // The ratchet owns the exit when it is on, so show ITS stop and not the
+      // trailing one - two different stops on screen at once is how you end up
+      // watching the wrong number.
+      if(pos.ratchet && (settings.ratchet_enabled || pos.ratchet_on)){
+        const r=pos.ratchet;
+        parts.push('RATCHET stop '+r.stop_price.toFixed(2)
+                   +' ('+(r.stop_points>=0?'+':'')+r.stop_points+'pt)'
+                   +' · best +'+r.peak_points+'pt · next +'+r.next_points+'pt');
+      }else if(settings.trail_enabled && pos.trail_stop!=null){
+        parts.push('TRAIL @ '+pos.trail_stop.toFixed(2));
+      }
       $('bracketLine').textContent=parts.join('  ·  ');
       $('closeSub').textContent=`MARKET · ${pos.symbol} ${pos.side} × ${pos.qty}`;
       $('hero').className='hero '+(pos.side==='LONG'?'long':'short');
@@ -982,6 +1012,7 @@ const FZ = (function(){
     $('tpE').checked=settings.tp_enabled; $('tpV').value=settings.tp_points;
     $('slE').checked=settings.sl_enabled; $('slV').value=settings.sl_points;
     $('trE').checked=settings.trail_enabled; $('trV').value=settings.trail_points;
+    $('raE').checked=settings.ratchet_enabled; $('raV').value=settings.ratchet_points;
     $('rdE').checked=!!settings.round_enabled; $('rdV').value=String(settings.round_step||50);
     $('setScrim').classList.add('show');
   }
@@ -1164,6 +1195,7 @@ const FZ = (function(){
     settings={tp_enabled:$('tpE').checked, tp_points:parseFloat($('tpV').value)||settings.tp_points,
               sl_enabled:$('slE').checked, sl_points:parseFloat($('slV').value)||settings.sl_points,
               trail_enabled:$('trE').checked, trail_points:parseFloat($('trV').value)||settings.trail_points,
+              ratchet_enabled:$('raE').checked, ratchet_points:parseFloat($('raV').value)||settings.ratchet_points,
               round_enabled:$('rdE').checked, round_step:parseFloat($('rdV').value)||50};
     localStorage.setItem(LSS,JSON.stringify(settings));
     await api('/api/settings',settings);
