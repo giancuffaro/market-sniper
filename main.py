@@ -199,7 +199,7 @@ def volatility_gauge(symbol: str = "QQQ"):
         raise HTTPException(400, f"{symbol} isn't one of the tradable symbols.")
     ysym = quotes.YSYM.get(symbol, symbol) if quotes else symbol
     opt = None
-    e = SESSION.get("live")
+    e = SESSION.get("s")
     if e is not None:
         try:
             opt = e.atm_option_for_vol(symbol)
