@@ -1814,6 +1814,108 @@ try:
               "catch (Exception)" in _cs and "Swallowed on purpose" in _cs)
         check(46, "install notes ship with it",
               os.path.exists(os.path.join(HERE, "ninjatrader", "INSTALL - read me.md")))
+
+    # --- 47. Futures ratchet ----------------------------------------------
+    # Percent does not carry from options to futures: +10% of an option premium
+    # is a small underlying move because premium is leveraged, while 10% of MNQ
+    # is over 2000 points. What carries is the SHAPE - one unit of risk per
+    # rung - so the futures version steps in POINTS.
+    import futures_client as _fcm
+    _fcm = importlib.reload(_fcm)
+    check(47, "the futures ratchet is configured in points",
+          "ratchet_points" in _fcm.DEFAULT_SETTINGS)
+    check(47, "and defaults to 10", _fcm.DEFAULT_SETTINGS["ratchet_points"] == 10.0)
+    check(47, "off by default, like every other auto-exit",
+          _fcm.DEFAULT_SETTINGS["ratchet_enabled"] is False)
+
+    class _FR(_fcm.BaseFuturesSession):
+        def __init__(self):
+            self.settings = dict(_fcm.DEFAULT_SETTINGS); self.position = None; self.mode = "TEST"
+        def _points_pnl(self):
+            p = self.position
+            return (p["mark"] - p["entry"]) * (1 if p["side"] == "LONG" else -1)
+
+    def _run(side, entry, marks, step=10.0):
+        f = _FR()
+        f.settings.update({"ratchet_enabled": True, "ratchet_points": step})
+        f.position = {"symbol": "MNQ", "side": side, "qty": 1, "entry": entry,
+                      "mark": entry, "ratchet_on": True, "ratchet_step": step}
+        out = []
+        for m in marks:
+            f.position["mark"] = float(m)
+            hit = f._bracket_hit()
+            out.append((m, dict(f.position["ratchet"]), hit))
+            if hit:
+                break
+        return f, out
+
+    # G's example, verbatim: touch 20 -> stop 10, touch 30 -> stop 20,
+    # touch 40 -> stop 30.
+    _f, _r = _run("LONG", 23000.0, [23010, 23020, 23030, 23040])
+    _stops = {int(x[1]["peak_points"]): x[1]["stop_points"] for x in _r}
+    check(47, "+10 moves the stop to breakeven", _stops.get(10) == 0.0, str(_stops))
+    check(47, "+20 moves it to +10", _stops.get(20) == 10.0, str(_stops))
+    check(47, "+30 moves it to +20", _stops.get(30) == 20.0, str(_stops))
+    check(47, "+40 moves it to +30", _stops.get(40) == 30.0, str(_stops))
+    check(47, "the opening stop is one step down",
+          _run("LONG", 23000.0, [23000])[1][0][1]["stop_points"] == -10.0)
+
+    # It must never come back down.
+    _f2, _r2 = _run("LONG", 23000.0, [23040, 23032, 23029])
+    check(47, "a pullback does not lower the stop",
+          _r2[1][1]["stop_points"] == 30.0, str(_r2[1][1]))
+    check(47, "and taking the stop exits", _r2[-1][2] == "TP", str(_r2[-1]))
+    check(47, "the exit says which rung it locked",
+          _f2.position.get("exit_reason", "").startswith("RATCHET+"),
+          str(_f2.position.get("exit_reason")))
+    # Breakeven has its own name, so the log can tell a scratch from a winner.
+    _f3, _r3 = _run("LONG", 23000.0, [23010, 23014, 22999])
+    check(47, "a breakeven stop is named RATCHET-BE",
+          _f3.position.get("exit_reason") == "RATCHET-BE", str(_f3.position.get("exit_reason")))
+
+    # SHORT mirrors it exactly.
+    _f4, _r4 = _run("SHORT", 23000.0, [22990, 22980, 22991])
+    check(47, "short: +20 puts the stop at 22990",
+          abs(_r4[1][1]["stop_price"] - 22990.0) < 0.01, str(_r4[1][1]))
+    check(47, "short exits on the way back up", _r4[-1][2] == "TP")
+
+    # The rung arithmetic is SHARED with the options side, not reimplemented -
+    # it already carries the float fix where an exact +10.0 computed as
+    # 9.999999999999993 and left the stop a rung low.
+    _fsrc = io.open("futures_client.py", encoding="utf-8").read()
+    check(47, "rung maths is shared with the options side",
+          "from webull_client import LiveSession as _LS" in _fsrc)
+    _exact = _run("LONG", 23000.0, [23010])[1][0][1]
+    check(47, "an exact rung touch is not a rung short", _exact["stop_points"] == 0.0,
+          str(_exact))
+
+    # The ratchet REPLACES tp/sl/trail while on, and returns early - a live
+    # take-profit would close the trade the moment the ratchet let it run.
+    _f5 = _FR()
+    _f5.settings.update({"ratchet_enabled": True, "ratchet_points": 10.0,
+                         "tp_enabled": True, "tp_points": 5.0})
+    _f5.position = {"symbol": "MNQ", "side": "LONG", "qty": 1, "entry": 23000.0,
+                    "mark": 23008.0, "ratchet_on": True, "ratchet_step": 10.0}
+    check(47, "a take-profit cannot fire underneath the ratchet",
+          _f5._bracket_hit() is None, str(_f5.position.get("ratchet")))
+    # Terms frozen at the fill, same as options.
+    check(47, "terms are frozen when the position opens",
+          _fsrc.count('"ratchet_on": bool(self.settings.get("ratchet_enabled"))') >= 3)
+    # Screen must show ONE stop, not two.
+    _fx = io.open("futures_index.html", encoding="utf-8").read()
+    check(47, "the futures screen has the toggle", 'id="raE"' in _fx and 'id="raV"' in _fx)
+    check(47, "it shows the ratchet stop instead of the trail when on",
+          "}else if(settings.trail_enabled" in _fx)
+    check(47, "and says the trail is ignored while it runs",
+          "Ignored while the RATCHET above is on" in _fx)
+    check(47, "the points-to-dollars comparison is on screen",
+          "$2 a point" in _fx and "14 points on MNQ" in _fx)
+
+    import subprocess as _sp3
+    _sm3 = _sp3.run(["node", "ui_smoke.js", "futures_index.html"], cwd=HERE,
+                    capture_output=True, text=True, timeout=60)
+    check(47, "the futures page still runs", _sm3.returncode == 0,
+          (_sm3.stdout + _sm3.stderr).strip()[:300])
     check(29,"and no premium/time value on the button",
           "% time" not in ix6 and "q.ask.toFixed" not in code6)
 
@@ -1866,7 +1968,7 @@ print("\n"+"="*68)
 by={}
 for sc,name,ok,_ in results:
     by.setdefault(sc,[0,0]); by[sc][0]+=1; by[sc][1]+= (1 if ok else 0)
-T={46:"NinjaScript in step",45:"Breadth + VIX",44:"Entry telemetry",43:"Trend module",42:"Audio cues",41:"Volatility gauges",40:"Volume gauge",39:"Dwell time",38:"Velocity vs feed artifacts",37:"Desktop icon",36:"Trade log detail",35:"Time value warns not blocks",34:"LOCK/X gone, size warns",33:"Page actually runs",32:"No SAVE / live trade frozen",31:"One switch / still modal",30:"Directional entry levels",29:"Percent only, no cash",28:"Grid/ATM/quality/one-armed",27:"Config screen cleanup",26:"Ratchet stop",25:"Console auto-hide",24:"Options auto-reconcile",23:"Daily trade log",22:"Options phantom clear",21:"Auto-reconcile w/ broker",20:"MY CONFIG always on",19:"Phantom position",18:"Futures hours",17:"Closed market honest",16:"Restart leaves no spinner",15:"One tab only",14:"Git lock self-heal",13:"Broker tabs + tray",12:"Velocity honest when shut",11:"Multi-broker sessions",1:"Futures login survives restart",2:"remember_login default",3:"Options profiles to disk",
+T={47:"Futures ratchet",46:"NinjaScript in step",45:"Breadth + VIX",44:"Entry telemetry",43:"Trend module",42:"Audio cues",41:"Volatility gauges",40:"Volume gauge",39:"Dwell time",38:"Velocity vs feed artifacts",37:"Desktop icon",36:"Trade log detail",35:"Time value warns not blocks",34:"LOCK/X gone, size warns",33:"Page actually runs",32:"No SAVE / live trade frozen",31:"One switch / still modal",30:"Directional entry levels",29:"Percent only, no cash",28:"Grid/ATM/quality/one-armed",27:"Config screen cleanup",26:"Ratchet stop",25:"Console auto-hide",24:"Options auto-reconcile",23:"Daily trade log",22:"Options phantom clear",21:"Auto-reconcile w/ broker",20:"MY CONFIG always on",19:"Phantom position",18:"Futures hours",17:"Closed market honest",16:"Restart leaves no spinner",15:"One tab only",14:"Git lock self-heal",13:"Broker tabs + tray",12:"Velocity honest when shut",11:"Multi-broker sessions",1:"Futures login survives restart",2:"remember_login default",3:"Options profiles to disk",
    4:"Browser autofill guard",5:"ITM3 strike math",6:"Preview == Arm",7:"Live-only / dead modes",
    8:"Auto-sync safety",9:"Endpoints alive",10:"UI integrity"}
 for sc in sorted(by):
