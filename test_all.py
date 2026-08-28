@@ -1759,8 +1759,13 @@ try:
     _v3 = _g.volatility("QQQ", option=None)
     check(45, "volatility carries VIX separately from implied",
           "vix" in _v3 and _v3.get("implied", {}).get("ok") is False)
+    # Behaviour, not prose: with no chain, implied must stay unavailable even
+    # though a perfectly good VIX number is sitting right there in the payload.
     check(45, "VIX is never passed off as the contract's IV",
-          "never substituted for the per-contract IV" in io.open("gauges.py", encoding="utf-8").read())
+          _v3["vix"].get("ok") is True and _v3["implied"].get("ok") is False
+          and _v3["implied"].get("iv_pct") is None)
+    check(45, "they are reported under different names",
+          _v3["vix"].get("level") is not None and "level" not in (_v3["implied"] or {}))
     check(45, "the endpoint exists", '@app.get("/api/market")' in
           io.open("main.py", encoding="utf-8").read())
     check(29,"and no premium/time value on the button",
