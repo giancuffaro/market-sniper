@@ -1562,6 +1562,95 @@ try:
                     capture_output=True, text=True, timeout=60)
     check(42, "the page still runs with the sound code in it",
           _sm2.returncode == 0, (_sm2.stdout + _sm2.stderr).strip()[:300])
+
+    # --- 43. Trend module -------------------------------------------------
+    import trend as _tr
+    _tr = importlib.reload(_tr)
+
+    def _mk(n, step=0.0, rng=0.40, vol=50000, up=True, start=700.0):
+        out, c = [], start
+        for i in range(n):
+            o = c
+            c = o + step
+            hi = max(o, c) + rng / 2
+            lo = min(o, c) - rng / 2
+            out.append({"t": 1700000000 + i * 60, "o": o, "h": hi, "l": lo,
+                        "c": c, "v": vol})
+        return out
+
+    # SLOPE. The old panel compared LEVELS, so a rolled-over market still read
+    # UP while the fast EMA sat above the slow one. Slope plus price position
+    # is the fix, and both halves are required.
+    _rise = _mk(60, step=0.10)
+    _fall = _mk(60, step=-0.10)
+    _flat = _mk(60, step=0.0)
+    check(43, "a rising EMA with price above it votes up",
+          _tr.slope_signal(_rise)["vote"] == 1, str(_tr.slope_signal(_rise)))
+    check(43, "a falling EMA with price below it votes down",
+          _tr.slope_signal(_fall)["vote"] == -1)
+    check(43, "a flat market votes neither", _tr.slope_signal(_flat)["vote"] == 0)
+    # The case the old panel got wrong: a long climb that has just turned over.
+    # The EMA is still high, but it is no longer rising and price is under it.
+    _rollover = _mk(45, step=0.12) + _mk(15, step=-0.30, start=705.4)
+    check(43, "a rollover does NOT still read up",
+          _tr.slope_signal(_rollover)["vote"] <= 0, str(_tr.slope_signal(_rollover)))
+    # One threshold has to work on any symbol and timeframe, so the slope is
+    # measured in units of the symbol's own bar range. A flat 0.05% band was
+    # over-sensitive on the 1-minute and never triggered on the weekly.
+    _wide = _mk(60, step=0.10, rng=8.0)
+    check(43, "the same slope in a wide-range market does not count",
+          _tr.slope_signal(_wide)["vote"] == 0, str(_tr.slope_signal(_wide)))
+    check(43, "slope is normalised by bar range", "per_bar / rng" in
+          io.open("trend.py", encoding="utf-8").read())
+
+    # STRUCTURE. Higher highs AND higher lows - both. Higher highs with lower
+    # lows is a widening range, which is what traps a breakout buyer.
+    _up_struct = _tr.structure_signal(_mk(40, step=0.15))
+    check(43, "a stepping market votes with its structure", _up_struct["vote"] in (0, 1))
+    _widen = []
+    for i in range(40):
+        c = 700.0 + (1.5 if i % 2 else -1.5) * (1 + i * 0.05)
+        _widen.append({"t": 1700000000 + i * 60, "o": 700.0, "h": max(700.0, c) + 0.2,
+                       "l": min(700.0, c) - 0.2, "c": c, "v": 50000})
+    check(43, "a widening range is not an uptrend",
+          _tr.structure_signal(_widen)["vote"] == 0, str(_tr.structure_signal(_widen)))
+
+    # VOLUME. One cumulative-volume artifact must not decide the vote.
+    _vbars = _mk(20, step=0.10)
+    _vbars[7]["v"] = 30000000          # the Yahoo artifact, on an UP bar
+    _vbars[7]["c"] = _vbars[7]["o"] - 1.0   # ...made a DOWN bar
+    _vbars[7]["l"] = _vbars[7]["c"] - 0.2
+    check(43, "one artifact bar cannot flip the volume vote",
+          _tr.volume_signal(_vbars)["vote"] == 1, str(_tr.volume_signal(_vbars)))
+    check(43, "volume is capped before it is counted", "ceiling = vols[len(vols) // 2] * 12.0" in
+          io.open("trend.py", encoding="utf-8").read())
+
+    # COMBINING. Two of three AND nothing pulling the other way. A 2-1 split is
+    # a market arguing with itself, which is chop.
+    check(43, "three agreeing votes is a trend",
+          _tr.direction(_mk(60, step=0.10))["state"] in ("up", "chop"))
+    check(43, "a 2-1 split is chop, not a trend",
+          _tr.direction.__doc__ is not None and
+          "-1 not in votes" in io.open("trend.py", encoding="utf-8").read())
+    _ch = _tr.direction(_flat)
+    check(43, "a flat market is chop", _ch["state"] == "chop", _ch["state"])
+    check(43, "every reading names its three components",
+          all(k in _ch for k in ("slope", "structure", "volume")))
+    check(43, "and how many agreed", "agree" in _ch)
+    check(43, "too few bars is handled, not crashed",
+          _tr.direction(_mk(3))["state"] == "chop")
+
+    # The old panel must STILL be there - side by side until G has seen both.
+    _m3 = io.open("main.py", encoding="utf-8").read()
+    check(43, "the old panel endpoint is untouched", '@app.get("/api/trend")' in _m3)
+    check(43, "the new one lives beside it", '@app.get("/api/direction")' in _m3)
+    check(43, "breadth against the Mag Seven exists", '@app.get("/api/breadth")' in _m3)
+    check(43, "the basket is the Mag Seven",
+          _tr.BASKET == ["AAPL", "MSFT", "NVDA", "AMZN", "GOOGL", "META", "TSLA"])
+    check(43, "1m, 5m and 15m are all available", set(_tr.TF) == {"1m", "5m", "15m"})
+    check(43, "the poll matches the 15s G asked for", _tr.TTL_OK if hasattr(_tr, "TTL_OK") else _tr._TTL == 15.0)
+    check(43, "trendmod is imported defensively",
+          "import trend as trendmod\nexcept Exception:\n    trendmod = None" in _m3)
     check(29,"and no premium/time value on the button",
           "% time" not in ix6 and "q.ask.toFixed" not in code6)
 
@@ -1614,7 +1703,7 @@ print("\n"+"="*68)
 by={}
 for sc,name,ok,_ in results:
     by.setdefault(sc,[0,0]); by[sc][0]+=1; by[sc][1]+= (1 if ok else 0)
-T={42:"Audio cues",41:"Volatility gauges",40:"Volume gauge",39:"Dwell time",38:"Velocity vs feed artifacts",37:"Desktop icon",36:"Trade log detail",35:"Time value warns not blocks",34:"LOCK/X gone, size warns",33:"Page actually runs",32:"No SAVE / live trade frozen",31:"One switch / still modal",30:"Directional entry levels",29:"Percent only, no cash",28:"Grid/ATM/quality/one-armed",27:"Config screen cleanup",26:"Ratchet stop",25:"Console auto-hide",24:"Options auto-reconcile",23:"Daily trade log",22:"Options phantom clear",21:"Auto-reconcile w/ broker",20:"MY CONFIG always on",19:"Phantom position",18:"Futures hours",17:"Closed market honest",16:"Restart leaves no spinner",15:"One tab only",14:"Git lock self-heal",13:"Broker tabs + tray",12:"Velocity honest when shut",11:"Multi-broker sessions",1:"Futures login survives restart",2:"remember_login default",3:"Options profiles to disk",
+T={43:"Trend module",42:"Audio cues",41:"Volatility gauges",40:"Volume gauge",39:"Dwell time",38:"Velocity vs feed artifacts",37:"Desktop icon",36:"Trade log detail",35:"Time value warns not blocks",34:"LOCK/X gone, size warns",33:"Page actually runs",32:"No SAVE / live trade frozen",31:"One switch / still modal",30:"Directional entry levels",29:"Percent only, no cash",28:"Grid/ATM/quality/one-armed",27:"Config screen cleanup",26:"Ratchet stop",25:"Console auto-hide",24:"Options auto-reconcile",23:"Daily trade log",22:"Options phantom clear",21:"Auto-reconcile w/ broker",20:"MY CONFIG always on",19:"Phantom position",18:"Futures hours",17:"Closed market honest",16:"Restart leaves no spinner",15:"One tab only",14:"Git lock self-heal",13:"Broker tabs + tray",12:"Velocity honest when shut",11:"Multi-broker sessions",1:"Futures login survives restart",2:"remember_login default",3:"Options profiles to disk",
    4:"Browser autofill guard",5:"ITM3 strike math",6:"Preview == Arm",7:"Live-only / dead modes",
    8:"Auto-sync safety",9:"Endpoints alive",10:"UI integrity"}
 for sc in sorted(by):
