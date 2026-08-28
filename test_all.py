@@ -1667,6 +1667,59 @@ try:
           all(('id="%s"' % k) in _ix2 for k in ("dSlope", "dStruct", "dVol", "dBreadth")))
     check(43, "chop is rendered as an answer, not a blank",
           "CHOP is not a" in _ix2 or "keeps you out" in _ix2)
+
+    # --- 44. Entry-condition telemetry ------------------------------------
+    import trade_log as _tl3
+    _tl3 = importlib.reload(_tl3)
+    _cols = ("in_trend", "in_trend_agree", "in_breadth", "in_velocity",
+             "in_vel_score", "in_dwell_above", "in_dwell_below", "in_pinned",
+             "in_vol_pctl", "in_rv_pct", "in_iv_pct", "in_counter_trend",
+             "in_round_level", "in_round_clock", "in_parked_rule")
+    for _c in _cols:
+        check(44, "log has %s" % _c, _c in _tl3.FIELDS)
+
+    class _Ctx(wb.LiveSession):
+        def __init__(self):
+            import config as _c
+            self.settings = dict(_c.DEFAULT_SETTINGS); self.strategies = []
+        def _underlying(self, sym):
+            return 717.34
+    _cs = _Ctx()
+    _ctx = _cs.entry_conditions("QQQ", "PUTS")
+    check(44, "a snapshot is produced", isinstance(_ctx, dict) and len(_ctx) > 5,
+          str(len(_ctx)))
+    check(44, "every key it emits is a real column",
+          all(k in _tl3.FIELDS for k in _ctx), str([k for k in _ctx if k not in _tl3.FIELDS]))
+
+    # THE PARKED RULE: measured, never enforced. G was explicit that it is
+    # untested and must not gate anything until it can be judged from data.
+    _wc6 = io.open("webull_client.py", encoding="utf-8").read()
+    for _p in (710.00, 715.00):
+        _c2 = _cs.entry_conditions("QQQ", "CALLS", spot=_p)
+        check(44, "%.2f is a 0/5 level" % _p, _c2.get("in_round_level") == "yes")
+    for _p in (717.34, 703.00):
+        _c2 = _cs.entry_conditions("QQQ", "CALLS", spot=_p)
+        check(44, "%.2f is not" % _p, _c2.get("in_round_level") == "no")
+    check(44, "the parked rule only ever records a verdict",
+          "would-allow" in _wc6 and "would-block" in _wc6)
+    check(44, "and never blocks an order with it",
+          "in_parked_rule" not in _wc6.split("def place", 1)[1].split("def ", 2)[0]
+          or "OrderRejected" not in _wc6.split("in_parked_rule", 1)[1][:400])
+    check(44, "nothing auto-tunes on the telemetry",
+          "fitted to noise" in _wc6)
+
+    # Captured at the FILL, not at the close - by then the market that made the
+    # trade is gone.
+    check(44, "the snapshot is taken when the position opens",
+          '"entry_ctx": self.entry_conditions(' in _wc6)
+    check(44, "and written out with the trade",
+          '**(p.get("entry_ctx") or {}),' in _wc6)
+    # One slow feed must never stop a trade being recorded.
+    _ctxsrc = _wc6.split("def entry_conditions", 1)[1].split("def atm_option_for_vol", 1)[0]
+    check(44, "every reading is wrapped separately",
+          _ctxsrc.count("except Exception:") >= 5, str(_ctxsrc.count("except Exception:")))
+    check(44, "counter-trend is derived, not left to be eyeballed",
+          "in_counter_trend" in _ctxsrc)
     check(29,"and no premium/time value on the button",
           "% time" not in ix6 and "q.ask.toFixed" not in code6)
 
@@ -1719,7 +1772,7 @@ print("\n"+"="*68)
 by={}
 for sc,name,ok,_ in results:
     by.setdefault(sc,[0,0]); by[sc][0]+=1; by[sc][1]+= (1 if ok else 0)
-T={43:"Trend module",42:"Audio cues",41:"Volatility gauges",40:"Volume gauge",39:"Dwell time",38:"Velocity vs feed artifacts",37:"Desktop icon",36:"Trade log detail",35:"Time value warns not blocks",34:"LOCK/X gone, size warns",33:"Page actually runs",32:"No SAVE / live trade frozen",31:"One switch / still modal",30:"Directional entry levels",29:"Percent only, no cash",28:"Grid/ATM/quality/one-armed",27:"Config screen cleanup",26:"Ratchet stop",25:"Console auto-hide",24:"Options auto-reconcile",23:"Daily trade log",22:"Options phantom clear",21:"Auto-reconcile w/ broker",20:"MY CONFIG always on",19:"Phantom position",18:"Futures hours",17:"Closed market honest",16:"Restart leaves no spinner",15:"One tab only",14:"Git lock self-heal",13:"Broker tabs + tray",12:"Velocity honest when shut",11:"Multi-broker sessions",1:"Futures login survives restart",2:"remember_login default",3:"Options profiles to disk",
+T={44:"Entry telemetry",43:"Trend module",42:"Audio cues",41:"Volatility gauges",40:"Volume gauge",39:"Dwell time",38:"Velocity vs feed artifacts",37:"Desktop icon",36:"Trade log detail",35:"Time value warns not blocks",34:"LOCK/X gone, size warns",33:"Page actually runs",32:"No SAVE / live trade frozen",31:"One switch / still modal",30:"Directional entry levels",29:"Percent only, no cash",28:"Grid/ATM/quality/one-armed",27:"Config screen cleanup",26:"Ratchet stop",25:"Console auto-hide",24:"Options auto-reconcile",23:"Daily trade log",22:"Options phantom clear",21:"Auto-reconcile w/ broker",20:"MY CONFIG always on",19:"Phantom position",18:"Futures hours",17:"Closed market honest",16:"Restart leaves no spinner",15:"One tab only",14:"Git lock self-heal",13:"Broker tabs + tray",12:"Velocity honest when shut",11:"Multi-broker sessions",1:"Futures login survives restart",2:"remember_login default",3:"Options profiles to disk",
    4:"Browser autofill guard",5:"ITM3 strike math",6:"Preview == Arm",7:"Live-only / dead modes",
    8:"Auto-sync safety",9:"Endpoints alive",10:"UI integrity"}
 for sc in sorted(by):
