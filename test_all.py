@@ -1443,6 +1443,50 @@ try:
     check(40, "the endpoint exists", '@app.get("/api/volume")' in _mainsrc2)
     check(40, "gauges is imported defensively",
           "import gauges\nexcept Exception:\n    gauges = None" in _mainsrc2)
+
+    # --- 41. Volatility: two gauges, never blended -----------------------
+    # Black-Scholes must round-trip, or the implied number is decoration.
+    for _v in (0.15, 0.35, 0.80):
+        _px = _g.bs_price(713.0, 712.0, 4 / 24 / 365, _v, True)
+        _back = _g.implied_vol(_px, 713.0, 712.0, 4 / 24 / 365, True)
+        check(41, "BS round-trips at %.0f%% vol" % (_v * 100),
+              _back is not None and abs(_back - _v * 100) < 0.5, str(_back))
+    # Bisection, not Newton: vega collapses near zero on a 0DTE away from the
+    # money and Newton divides by it. These must return None, not diverge.
+    check(41, "a quote below intrinsic is refused",
+          _g.implied_vol(0.50, 713.0, 712.0, 4 / 24 / 365, True) is None)
+    check(41, "an impossible quote is refused",
+          _g.implied_vol(700.0, 713.0, 712.0, 4 / 24 / 365, True) is None)
+    check(41, "zero time to expiry is refused",
+          _g.implied_vol(1.0, 713.0, 712.0, 0, True) is None)
+    check(41, "bisection is used, and says why", "Bisection rather than Newton" in _gsrc)
+    # Time to expiry can never be zero or IV goes infinite in the last minute.
+    check(41, "expiry time is floored at a minute", _g.hours_to_expiry() > 0)
+
+    # Realized is ranked against the SAME calculation rolled back through the
+    # symbol's own history, so "high" means high for this symbol.
+    check(41, "realized is a percentile of its own history",
+          "_annualised_vol(closes[end - RV_WINDOW_DAYS - 1:end])" in _gsrc)
+    check(41, "the two gauges stay separate",
+          '"realized":' in _gsrc and '"implied":' in _gsrc and "blended" not in _gsrc.lower())
+    check(41, "thresholds are plain constants, meant to be argued with",
+          all(k in _gsrc for k in ("RV_LOW_PCTL", "RV_HIGH_PCTL",
+                                   "IV_RICH_RATIO", "IV_CHEAP_RATIO")))
+    # Not connected must SAY not connected rather than invent a number.
+    _nov = _g.volatility("QQQ", option=None)
+    check(41, "implied is unavailable, not guessed, without a chain",
+          _nov["implied"]["ok"] is False and "connect" in _nov["implied"]["reason"])
+
+    _wc4 = io.open("webull_client.py", encoding="utf-8").read()
+    check(41, "the ATM chain quote comes from Webull", "def atm_option_for_vol" in _wc4)
+    check(41, "a native Webull IV is preferred over inverting a mid",
+          "iv_native" in _wc4 and "iv_native" in _mainsrc2)
+    check(41, "a fractional IV is normalised to percent", "if iv is not None and iv < 5.0:" in _wc4)
+    check(41, "greeks are picked up if Webull sends them",
+          all(gk in _wc4 for gk in ('"delta"', '"theta"', '"gamma"', '"vega"')))
+    check(41, "the endpoint exists", '@app.get("/api/volatility")' in _mainsrc2)
+    check(41, "a chain hiccup cannot kill the realized reading",
+          "a chain hiccup must not kill realized" in _mainsrc2)
     check(29,"and no premium/time value on the button",
           "% time" not in ix6 and "q.ask.toFixed" not in code6)
 
@@ -1495,7 +1539,7 @@ print("\n"+"="*68)
 by={}
 for sc,name,ok,_ in results:
     by.setdefault(sc,[0,0]); by[sc][0]+=1; by[sc][1]+= (1 if ok else 0)
-T={40:"Volume gauge",39:"Dwell time",38:"Velocity vs feed artifacts",37:"Desktop icon",36:"Trade log detail",35:"Time value warns not blocks",34:"LOCK/X gone, size warns",33:"Page actually runs",32:"No SAVE / live trade frozen",31:"One switch / still modal",30:"Directional entry levels",29:"Percent only, no cash",28:"Grid/ATM/quality/one-armed",27:"Config screen cleanup",26:"Ratchet stop",25:"Console auto-hide",24:"Options auto-reconcile",23:"Daily trade log",22:"Options phantom clear",21:"Auto-reconcile w/ broker",20:"MY CONFIG always on",19:"Phantom position",18:"Futures hours",17:"Closed market honest",16:"Restart leaves no spinner",15:"One tab only",14:"Git lock self-heal",13:"Broker tabs + tray",12:"Velocity honest when shut",11:"Multi-broker sessions",1:"Futures login survives restart",2:"remember_login default",3:"Options profiles to disk",
+T={41:"Volatility gauges",40:"Volume gauge",39:"Dwell time",38:"Velocity vs feed artifacts",37:"Desktop icon",36:"Trade log detail",35:"Time value warns not blocks",34:"LOCK/X gone, size warns",33:"Page actually runs",32:"No SAVE / live trade frozen",31:"One switch / still modal",30:"Directional entry levels",29:"Percent only, no cash",28:"Grid/ATM/quality/one-armed",27:"Config screen cleanup",26:"Ratchet stop",25:"Console auto-hide",24:"Options auto-reconcile",23:"Daily trade log",22:"Options phantom clear",21:"Auto-reconcile w/ broker",20:"MY CONFIG always on",19:"Phantom position",18:"Futures hours",17:"Closed market honest",16:"Restart leaves no spinner",15:"One tab only",14:"Git lock self-heal",13:"Broker tabs + tray",12:"Velocity honest when shut",11:"Multi-broker sessions",1:"Futures login survives restart",2:"remember_login default",3:"Options profiles to disk",
    4:"Browser autofill guard",5:"ITM3 strike math",6:"Preview == Arm",7:"Live-only / dead modes",
    8:"Auto-sync safety",9:"Endpoints alive",10:"UI integrity"}
 for sc in sorted(by):
