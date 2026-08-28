@@ -79,6 +79,16 @@ const win = {
   alert(){}, confirm:()=>true, prompt:()=>null, open:()=>null, close(){}, print(){},
   BroadcastChannel: class { constructor(){} postMessage(){} close(){} addEventListener(){} set onmessage(_){} },
   performance:{now:()=>0},
+  // Enough of Web Audio that the sound code runs for real in here. If it ever
+  // throws, that is a genuine bug and not a missing stub.
+  AudioContext: class {
+    constructor(){ this.currentTime = 0; this.state = 'running'; this.destination = {}; }
+    resume(){}
+    createOscillator(){ return {frequency:{setValueAtTime(){}}, type:'sine',
+      connect(){}, start(){}, stop(){}}; }
+    createGain(){ return {gain:{setValueAtTime(){}, exponentialRampToValueAtTime(){}},
+      connect(){}}; }
+  },
 };
 win.window = win; win.self = win; win.globalThis = win; win.top = win; win.parent = win;
 
@@ -110,6 +120,8 @@ const steps = [
   ['applySettings()',           () => EZ.applySettings()],
   ['openSettings() again',      () => EZ.openSettings()],
   ['closeSettings()',           () => EZ.closeSettings()],
+  ['toggleSound() off',         () => EZ.toggleSound()],
+  ['toggleSound() on',          () => EZ.toggleSound()],
 ];
 for (const [name, fn] of steps) {
   try { const r = fn(); if (r && r.catch) r.catch(e => bad(name + ' (async)', e)); }

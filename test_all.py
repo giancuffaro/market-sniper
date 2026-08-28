@@ -1527,6 +1527,41 @@ try:
     check(41, "the endpoint exists", '@app.get("/api/volatility")' in _mainsrc2)
     check(41, "a chain hiccup cannot kill the realized reading",
           "a chain hiccup must not kill realized" in _mainsrc2)
+
+    # --- 42. Audio cues -----------------------------------------------------
+    _ix = io.open("index.html", encoding="utf-8").read()
+    for _cue in ("armed", "filled", "exit", "cancel", "blocked"):
+        check(42, "the %s cue is wired" % _cue, "sfx('%s')" % _cue in _ix)
+    # Synthesised, so there is no audio file to ship or fail to load.
+    check(42, "tones are synthesised, not files",
+          "createOscillator" in _ix and ".mp3" not in _ix and ".wav" not in _ix)
+    # A square gain edge is audible as a click at both ends of every note.
+    check(42, "the envelope is ramped, not switched",
+          "exponentialRampToValueAtTime" in _ix)
+    # Polling runs once a second: sounding STATE rather than TRANSITION would
+    # replay the note every tick for as long as the position was open.
+    check(42, "fill and exit sound on the transition only",
+          "if(pos && !prevPos) sfx('filled');" in _ix and
+          "if(!pos && prevPos) sfx('exit');" in _ix)
+    check(42, "the previous position is tracked for that", "prevPos=false" in _ix)
+    check(42, "sound can be switched off", "function toggleSound" in _ix and
+          'id="sndBtn"' in _ix)
+    check(42, "the choice survives a reload", "localStorage.setItem('ms_sound'" in _ix)
+    # Audio must never be able to take the trading screen down with it.
+    check(42, "any audio failure is swallowed",
+          "never break trading over it" in _ix)
+    # The grid has .50 levels: "715" for a 715.50 trigger is the wrong price.
+    check(42, "the armed line shows the level to 2dp",
+          "Number(armed.target).toFixed(2)" in _ix)
+    check(42, "and names the breakout level too", "armed.breakout" in _ix)
+    _wc5 = io.open("webull_client.py", encoding="utf-8").read()
+    check(42, "the server sends the breakout level", '"breakout": brk' in _wc5)
+
+    import subprocess as _sp2
+    _sm2 = _sp2.run(["node", "ui_smoke.js", "index.html"], cwd=HERE,
+                    capture_output=True, text=True, timeout=60)
+    check(42, "the page still runs with the sound code in it",
+          _sm2.returncode == 0, (_sm2.stdout + _sm2.stderr).strip()[:300])
     check(29,"and no premium/time value on the button",
           "% time" not in ix6 and "q.ask.toFixed" not in code6)
 
@@ -1579,7 +1614,7 @@ print("\n"+"="*68)
 by={}
 for sc,name,ok,_ in results:
     by.setdefault(sc,[0,0]); by[sc][0]+=1; by[sc][1]+= (1 if ok else 0)
-T={41:"Volatility gauges",40:"Volume gauge",39:"Dwell time",38:"Velocity vs feed artifacts",37:"Desktop icon",36:"Trade log detail",35:"Time value warns not blocks",34:"LOCK/X gone, size warns",33:"Page actually runs",32:"No SAVE / live trade frozen",31:"One switch / still modal",30:"Directional entry levels",29:"Percent only, no cash",28:"Grid/ATM/quality/one-armed",27:"Config screen cleanup",26:"Ratchet stop",25:"Console auto-hide",24:"Options auto-reconcile",23:"Daily trade log",22:"Options phantom clear",21:"Auto-reconcile w/ broker",20:"MY CONFIG always on",19:"Phantom position",18:"Futures hours",17:"Closed market honest",16:"Restart leaves no spinner",15:"One tab only",14:"Git lock self-heal",13:"Broker tabs + tray",12:"Velocity honest when shut",11:"Multi-broker sessions",1:"Futures login survives restart",2:"remember_login default",3:"Options profiles to disk",
+T={42:"Audio cues",41:"Volatility gauges",40:"Volume gauge",39:"Dwell time",38:"Velocity vs feed artifacts",37:"Desktop icon",36:"Trade log detail",35:"Time value warns not blocks",34:"LOCK/X gone, size warns",33:"Page actually runs",32:"No SAVE / live trade frozen",31:"One switch / still modal",30:"Directional entry levels",29:"Percent only, no cash",28:"Grid/ATM/quality/one-armed",27:"Config screen cleanup",26:"Ratchet stop",25:"Console auto-hide",24:"Options auto-reconcile",23:"Daily trade log",22:"Options phantom clear",21:"Auto-reconcile w/ broker",20:"MY CONFIG always on",19:"Phantom position",18:"Futures hours",17:"Closed market honest",16:"Restart leaves no spinner",15:"One tab only",14:"Git lock self-heal",13:"Broker tabs + tray",12:"Velocity honest when shut",11:"Multi-broker sessions",1:"Futures login survives restart",2:"remember_login default",3:"Options profiles to disk",
    4:"Browser autofill guard",5:"ITM3 strike math",6:"Preview == Arm",7:"Live-only / dead modes",
    8:"Auto-sync safety",9:"Endpoints alive",10:"UI integrity"}
 for sc in sorted(by):
