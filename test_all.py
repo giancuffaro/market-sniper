@@ -1651,6 +1651,22 @@ try:
     check(43, "the poll matches the 15s G asked for", _tr.TTL_OK if hasattr(_tr, "TTL_OK") else _tr._TTL == 15.0)
     check(43, "trendmod is imported defensively",
           "import trend as trendmod\nexcept Exception:\n    trendmod = None" in _m3)
+
+    # The two panels must run SIDE BY SIDE. The handoff was explicit: do not
+    # delete the old one until G has watched both.
+    _ix2 = io.open("index.html", encoding="utf-8").read()
+    check(43, "the old strip is still on screen", 'id="trendCells"' in _ix2)
+    check(43, "and still polled", "api('/api/trend?symbol='" in _ix2)
+    check(43, "the new panel is on screen too", 'id="dirBar"' in _ix2)
+    check(43, "it polls direction and breadth",
+          "api('/api/direction?symbol='" in _ix2 and "api('/api/breadth?lead='" in _ix2)
+    check(43, "at the 15s G asked for", "setInterval(refreshDirection,15000)" in _ix2)
+    check(43, "its timer is cleared on disconnect like the others",
+          _ix2.count("clearInterval(dirTimer)") >= 4)
+    check(43, "each signal is shown separately, not just the verdict",
+          all(('id="%s"' % k) in _ix2 for k in ("dSlope", "dStruct", "dVol", "dBreadth")))
+    check(43, "chop is rendered as an answer, not a blank",
+          "CHOP is not a" in _ix2 or "keeps you out" in _ix2)
     check(29,"and no premium/time value on the button",
           "% time" not in ix6 and "q.ask.toFixed" not in code6)
 
