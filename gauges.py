@@ -309,3 +309,197 @@ def label(v):
         return v.get("note") or "—"
     return "VOL %s (%.0fth pctl, %.0f%% of day done)" % (
         v["state"].upper(), v["percentile"], v["session_pct"])
+
+
+# =========================================================================
+# VOLATILITY — TWO SEPARATE GAUGES
+#
+# Realized and implied answer different questions and are deliberately never
+# blended into one number:
+#
+#   REALIZED  what the stock has ACTUALLY been doing. Free, broker-free, and
+#             ranked as a percentile against two years of its own history, so
+#             "high" means high for this symbol rather than high in the
+#             abstract.
+#   IMPLIED   what the option market is CHARGING for the future. It has to come
+#             from a live chain - Yahoo's options endpoint returns 401 without
+#             a crumb, so there is no free source - which means it is only
+#             available once connected, and says so plainly when it is not.
+#
+# The gap between them is the number worth watching. Implied well above
+# realized means you are paying up for movement that has not been happening.
+# Every threshold below is a plain constant, meant to be argued with.
+# =========================================================================
+
+import math
+
+RV_WINDOW_DAYS = 20          # trading days in the realized-vol window
+RV_HISTORY_DAYS = 500        # sessions to rank that window against
+TRADING_DAYS = 252
+
+# Tweakable. These are percentile bands on the symbol's OWN history, not
+# absolute vol numbers, so they travel between symbols without re-tuning.
+RV_LOW_PCTL = 25.0
+RV_HIGH_PCTL = 75.0
+
+# Implied-vs-realized. Above RICH, options are expensive relative to how the
+# stock has actually moved; below CHEAP, they are underpricing it.
+IV_RICH_RATIO = 1.25
+IV_CHEAP_RATIO = 0.90
+
+_RV_CACHE = {}
+_RV_TTL = 900.0
+
+
+def _closes_daily(ysym, force=False):
+    now = time.time()
+    c = _RV_CACHE.get(ysym)
+    if c and not force and now - c["ts"] < _RV_TTL:
+        return c["closes"]
+    res = _chart(ysym, "2y", "1d")["chart"]["result"][0]
+    q = (res.get("indicators", {}).get("quote") or [{}])[0]
+    closes = [float(x) for x in (q.get("close") or []) if x is not None and x > 0]
+    _RV_CACHE[ysym] = {"closes": closes, "ts": now}
+    return closes
+
+
+def _annualised_vol(closes):
+    """Close-to-close annualised volatility, in percent."""
+    if len(closes) < 3:
+        return None
+    rets = []
+    for i in range(1, len(closes)):
+        if closes[i - 1] > 0 and closes[i] > 0:
+            rets.append(math.log(closes[i] / closes[i - 1]))
+    if len(rets) < 2:
+        return None
+    mean = sum(rets) / len(rets)
+    var = sum((r - mean) ** 2 for r in rets) / (len(rets) - 1)
+    return math.sqrt(var) * math.sqrt(TRADING_DAYS) * 100.0
+
+
+def realized(ysym, force=False):
+    """Realized vol now, and where it sits in this symbol's own two years."""
+    try:
+        closes = _closes_daily(ysym, force=force)
+    except Exception as e:                                   # noqa: BLE001
+        return {"ok": False, "reason": str(e)[:140]}
+    if len(closes) < RV_WINDOW_DAYS + 30:
+        return {"ok": False, "reason": "not enough history"}
+
+    current = _annualised_vol(closes[-(RV_WINDOW_DAYS + 1):])
+    if current is None:
+        return {"ok": False, "reason": "could not compute"}
+
+    # The same measure, rolled back through history, so today is compared
+    # against the identical calculation rather than against a different one.
+    hist = []
+    start = max(RV_WINDOW_DAYS + 1, len(closes) - RV_HISTORY_DAYS)
+    for end in range(start, len(closes)):
+        v = _annualised_vol(closes[end - RV_WINDOW_DAYS - 1:end])
+        if v is not None:
+            hist.append(v)
+    pctl = percentile_of(current, hist)
+    state = ("low" if pctl is not None and pctl < RV_LOW_PCTL else
+             "high" if pctl is not None and pctl > RV_HIGH_PCTL else "normal")
+    return {"ok": True, "rv_pct": round(current, 2), "percentile": pctl,
+            "state": state, "window_days": RV_WINDOW_DAYS, "samples": len(hist)}
+
+
+def _norm_cdf(x):
+    return 0.5 * (1.0 + math.erf(x / math.sqrt(2.0)))
+
+
+def bs_price(spot, strike, t_years, vol, is_call, rate=0.0):
+    """Black-Scholes, no dividends. Rate is 0 by default: over the hours a
+    0DTE contract lives, carry is far smaller than the bid/ask spread."""
+    if t_years <= 0 or vol <= 0 or spot <= 0 or strike <= 0:
+        intrinsic = (spot - strike) if is_call else (strike - spot)
+        return max(0.0, intrinsic)
+    sd = vol * math.sqrt(t_years)
+    d1 = (math.log(spot / strike) + (rate + 0.5 * vol * vol) * t_years) / sd
+    d2 = d1 - sd
+    disc = math.exp(-rate * t_years)
+    if is_call:
+        return spot * _norm_cdf(d1) - strike * disc * _norm_cdf(d2)
+    return strike * disc * _norm_cdf(-d2) - spot * _norm_cdf(-d1)
+
+
+def implied_vol(price, spot, strike, t_years, is_call, rate=0.0):
+    """Invert Black-Scholes by bisection.
+
+    Bisection rather than Newton on purpose: vega collapses toward zero for a
+    0DTE contract that is any distance from the money, and Newton divides by
+    it. Bisection cannot diverge - it just narrows, or reports that it could
+    not bracket the price, which is the honest answer for a contract whose
+    quote is below intrinsic.
+    """
+    if price is None or price <= 0 or t_years <= 0:
+        return None
+    intrinsic = max(0.0, (spot - strike) if is_call else (strike - spot))
+    if price < intrinsic - 0.01:
+        return None                    # quote below intrinsic: not invertible
+    lo, hi = 0.0001, 5.0               # 0.01% to 500% annualised
+    if bs_price(spot, strike, t_years, hi, is_call, rate) < price:
+        return None                    # even 500% vol cannot reach this price
+    for _ in range(80):
+        mid = (lo + hi) / 2.0
+        if bs_price(spot, strike, t_years, mid, is_call, rate) < price:
+            lo = mid
+        else:
+            hi = mid
+    return (lo + hi) / 2.0 * 100.0
+
+
+def hours_to_expiry(now_epoch=None, close_hour=16, tz=None):
+    """Hours until today's close. Never returns 0 - a zero would make every
+    implied vol infinite; the last minutes are floored at one minute."""
+    tz = tz or ET
+    now = dt.datetime.fromtimestamp(now_epoch or time.time(),
+                                    dt.timezone.utc).astimezone(tz)
+    close = now.replace(hour=close_hour, minute=0, second=0, microsecond=0)
+    secs = (close - now).total_seconds()
+    return max(60.0, secs) / 3600.0
+
+
+def volatility(ysym, option=None, now_epoch=None, force=False):
+    """Both gauges. `option` is an optional live ATM quote from the broker:
+    {"spot":..,"strike":..,"price":..,"is_call":..} - without it, implied is
+    reported as unavailable rather than guessed."""
+    out = {"ok": True, "realized": realized(ysym, force=force), "implied": None}
+    if not option:
+        out["implied"] = {"ok": False,
+                          "reason": "needs a live option chain — connect to see it"}
+        return out
+    try:
+        hrs = hours_to_expiry(now_epoch)
+        t = hrs / 24.0 / 365.0
+        iv = implied_vol(float(option["price"]), float(option["spot"]),
+                         float(option["strike"]), t, bool(option.get("is_call", True)))
+    except Exception as e:                                   # noqa: BLE001
+        out["implied"] = {"ok": False, "reason": str(e)[:120]}
+        return out
+    if iv is None:
+        out["implied"] = {"ok": False, "reason": "could not invert this quote"}
+        return out
+    rv = (out["realized"] or {}).get("rv_pct")
+    ratio = round(iv / rv, 2) if rv else None
+    state = "unknown"
+    if ratio is not None:
+        state = ("rich" if ratio >= IV_RICH_RATIO else
+                 "cheap" if ratio <= IV_CHEAP_RATIO else "fair")
+    out["implied"] = {"ok": True, "iv_pct": round(iv, 1), "hours_left": round(hrs, 2),
+                      "vs_realized": ratio, "state": state}
+    return out
+
+
+def vol_label(v):
+    if not v or not v.get("ok"):
+        return "—"
+    r = v.get("realized") or {}
+    i = v.get("implied") or {}
+    left = ("RV %.0f%% (%.0fth)" % (r["rv_pct"], r["percentile"])
+            if r.get("ok") and r.get("percentile") is not None else "RV —")
+    right = ("IV %.0f%% %s" % (i["iv_pct"], i["state"].upper())
+             if i.get("ok") else "IV —")
+    return left + "  ·  " + right
