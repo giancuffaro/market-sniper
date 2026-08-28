@@ -462,11 +462,37 @@ def hours_to_expiry(now_epoch=None, close_hour=16, tz=None):
     return max(60.0, secs) / 3600.0
 
 
+def vix(force=False):
+    """^VIX — a free, broker-free implied-vol reading for the market.
+
+    Found while looking for a breadth feed: every advance/decline ticker 404s
+    on Yahoo, but ^VIX serves fine. It is NOT this symbol's implied vol - it is
+    30-day S&P implied vol - so it is reported under its own name and never
+    substituted for the per-contract IV that comes off the Webull chain.
+    """
+    now = time.time()
+    c = _RV_CACHE.get("^VIX_now")
+    if c and not force and now - c["ts"] < 60.0:
+        return c["v"]
+    try:
+        meta = _chart("^VIX", "1d", "5m")["chart"]["result"][0]["meta"]
+        v = {"ok": True, "level": round(float(meta.get("regularMarketPrice")), 2),
+             "prev": round(float(meta.get("chartPreviousClose") or 0), 2)}
+        v["change"] = round(v["level"] - v["prev"], 2) if v["prev"] else None
+    except Exception as e:                                   # noqa: BLE001
+        v = {"ok": False, "reason": str(e)[:120]}
+    _RV_CACHE["^VIX_now"] = {"v": v, "ts": now}
+    return v
+
+
 def volatility(ysym, option=None, now_epoch=None, force=False):
     """Both gauges. `option` is an optional live ATM quote from the broker:
     {"spot":..,"strike":..,"price":..,"is_call":..} - without it, implied is
     reported as unavailable rather than guessed."""
-    out = {"ok": True, "realized": realized(ysym, force=force), "implied": None}
+    out = {"ok": True, "realized": realized(ysym, force=force), "implied": None,
+           # Market-wide implied vol, always available. Separate from the
+           # per-contract IV below because they are different measurements.
+           "vix": vix(force=force)}
     if not option:
         out["implied"] = {"ok": False,
                           "reason": "needs a live option chain — connect to see it"}

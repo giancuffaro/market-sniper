@@ -261,3 +261,80 @@ def label(d):
     if not d or not d.get("ok"):
         return "—"
     return "%s (%d/3)" % (d["state"].upper(), d.get("agree", 0))
+
+
+# =========================================================================
+# MARKET BREADTH — AN APPROXIMATION, AND LABELLED AS ONE
+#
+# True advancers-minus-decliners is an exchange-published figure. It is NOT
+# available here: Yahoo returns 404 for ^ADD, ^ADVN, ^DECN, ^TICK and ^TRIN,
+# and the Webull OpenAPI SDK is a TRADING api - it exposes accounts, orders and
+# instrument snapshots, with no market-statistics endpoint. Checked, not
+# assumed.
+#
+# So breadth is computed from the eleven S&P sector ETFs. That is a proxy for
+# "how much of the market is participating", not a share count, and it is
+# reported under a name that says so. Eleven requests, ~2 seconds, cached.
+#
+# Why sectors rather than a basket of big names: the Mag Seven ARE the index,
+# so counting them tells you almost the same thing twice. Sectors weight the
+# parts of the market those names are not in, which is the whole question
+# breadth is asked to answer.
+# =========================================================================
+
+SECTORS = ["XLK", "XLF", "XLV", "XLE", "XLY", "XLP",
+           "XLI", "XLB", "XLU", "XLRE", "XLC"]
+
+_BREADTH_CACHE = {"data": None, "ts": 0.0}
+_BREADTH_TTL = 60.0
+
+
+def _day_change(ysym):
+    url = ("https://query1.finance.yahoo.com/v8/finance/chart/"
+           f"{urllib.request.quote(ysym)}?range=1d&interval=1d")
+    req = urllib.request.Request(url, headers=_UA)
+    with urllib.request.urlopen(req, timeout=8) as r:
+        meta = json.load(r)["chart"]["result"][0]["meta"]
+    px = meta.get("regularMarketPrice")
+    prev = meta.get("chartPreviousClose") or meta.get("previousClose")
+    if not px or not prev:
+        return None
+    return (px / prev - 1.0) * 100.0
+
+
+def market_breadth(force=False):
+    """Sector participation, standing in for advancers minus decliners."""
+    now = time.time()
+    if _BREADTH_CACHE["data"] and not force and now - _BREADTH_CACHE["ts"] < _BREADTH_TTL:
+        return _BREADTH_CACHE["data"]
+    moves = {}
+    for t in SECTORS:
+        try:
+            c = _day_change(t)
+            if c is not None:
+                moves[t] = round(c, 2)
+        except Exception:
+            continue
+    if not moves:
+        out = {"ok": False, "reason": "no sector data"}
+        _BREADTH_CACHE.update(data=out, ts=now)
+        return out
+    up = sum(1 for v in moves.values() if v > 0)
+    down = sum(1 for v in moves.values() if v < 0)
+    n = len(moves)
+    ratio = (up - down) / float(n)
+    state = "broad-up" if ratio >= 0.45 else ("broad-down" if ratio <= -0.45 else "mixed")
+    out = {"ok": True, "state": state, "advancing": up, "declining": down,
+           "flat": n - up - down, "sectors": n, "net": up - down,
+           "ratio": round(ratio, 2), "moves": moves,
+           "basis": "11 S&P sector ETFs — a participation proxy, NOT exchange "
+                    "advance/decline. No free ADD feed exists; ^ADD, ^ADVN and "
+                    "^TICK all 404 and the Webull SDK has no market-stats call."}
+    _BREADTH_CACHE.update(data=out, ts=now)
+    return out
+
+
+def breadth_label(b):
+    if not b or not b.get("ok"):
+        return "—"
+    return "BREADTH %d up / %d down (%s)" % (b["advancing"], b["declining"], b["state"])
