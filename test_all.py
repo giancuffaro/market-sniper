@@ -1337,6 +1337,13 @@ try:
     # A session loads today's blotter from disk. Start from empty so the counts
     # measure THIS test, not whatever ran before it.
     z6.blotter = []; z6.day_realized = 0.0
+    # A session restores the saved strategies, and state() evaluates them. With
+    # the market OPEN an ORB condition can be met mid-suite, and this fake
+    # session then tries to place a real order and dies on the missing SDK
+    # handle. The test is about percent display, not the strategy engine, so
+    # nothing is armed. Without this the whole suite passed only out of hours.
+    for _st6 in (z6.strategies or []):
+        _st6["enabled"] = False
     for e_, x_ in ((3.00,3.45),(2.40,2.05)):
         z6._record_close({"symbol":"QQQ","side":"CALLS","strike":711.0,"qty":1,
                           "entry":e_,"expiration":"2026-08-26","opened_at":"09:41"},
