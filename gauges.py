@@ -61,6 +61,32 @@ def _chart(ysym, rng, interval):
                 f"{urllib.request.quote(ysym)}?range={rng}&interval={interval}")
 
 
+# Yahoo's INTRADAY volume is not trustworthy as a sum. Measured 2026-08-26
+# 12:55 ET, QQQ's 5-minute series contained six bars at 26-47x the median bar
+# (11:40 alone was 28,423,894 against a 606,308 median) and the day's bars
+# summed to 277,170,149 - against a median QQQ session of 43,645,800. The feed
+# intermittently publishes a cumulative figure in a single bar.
+#
+# Two consequences, handled separately:
+#   - TODAY'S TOTAL comes from the DAILY bar instead of a sum of intraday bars.
+#     It agreed with the artifact-cleaned sum to within 1% (19.45M vs 19.32M),
+#     and it is the same series the history is ranked against, so it is a like
+#     for like comparison rather than two different feeds.
+#   - THE PROFILE only needs the SHAPE of a day, so its bars are cleaned by
+#     clipping anything above OUTLIER_X times that session's median.
+OUTLIER_X = 12.0
+
+
+def _clean(vals):
+    """Clip feed artifacts to OUTLIER_X x the median of the same session."""
+    good = sorted(v for v in vals if v and v > 0)
+    if not good:
+        return list(vals)
+    med = good[len(good) // 2]
+    ceiling = med * OUTLIER_X
+    return [min(v, ceiling) for v in vals]
+
+
 def _minute_of_day(epoch, tz_offset_hours):
     t = dt.datetime.fromtimestamp(epoch, dt.timezone.utc).astimezone(
         dt.timezone(dt.timedelta(hours=tz_offset_hours)))
@@ -139,9 +165,14 @@ def intraday_profile(ysym, force=False):
         total = sum(day.values())
         if total <= 0:
             continue
+        mins = sorted(day)
+        cleaned = _clean([day[m] for m in mins])
+        total = sum(cleaned)
+        if total <= 0:
+            continue
         run = 0.0
-        for m in sorted(day):
-            run += day[m]
+        for m, v in zip(mins, cleaned):
+            run += v
             buckets.setdefault(m, []).append(run / total)
     profile = [(m, sum(v) / len(v)) for m, v in sorted(buckets.items())]
     _PROFILE_CACHE[ysym] = {"profile": profile, "ts": now}
@@ -194,26 +225,26 @@ def volume(ysym, now_epoch=None, force=False):
     try:
         hist = daily_volumes(ysym, force=force)
         profile = intraday_profile(ysym, force=force)
-        res = _chart(ysym, "1d", "5m")["chart"]["result"][0]
+        res = _chart(ysym, "1d", "1d")["chart"]["result"][0]
     except Exception as e:                                   # noqa: BLE001
         return {"ok": False, "reason": str(e)[:140]}
 
-    ts = res.get("timestamp") or []
-    q = (res.get("indicators", {}).get("quote") or [{}])[0]
-    vols = q.get("volume") or []
+    # One number, from the daily series - NOT a sum of intraday bars. See the
+    # note by OUTLIER_X: summing them overstated QQQ by 14x this afternoon.
+    meta = res.get("meta") or {}
+    traded = float(meta.get("regularMarketVolume") or 0)
+    if traded <= 0:
+        vv = ((res.get("indicators", {}).get("quote") or [{}])[0].get("volume") or [])
+        traded = float(vv[0]) if vv and vv[0] else 0.0
 
-    traded = 0.0
-    last_minute = None
-    for i, t in enumerate(ts):
-        v = vols[i] if i < len(vols) else None
-        if v is None or v <= 0:
-            continue
-        loc = dt.datetime.fromtimestamp(t, dt.timezone.utc).astimezone(ET)
-        m = loc.hour * 60 + loc.minute
-        if m < SESSION_OPEN_MIN or m >= SESSION_CLOSE_MIN:
-            continue
-        traded += float(v)
-        last_minute = m
+    # How far into the session we are, from the clock rather than from bars.
+    nowet = dt.datetime.fromtimestamp(now_epoch or time.time(),
+                                      dt.timezone.utc).astimezone(ET)
+    last_minute = nowet.hour * 60 + nowet.minute
+    if last_minute >= SESSION_CLOSE_MIN:
+        last_minute = SESSION_CLOSE_MIN - 1
+    if last_minute < SESSION_OPEN_MIN:
+        last_minute = None
 
     if not hist:
         return {"ok": False, "reason": "no history to rank against"}
