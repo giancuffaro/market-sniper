@@ -30,6 +30,10 @@ try:
     import gauges
 except Exception:
     gauges = None
+try:
+    import trend as trendmod
+except Exception:
+    trendmod = None
 
 _EXEC = ThreadPoolExecutor(max_workers=3)
 CONNECT_TIMEOUT_S = 25
@@ -221,6 +225,37 @@ def volatility_gauge(symbol: str = "QQQ"):
     if opt:
         v["greeks"] = {k: opt.get(k) for k in ("delta", "theta", "gamma", "vega")}
     return {"symbol": symbol, **v, "label": gauges.vol_label(v)}
+
+
+@app.get("/api/direction")
+def direction(symbol: str = "QQQ", tf: str = "1m"):
+    """up / down / chop from three signals that have to agree.
+
+    Deliberately NOT a replacement for /api/trend yet - both are live so they
+    can be compared side by side before the old one goes anywhere.
+
+    The old panel asks one question (is EMA9 over EMA21) eleven times. This
+    asks three different ones - is the 21-EMA sloping and is price the right
+    side of it, are highs and lows both stepping the same way, and is volume
+    arriving on up-bars - and reports how many agree."""
+    if trendmod is None:
+        return {"symbol": symbol, "ok": False, "reason": "trend module unavailable"}
+    ysym = quotes.YSYM.get(symbol, symbol) if quotes else symbol
+    d = trendmod.for_symbol(ysym, tf)
+    return {"symbol": symbol, "tf": tf, **d, "label": trendmod.label(d)}
+
+
+@app.get("/api/breadth")
+def breadth(lead: str = "QQQ", tf: str = "1m"):
+    """The lead symbol against the Mag Seven.
+
+    QQQ green while five of seven are red is a rally carried by one or two
+    names. That is a different trade from a broad one, and the old panel had
+    no way to tell you which you were in."""
+    if trendmod is None:
+        return {"ok": False, "reason": "trend module unavailable"}
+    ysym = quotes.YSYM.get(lead, lead) if quotes else lead
+    return trendmod.basket(ysym, tf)
 
 
 @app.get("/api/preview")
