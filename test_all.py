@@ -1467,8 +1467,14 @@ try:
     # symbol's own history, so "high" means high for this symbol.
     check(41, "realized is a percentile of its own history",
           "_annualised_vol(closes[end - RV_WINDOW_DAYS - 1:end])" in _gsrc)
+    # Check the SHAPE of the result, not the prose. The word "blended" appears
+    # in a comment explaining that they are not blended, which is exactly the
+    # kind of thing a string match gets wrong.
+    _sep = _g.volatility("QQQ", option=None)
     check(41, "the two gauges stay separate",
-          '"realized":' in _gsrc and '"implied":' in _gsrc and "blended" not in _gsrc.lower())
+          isinstance(_sep.get("realized"), dict) and isinstance(_sep.get("implied"), dict)
+          and not any(k in _sep for k in ("vol_score", "combined", "blended")))
+    check(41, "and realized survives on its own", _sep["realized"].get("ok") is True)
     check(41, "thresholds are plain constants, meant to be argued with",
           all(k in _gsrc for k in ("RV_LOW_PCTL", "RV_HIGH_PCTL",
                                    "IV_RICH_RATIO", "IV_CHEAP_RATIO")))
