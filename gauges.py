@@ -44,7 +44,25 @@ _PROFILE_TTL = 12 * 3600
 _TODAY_CACHE = {}        # ysym -> {"data": {...}, "ts": epoch}
 _TODAY_TTL = 30.0
 
-ET = dt.timezone(dt.timedelta(hours=-4))     # trading clock; DST handled below
+# Exchange clock. -4 is EDT and is only a FALLBACK: every Yahoo response
+# carries meta.gmtoffset for the exchange, which already accounts for daylight
+# saving. Hardcoding -4 works from March to November and is silently an hour
+# out for the rest of the year - and an hour is a fifth of a trading session,
+# which is enough to move a "how much of the day is done" figure by 15 points.
+ET = dt.timezone(dt.timedelta(hours=-4))
+_TZ_CACHE = {}
+
+
+def _tz_for(ysym, meta=None):
+    """Exchange timezone from the feed itself, cached. Falls back to EDT."""
+    if meta and meta.get("gmtoffset") is not None:
+        try:
+            tz = dt.timezone(dt.timedelta(seconds=int(meta["gmtoffset"])))
+            _TZ_CACHE[ysym] = tz
+            return tz
+        except Exception:
+            pass
+    return _TZ_CACHE.get(ysym, ET)
 SESSION_OPEN_MIN = 9 * 60 + 30               # 09:30
 SESSION_CLOSE_MIN = 16 * 60                  # 16:00
 SESSION_MINUTES = SESSION_CLOSE_MIN - SESSION_OPEN_MIN
@@ -108,13 +126,14 @@ def daily_volumes(ysym, force=False):
     ts = res.get("timestamp") or []
     q = (res.get("indicators", {}).get("quote") or [{}])[0]
     vols = q.get("volume") or []
-    today = dt.datetime.now(dt.timezone.utc).astimezone(ET).date()
+    tz = _tz_for(ysym, res.get("meta"))
+    today = dt.datetime.now(dt.timezone.utc).astimezone(tz).date()
     out = []
     for i, t in enumerate(ts):
         v = vols[i] if i < len(vols) else None
         if v is None or v <= 0:
             continue
-        d = dt.datetime.fromtimestamp(t, dt.timezone.utc).astimezone(ET).date()
+        d = dt.datetime.fromtimestamp(t, dt.timezone.utc).astimezone(tz).date()
         if d >= today:
             continue                       # exclude today, and any stray future row
         out.append(float(v))
@@ -138,6 +157,7 @@ def intraday_profile(ysym, force=False):
     ts = res.get("timestamp") or []
     q = (res.get("indicators", {}).get("quote") or [{}])[0]
     vols = q.get("volume") or []
+    tz = _tz_for(ysym, res.get("meta"))
 
     # Group into sessions, keyed by date, as {minute: volume}.
     days = {}
@@ -145,7 +165,7 @@ def intraday_profile(ysym, force=False):
         v = vols[i] if i < len(vols) else None
         if v is None or v <= 0:
             continue
-        loc = dt.datetime.fromtimestamp(t, dt.timezone.utc).astimezone(ET)
+        loc = dt.datetime.fromtimestamp(t, dt.timezone.utc).astimezone(tz)
         m = loc.hour * 60 + loc.minute
         if m < SESSION_OPEN_MIN or m >= SESSION_CLOSE_MIN:
             continue                       # regular hours only
@@ -238,8 +258,9 @@ def volume(ysym, now_epoch=None, force=False):
         traded = float(vv[0]) if vv and vv[0] else 0.0
 
     # How far into the session we are, from the clock rather than from bars.
+    tz = _tz_for(ysym, meta)
     nowet = dt.datetime.fromtimestamp(now_epoch or time.time(),
-                                      dt.timezone.utc).astimezone(ET)
+                                      dt.timezone.utc).astimezone(tz)
     last_minute = nowet.hour * 60 + nowet.minute
     if last_minute >= SESSION_CLOSE_MIN:
         last_minute = SESSION_CLOSE_MIN - 1
