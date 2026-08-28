@@ -98,6 +98,7 @@
   .top .meta{color:var(--dim);display:flex;gap:8px;align-items:center;flex-wrap:wrap;justify-content:flex-end}
   .modepill{border:1px solid var(--line);border-radius:6px;padding:3px 8px;font-size:11px;letter-spacing:.12em}
   .modepill.LIVE{color:var(--amber);border-color:var(--amber)}
+  .setbtn.off{opacity:.45}
   .setbtn{border:1px solid var(--line);border-radius:6px;padding:3px 9px;color:var(--dim);font-size:11px;cursor:pointer}
   .quitbtn{border:1px solid var(--red);color:var(--red);background:transparent;border-radius:7px;padding:2px 9px;font-size:14px;font-weight:800;cursor:pointer;line-height:1.3}
   .quitbtn:hover{background:var(--red);color:#fff}
@@ -363,6 +364,8 @@
         <span class="modepill LIVE" id="modePill">LIVE</span>
         <span class="modepill" id="acctType" style="display:none"></span>
         <span class="setbtn" style="color:var(--blue,#4aa3e0);border-color:var(--blue,#4aa3e0)" onclick="location.href='http://127.0.0.1:8010'">⇄ FUTURES</span>
+        <span class="setbtn" id="sndBtn" title="Sound on arm, fill and exit"
+              onclick="EZ.toggleSound()">SOUND ON</span>
         <span class="setbtn" onclick="EZ.openSettings()">CONFIGURATION</span>
         <div class="theme-dots" role="group" aria-label="Theme color"><button class="tdot tdot-white" data-set="light" onclick="EZ.setTheme('light')" aria-label="White theme"></button><button class="tdot tdot-gray" data-set="gray" onclick="EZ.setTheme('gray')" aria-label="Gray theme"></button><button class="tdot tdot-black" data-set="dark" onclick="EZ.setTheme('dark')" aria-label="Black theme"></button></div>
       </div>
@@ -576,7 +579,7 @@
 <script>
 const EZ = (function(){
   const LSK="ezexec_creds", LSS="ezexec_settings", LSP="ezexec_profiles", LSPA="ezexec_active_profile", LST="ezexec_theme", LSA="ezexec_autolock", LSST="ezexec_strategies";
-  let connected=false, marketClosed=false, lastPreview=null;
+  let connected=false, marketClosed=false, lastPreview=null, prevPos=false;
   // Buying power is never shown. It exists to answer one question: can this
   // account cover the number of contracts currently selected?
   let buyingPower=0, lastAsks={CALLS:null, PUTS:null};
@@ -902,6 +905,49 @@ const EZ = (function(){
     $('footMirror').textContent=' · mirror: '+name;
   }
 
+  // ---- SOUND ------------------------------------------------------------
+  // Synthesised, not files: nothing to ship, nothing to 404, and it works with
+  // no network. Browsers block audio until the user has interacted with the
+  // page - arming IS a click, so the first sound always has permission.
+  let audioCtx=null, soundOn=(localStorage.getItem('ms_sound')!=='0');
+  function beep(seq){
+    if(!soundOn) return;
+    try{
+      audioCtx = audioCtx || new (window.AudioContext||window.webkitAudioContext)();
+      if(audioCtx.state==='suspended') audioCtx.resume();
+      let t=audioCtx.currentTime;
+      seq.forEach(function(n){
+        const osc=audioCtx.createOscillator(), g=audioCtx.createGain();
+        osc.type=n.type||'sine'; osc.frequency.setValueAtTime(n.f,t);
+        // Ramp the gain instead of switching it: a square edge on the envelope
+        // is heard as a click at the start and end of every note.
+        g.gain.setValueAtTime(0.0001,t);
+        g.gain.exponentialRampToValueAtTime(n.v||0.18, t+0.012);
+        g.gain.exponentialRampToValueAtTime(0.0001, t+n.d);
+        osc.connect(g); g.connect(audioCtx.destination);
+        osc.start(t); osc.stop(t+n.d+0.02);
+        t += n.d + (n.gap||0.02);
+      });
+    }catch(e){ /* no audio device, or blocked - never break trading over it */ }
+  }
+  // Deliberately distinguishable without looking: ARMED is a neutral two-tone
+  // prompt, FILLED rises, and an exit falls.
+  const SFX={
+    armed:   [{f:880,d:0.09},{f:1175,d:0.11}],
+    filled:  [{f:660,d:0.07},{f:880,d:0.07},{f:1320,d:0.16}],
+    exit:    [{f:520,d:0.10},{f:390,d:0.18}],
+    cancel:  [{f:520,d:0.07},{f:392,d:0.09}],
+    blocked: [{f:300,d:0.16,type:'square',v:0.10}]
+  };
+  function sfx(kind){ if(SFX[kind]) beep(SFX[kind]); }
+  function toggleSound(){
+    soundOn=!soundOn;
+    localStorage.setItem('ms_sound', soundOn?'1':'0');
+    const b=$('sndBtn'); if(b){ b.textContent = soundOn?'SOUND ON':'SOUND OFF';
+      b.classList.toggle('off', !soundOn); }
+    if(soundOn) sfx('armed');       // so you hear what you just switched on
+  }
+
   function showEvent(msg){
     const sl=/STOP LOSS|blocked|FAILED/i.test(msg) && !/TAKE PROFIT/.test(msg);
     $('eventBanner').className='event show'+(sl?' sl':'');
@@ -1119,9 +1165,14 @@ const EZ = (function(){
     side=s;
     if(settings.my_enabled){
       const r=await api('/api/order/arm',{symbol:sym,side:s,qty});
-      if(!r.ok && r.rejected){ showReject(r.reason,r.phantom); return; }
+      if(!r.ok && r.rejected){ sfx('blocked'); showReject(r.reason,r.phantom); return; }
       hideReject();
-      showEvent('ARMED · ABSOLUTE ENTRY — waiting for '+sym+' to reach '+Number(r.target).toFixed(0)+', then buys the ask');
+      sfx('armed');
+      // 2dp: the grid has .50 levels, and "715" for a 715.50 trigger is a
+      // different price from the one that will actually fire.
+      const _lv = Number(r.target).toFixed(2)
+        + (r.breakout!=null ? ' or ' + Number(r.breakout).toFixed(2) : '');
+      showEvent('ARMED · ABSOLUTE ENTRY — waiting for '+sym+' to reach '+_lv+', then buys the ask');
       await tick(); return;
     }
     const r=await api('/api/order/place',{symbol:sym,side:s,qty});
@@ -1132,7 +1183,7 @@ const EZ = (function(){
   }
   async function disarm(){
     await api('/api/order/disarm',{});
-    showEvent('ABSOLUTE ENTRY cancelled');
+    sfx('cancel'); showEvent('ABSOLUTE ENTRY cancelled');
     await tick();
   }
   async function close(){
@@ -1317,12 +1368,19 @@ const EZ = (function(){
     paintQtyAfford();
 
     const pos=st.position; inTrade=!!pos;
+    // Sound the transitions, not the states - polling once a second would
+    // otherwise play the same note every tick for as long as you held.
+    if(pos && !prevPos) sfx('filled');
+    if(!pos && prevPos) sfx('exit');
+    prevPos = !!pos;
     lockdown(inTrade);
     const armed=st.armed;
     if(armed && !pos){
       $('armBand').classList.remove('hidden');
       $('armTitle').textContent='ARMED · ABSOLUTE ENTRY';
-      $('armSub').textContent='waiting for '+armed.symbol+' → '+Number(armed.target).toFixed(0)+' · then '+armed.side+' at ask';
+      $('armSub').textContent='waiting for '+armed.symbol+' → '+Number(armed.target).toFixed(2)
+        + (armed.breakout!=null ? ' or ' + Number(armed.breakout).toFixed(2) : '')
+        + ' · then '+armed.side+' at ask';
     }else{
       $('armBand').classList.add('hidden');
     }
@@ -1481,7 +1539,7 @@ const EZ = (function(){
   })();
 
   return {step,buy,close,disarm,hideReject,forgetPosition,disconnect,quitApp,switchAccount,toggleTheme,setTheme,lockNow,
-          openSettings,closeSettings,applySettings,setStrikeMode,hideEvent,
+          openSettings,closeSettings,applySettings,setStrikeMode,hideEvent,toggleSound,
           mirrorToggle,selectProfile,saveProfile,deleteProfile,pickAccount,
           showTab,toggleStrategy,newStrategy,editStrategy,saveStrategy,deleteStrategy,cancelStrategyEdit,stTypeChanged};
 })();
