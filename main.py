@@ -20,6 +20,12 @@ try:
     import tape
 except Exception:
     tape = None
+# Dwell time. Optional like the rest: a missing analytics module must never be
+# the reason the trading app will not start.
+try:
+    import levels
+except Exception:
+    levels = None
 
 _EXEC = ThreadPoolExecutor(max_workers=3)
 CONNECT_TIMEOUT_S = 25
