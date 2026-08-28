@@ -152,12 +152,16 @@ OUTLIER_CAP_X = 12.0     # x the session median volume
 
 
 def _cap_volumes(bars):
-    """Return volumes with feed artifacts clipped to OUTLIER_CAP_X x median."""
+    """Volumes with feed artifacts clipped. Returns (volumes, was_clipped)."""
     med = _median([b["v"] for b in bars if b["v"] > 0])
     if med <= 0:
-        return [b["v"] for b in bars]
+        return [b["v"] for b in bars], [False] * len(bars)
     ceiling = med * OUTLIER_CAP_X
-    return [min(b["v"], ceiling) for b in bars]
+    out, clipped = [], []
+    for b in bars:
+        clipped.append(b["v"] > ceiling)
+        out.append(min(b["v"], ceiling))
+    return out, clipped
 
 
 def _mean(vals):
@@ -200,9 +204,10 @@ def compute(bars):
     # Cap against the WHOLE window under consideration, not each half, or a
     # burst that fills the recent window would raise its own ceiling.
     window = baseline + recent
-    capped = _cap_volumes(window)
+    capped, clipped = _cap_volumes(window)
     v_base = capped[:len(baseline)]
     v_recent = capped[len(baseline):]
+    clipped_recent = clipped[len(baseline):]
 
     # Medians, not means: one artifact bar cannot move a median, and neither
     # can one genuine outlier minute, which is the honest reading of "how fast
@@ -233,8 +238,20 @@ def compute(bars):
 
     # Acceleration: is the newest bar faster than the rest of the recent window?
     # Positive means still building, negative means the burst is fading.
-    last_v = v_recent[-1] if v_recent else recent[-1]["v"]   # capped, same as the rest
-    accel = ((last_v / vol_recent) - 1.0) * 100.0 if vol_recent > 0 else 0.0
+    # If the NEWEST bar is itself an artifact, there is no honest acceleration
+    # to report: the number would just be describing the cap we applied. Say
+    # so instead of printing +1534%, which is what the capped value produced
+    # on QQQ the first time this ran.
+    artifact_note = ""
+    if clipped_recent and clipped_recent[-1]:
+        accel = 0.0
+        artifact_note = "last bar's volume looked like a feed artifact — ignored"
+    else:
+        last_v = v_recent[-1] if v_recent else recent[-1]["v"]
+        accel = ((last_v / vol_recent) - 1.0) * 100.0 if vol_recent > 0 else 0.0
+        # Even a real burst does not exceed this off a median baseline; beyond
+        # it we are reading noise, so it is clamped rather than shown raw.
+        accel = max(-100.0, min(accel, 400.0))
 
     # Which way the recent window actually went.
     # "Flat" needs to win ties: an unchanged window is not a down window.
@@ -255,7 +272,9 @@ def compute(bars):
         "vol_per_min": int(vol_recent),
         "range_per_min": round(rng_recent, 2),
         "bars_used": len(recent) + len(baseline),
+        "clipped_bars": sum(1 for c in clipped if c),
         "last_bar_ts": recent[-1]["t"],
+        "note": artifact_note,
     }
 
 
