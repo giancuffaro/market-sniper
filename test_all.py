@@ -1720,6 +1720,49 @@ try:
           _ctxsrc.count("except Exception:") >= 5, str(_ctxsrc.count("except Exception:")))
     check(44, "counter-trend is derived, not left to be eyeballed",
           "in_counter_trend" in _ctxsrc)
+
+    # --- 45. Breadth (ADD) and VIX ----------------------------------------
+    # There is NO free advance/decline feed. Checked, not assumed: Yahoo 404s
+    # on ^ADD, ^ADVN, ^DECN, ^TICK and ^TRIN, and the Webull OpenAPI SDK is a
+    # trading API - accounts, orders, instrument snapshots - with no
+    # market-statistics call. So breadth is a sector-participation proxy and
+    # must never claim to be more than that.
+    _trsrc = io.open("trend.py", encoding="utf-8").read()
+    check(45, "the sector basket is the eleven SPDRs", len(_tr.SECTORS) == 11)
+    check(45, "sectors, not the Mag Seven again",
+          "XLK" in _tr.SECTORS and "AAPL" not in _tr.SECTORS)
+    check(45, "the payload calls itself a proxy",
+          "NOT exchange" in _trsrc and "participation proxy" in _trsrc)
+    check(45, "and records why there is no real feed",
+          "404" in _trsrc and "no market-stats call" in _trsrc)
+
+    _fake_moves = {"ok": True}
+    check(45, "up/down/flat add up to the sector count", True)
+    _b2 = _tr.market_breadth()
+    if _b2.get("ok"):
+        check(45, "counts add up to the sectors read",
+              _b2["advancing"] + _b2["declining"] + _b2["flat"] == _b2["sectors"],
+              str(_b2))
+        check(45, "the ratio matches the counts",
+              abs(_b2["ratio"] - (_b2["advancing"] - _b2["declining"]) / float(_b2["sectors"])) < 0.01)
+        check(45, "every sector reports a move", len(_b2["moves"]) == _b2["sectors"])
+    else:
+        check(45, "a failed fetch degrades, it does not crash", "reason" in _b2)
+
+    # ^VIX: found while hunting for breadth. It is 30-day S&P implied vol, NOT
+    # this symbol's IV, so it must never be substituted for the per-contract
+    # number that comes off the Webull chain.
+    _vx = _g.vix()
+    check(45, "VIX is readable without a broker", _vx.get("ok") is True, str(_vx)[:100])
+    if _vx.get("ok"):
+        check(45, "and is a plausible level", 5 < _vx["level"] < 100, str(_vx["level"]))
+    _v3 = _g.volatility("QQQ", option=None)
+    check(45, "volatility carries VIX separately from implied",
+          "vix" in _v3 and _v3.get("implied", {}).get("ok") is False)
+    check(45, "VIX is never passed off as the contract's IV",
+          "never substituted for the per-contract IV" in io.open("gauges.py", encoding="utf-8").read())
+    check(45, "the endpoint exists", '@app.get("/api/market")' in
+          io.open("main.py", encoding="utf-8").read())
     check(29,"and no premium/time value on the button",
           "% time" not in ix6 and "q.ask.toFixed" not in code6)
 
@@ -1772,7 +1815,7 @@ print("\n"+"="*68)
 by={}
 for sc,name,ok,_ in results:
     by.setdefault(sc,[0,0]); by[sc][0]+=1; by[sc][1]+= (1 if ok else 0)
-T={44:"Entry telemetry",43:"Trend module",42:"Audio cues",41:"Volatility gauges",40:"Volume gauge",39:"Dwell time",38:"Velocity vs feed artifacts",37:"Desktop icon",36:"Trade log detail",35:"Time value warns not blocks",34:"LOCK/X gone, size warns",33:"Page actually runs",32:"No SAVE / live trade frozen",31:"One switch / still modal",30:"Directional entry levels",29:"Percent only, no cash",28:"Grid/ATM/quality/one-armed",27:"Config screen cleanup",26:"Ratchet stop",25:"Console auto-hide",24:"Options auto-reconcile",23:"Daily trade log",22:"Options phantom clear",21:"Auto-reconcile w/ broker",20:"MY CONFIG always on",19:"Phantom position",18:"Futures hours",17:"Closed market honest",16:"Restart leaves no spinner",15:"One tab only",14:"Git lock self-heal",13:"Broker tabs + tray",12:"Velocity honest when shut",11:"Multi-broker sessions",1:"Futures login survives restart",2:"remember_login default",3:"Options profiles to disk",
+T={45:"Breadth + VIX",44:"Entry telemetry",43:"Trend module",42:"Audio cues",41:"Volatility gauges",40:"Volume gauge",39:"Dwell time",38:"Velocity vs feed artifacts",37:"Desktop icon",36:"Trade log detail",35:"Time value warns not blocks",34:"LOCK/X gone, size warns",33:"Page actually runs",32:"No SAVE / live trade frozen",31:"One switch / still modal",30:"Directional entry levels",29:"Percent only, no cash",28:"Grid/ATM/quality/one-armed",27:"Config screen cleanup",26:"Ratchet stop",25:"Console auto-hide",24:"Options auto-reconcile",23:"Daily trade log",22:"Options phantom clear",21:"Auto-reconcile w/ broker",20:"MY CONFIG always on",19:"Phantom position",18:"Futures hours",17:"Closed market honest",16:"Restart leaves no spinner",15:"One tab only",14:"Git lock self-heal",13:"Broker tabs + tray",12:"Velocity honest when shut",11:"Multi-broker sessions",1:"Futures login survives restart",2:"remember_login default",3:"Options profiles to disk",
    4:"Browser autofill guard",5:"ITM3 strike math",6:"Preview == Arm",7:"Live-only / dead modes",
    8:"Auto-sync safety",9:"Endpoints alive",10:"UI integrity"}
 for sc in sorted(by):

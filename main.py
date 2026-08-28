@@ -258,6 +258,20 @@ def breadth(lead: str = "QQQ", tf: str = "1m"):
     return trendmod.basket(ysym, tf)
 
 
+@app.get("/api/market")
+def market_breadth():
+    """Sector participation, standing in for advancers minus decliners.
+
+    It is an APPROXIMATION and says so in its own payload. There is no free
+    advance/decline feed: Yahoo 404s on ^ADD, ^ADVN, ^DECN, ^TICK and ^TRIN,
+    and the Webull OpenAPI SDK is a trading API with no market-statistics
+    endpoint. Eleven sector ETFs are the closest honest stand-in."""
+    if trendmod is None:
+        return {"ok": False, "reason": "trend module unavailable"}
+    b = trendmod.market_breadth()
+    return {**b, "label": trendmod.breadth_label(b)}
+
+
 @app.get("/api/preview")
 def preview(symbol: str = "QQQ", side: str = "CALLS"):
     """Where an armed entry would trigger, and which strike you'd end up with.
