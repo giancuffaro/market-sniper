@@ -114,6 +114,16 @@
   .trendbar .tlbl{color:var(--dim);font-size:11px;letter-spacing:.12em}
   .trendbar .tlbl b{color:var(--txt)}
   .trendbar .tmeta{color:var(--dimmer);font-size:9.5px;letter-spacing:.06em}
+  .dirrow{display:flex;align-items:center;gap:7px;flex-wrap:wrap}
+  .dirverdict{font-family:'Space Grotesk','Inter',sans-serif;font-weight:800;
+    font-size:13px;letter-spacing:.08em;padding:3px 10px;border-radius:8px;
+    border:1px solid var(--line);color:var(--dim)}
+  .dirverdict.up{color:var(--green);border-color:var(--green);background:var(--green-deep)}
+  .dirverdict.down{color:var(--red);border-color:var(--red);background:var(--red-deep)}
+  .dsig{font-size:10.5px;letter-spacing:.04em;color:var(--dim);
+    border:1px solid var(--line);border-radius:7px;padding:3px 7px;white-space:nowrap}
+  .dsig.pos{color:var(--green);border-color:var(--green)}
+  .dsig.neg{color:var(--red);border-color:var(--red)}
   .tcells{display:flex;flex-wrap:wrap;gap:7px 9px;margin-top:9px}
   .tcell{display:inline-flex;align-items:center;gap:4px;border:1px solid var(--line);border-radius:7px;
          padding:4px 7px;background:var(--panel2);min-width:46px;justify-content:center}
@@ -380,6 +390,21 @@
     <div class="trendbar" id="trendBar">
       <div class="tlbl">TREND <b id="trendSym">QQQ</b> <span class="tmeta">· multi-timeframe · live</span></div>
       <div id="trendCells" class="tcells"></div>
+    </div>
+    <!-- The NEW read, deliberately beside the old strip rather than replacing
+         it. The strip above is one signal (EMA9 vs EMA21) shown eleven times;
+         this is three different signals and whether they agree. Both run until
+         G has watched them side by side. -->
+    <div class="trendbar" id="dirBar">
+      <div class="tlbl">DIRECTION <b id="dirSym">QQQ</b>
+        <span class="tmeta">· slope · structure · volume</span></div>
+      <div class="dirrow">
+        <span class="dirverdict" id="dirState">—</span>
+        <span class="dsig" id="dSlope" title="21-EMA slope, and which side of it price is on">slope —</span>
+        <span class="dsig" id="dStruct" title="higher highs AND higher lows">structure —</span>
+        <span class="dsig" id="dVol" title="share of volume arriving on up-bars">volume —</span>
+        <span class="dsig" id="dBreadth" title="how much of the Mag Seven agrees">breadth —</span>
+      </div>
       <div class="velrow" id="velRow" title="Volume and range per minute over the last 5 minutes, versus the previous half hour. 50 = moving exactly as fast as it has been.">
         <span class="vlbl">VELOCITY</span>
         <span class="velbar"><i id="velFill"></i></span>
@@ -583,7 +608,7 @@ const EZ = (function(){
   // Buying power is never shown. It exists to answer one question: can this
   // account cover the number of contracts currently selected?
   let buyingPower=0, lastAsks={CALLS:null, PUTS:null};
-  let sym="QQQ", side="CALLS", qty=1, inTrade=false, poll=null, priceTimer=null, trendTimer=null, velTimer=null;
+  let sym="QQQ", side="CALLS", qty=1, inTrade=false, poll=null, priceTimer=null, trendTimer=null, velTimer=null, dirTimer=null;
   let profiles=[], activeProf=null, mirrorOn=false;
   let settings={strike_mode:"ITM2",ratchet_step_pct:10,tp_enabled:false,tp_value:30,tp_unit:"cents",
                 sl_enabled:false,sl_value:20,sl_unit:"cents",my_enabled:true};
@@ -775,6 +800,8 @@ const EZ = (function(){
     poll=setInterval(tick,1000);
     priceTimer=setInterval(()=>{ refreshPrices(); if(!inTrade) refreshQuote(); },5000);
     trendTimer=setInterval(refreshTrend,20000);
+    // 15s, as asked for.
+    dirTimer=setInterval(refreshDirection,15000); refreshDirection();
     // Bars only close once a minute, so polling faster than this just burns
     // requests for a number that cannot have changed.
     velTimer=setInterval(refreshVel,15000);
@@ -790,7 +817,7 @@ const EZ = (function(){
   async function lockNow(auto){
     if(inTrade && !auto && !confirm('You have an OPEN position. Lock anyway?')) return;
     await api('/api/disconnect',{});
-    clearInterval(poll); clearInterval(priceTimer); clearInterval(trendTimer); clearInterval(velTimer);
+    clearInterval(poll); clearInterval(priceTimer); clearInterval(trendTimer); clearInterval(dirTimer); clearInterval(velTimer);
     location.reload();
   }
 
@@ -970,6 +997,50 @@ const EZ = (function(){
       return `<span class="tcell ${cls}"><span class="ttf">${lbl}</span><span class="tarr">${arr}</span></span>`;
     }).join('');
   }
+  // Three signals, and the honest answer when they disagree. CHOP is not a
+  // failure to decide - it is the reading that keeps you out of the trade.
+  function renderDirection(d, b){
+    const v=$('dirState'); if(!v) return;
+    const st=(d&&d.ok)?d.state:null;
+    v.textContent = st ? (st.toUpperCase()+'  '+(d.agree||0)+'/3') : '—';
+    v.className = 'dirverdict'+(st==='up'?' up':st==='down'?' down':'');
+    const paint=(id,vote,txt,tip)=>{
+      const el=$(id); if(!el) return;
+      el.textContent=txt;
+      el.className='dsig'+(vote>0?' pos':vote<0?' neg':'');
+      if(tip) el.title=tip;
+    };
+    if(d&&d.ok){
+      const sl=d.slope||{}, sr=d.structure||{}, vo=d.volume||{};
+      paint('dSlope', sl.vote, 'slope '+(sl.slope!=null?(sl.slope>0?'+':'')+sl.slope:'—')
+            +(sl.price_vs_ema?' · '+sl.price_vs_ema:''),
+            'EMA'+21+' slope in bar-ranges per bar, and which side of it price sits');
+      paint('dStruct', sr.vote, 'structure '+(sr.vote>0?'HH+HL':sr.vote<0?'LH+LL':'mixed'),
+            sr.reason||'higher highs AND higher lows, both required');
+      paint('dVol', vo.vote, 'volume '+(vo.up_share!=null?vo.up_share+'% up':'—'),
+            vo.reason||'share of volume arriving on up-bars');
+    }else{
+      paint('dSlope',0,'slope —'); paint('dStruct',0,'structure —'); paint('dVol',0,'volume —');
+    }
+    if(b&&b.ok){
+      const agreeTxt = b.confirmed===null?'—':(b.confirmed?'confirms':'DIVERGES');
+      paint('dBreadth', b.confirmed===null?0:(b.confirmed?1:-1),
+            'breadth '+b.up+'up/'+b.down+'dn · '+agreeTxt,
+            'Mag Seven: '+b.up+' up, '+b.down+' down, '+b.chop+' chop. '
+            +'A lead that rises while the basket falls is a thin rally.');
+    }
+  }
+  async function refreshDirection(){
+    try{
+      const [d,b]=await Promise.all([
+        api('/api/direction?symbol='+sym),
+        api('/api/breadth?lead='+sym)
+      ]);
+      $('dirSym').textContent=sym;
+      renderDirection(d,b);
+    }catch(e){}
+  }
+
   async function refreshTrend(){
     try{
       const r=await api('/api/trend?symbol='+sym);
@@ -1204,7 +1275,7 @@ const EZ = (function(){
       if(++lostCount >= 2){                    // one blip is not a disconnect
         connected = false;
         clearInterval(poll); clearInterval(priceTimer);
-        clearInterval(trendTimer); clearInterval(velTimer);
+        clearInterval(trendTimer); clearInterval(dirTimer); clearInterval(velTimer);
         $('dash').classList.add('hidden');
         $('connectScreen').classList.remove('hidden');
         const e=$('connectErr'); if(e) e.textContent='The app restarted - connect again.';
@@ -1471,17 +1542,17 @@ const EZ = (function(){
   async function switchAccount(){
     if(inTrade && !confirm('You have an OPEN position. Leave anyway?')) return;
     await api('/api/disconnect',{});
-    clearInterval(poll); clearInterval(priceTimer); clearInterval(trendTimer); clearInterval(velTimer);
+    clearInterval(poll); clearInterval(priceTimer); clearInterval(trendTimer); clearInterval(dirTimer); clearInterval(velTimer);
     location.reload();
   }
   async function disconnect(){
     localStorage.removeItem(LSP); localStorage.removeItem(LSPA); localStorage.removeItem(LSK);
-    await api('/api/disconnect',{}); clearInterval(poll); clearInterval(priceTimer); clearInterval(trendTimer); clearInterval(velTimer); location.reload();
+    await api('/api/disconnect',{}); clearInterval(poll); clearInterval(priceTimer); clearInterval(trendTimer); clearInterval(dirTimer); clearInterval(velTimer); location.reload();
   }
   async function quitApp(){
     if(inTrade && !confirm('You have an OPEN position. Shut the app down anyway?')) return;
     if(!inTrade && !confirm('Shut the app down completely?')) return;
-    try{ clearInterval(poll); clearInterval(priceTimer); clearInterval(trendTimer); clearInterval(velTimer); }catch(e){}
+    try{ clearInterval(poll); clearInterval(priceTimer); clearInterval(trendTimer); clearInterval(dirTimer); clearInterval(velTimer); }catch(e){}
     try{ await fetch('/api/shutdown',{method:'POST'}); }catch(e){}
     // also stop the sibling futures app (8010) so everything closes
     try{ await fetch('http://127.0.0.1:8010/api/shutdown',{method:'POST'}); }catch(e){}
@@ -1519,7 +1590,7 @@ const EZ = (function(){
       function standDown(){
         try{ clearInterval(poll); }catch(e){}
         try{ clearInterval(priceTimer); }catch(e){}
-        try{ clearInterval(trendTimer); }catch(e){}
+        try{ clearInterval(trendTimer); clearInterval(dirTimer); }catch(e){}
         try{ clearInterval(velTimer); }catch(e){}
         try{ window.close(); }catch(e){}
         setTimeout(function(){
