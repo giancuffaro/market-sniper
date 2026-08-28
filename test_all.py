@@ -1241,18 +1241,28 @@ try:
     check(37, "the one-time setup file exists", os.path.exists(_shortcut))
     _sh = io.open(_shortcut, encoding="utf-8").read()
     check(37, "the setup file is pure ASCII", all(ord(c) < 128 for c in _sh))
-    check(37, "the shortcut targets the ASCII stub, never the emoji file",
-          "Join-Path $dir 'MARKET SNIPER.bat'" in _sh and "START MARKET SNIPER" not in _sh)
+    # Windows will not PIN a shortcut whose target is a .bat - a shell rule,
+    # not a setting. So the target is cmd.exe (pinnable) and the batch file
+    # rides along as an argument.
+    check(37, "the target is cmd.exe, so it can be pinned",
+          "System32\\cmd.exe" in _sh)
+    check(37, "the batch file is passed as an argument",
+          "$s.Arguments = '/c" in _sh and "MARKET SNIPER.bat" in _sh)
+    check(37, "the emoji launcher is never named in the shortcut",
+          "START MARKET SNIPER" not in _sh)
     check(37, "it refuses to run if the stub is missing",
           'if not exist "%~dp0MARKET SNIPER.bat"' in _sh)
     check(37, "it clears a stale icon first", "Remove-Item $link -Force" in _sh)
     # The first version reported success while leaving a dead icon behind,
     # because assigning TargetPath threw and nothing checked afterwards.
     check(37, "it reads the shortcut BACK and proves the target exists",
-          "$check = $ws.CreateShortcut($link)" in _sh and
-          "Test-Path $check.TargetPath" in _sh)
+          "$c = $ws.CreateShortcut($link)" in _sh and
+          "Test-Path $c.TargetPath" in _sh)
+    check(37, "it also proves the batch file it points at exists",
+          "shortcut saved but MARKET SNIPER.bat is missing" in _sh)
     check(37, "it stops on the first PowerShell error",
           "$ErrorActionPreference = 'Stop'" in _sh)
+    check(37, "it tells you how to pin it", "Pin to taskbar" in _sh)
     check(37, "it applies the icon", "sniper.ico" in _sh)
     check(37, "it explains the manual fallback", "Send to" in _sh and "Change Icon" in _sh)
     # The stub adds nothing: the real launcher already opens the browser, so
