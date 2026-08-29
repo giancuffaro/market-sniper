@@ -62,7 +62,8 @@ DEFAULT_SETTINGS = {
     # Stop AND step are the same number by design - one unit of risk per rung,
     # exactly the shape of the options ratchet.
     "ratchet_enabled": False, "ratchet_points": 12.5,
-    "round_enabled": False, "round_step": 50.0,
+    # 25-point grid: G's measured entry level on MNQ.
+    "round_enabled": False, "round_step": 25.0,
 }
 
 ROUND_STEPS = (10.0, 25.0, 50.0, 100.0, 250.0)
@@ -651,7 +652,10 @@ class BaseFuturesSession:
                          "opened_at": dt.datetime.now().strftime("%H:%M"),
                          # Frozen at the fill. Nudging the step mid-trade must
                          # not move the stop under a position already running.
-                         "ratchet_on": bool(self.settings.get("ratchet_enabled")),
+                         # ALWAYS on. The toggle decides whether the ENTRY waits for a
+                         # level; it never decides whether a live position has a
+                         # stop. Same rule as the options side.
+                         "ratchet_on": True,
                          "ratchet_step": float(self.settings.get("ratchet_points") or 10.0)}
         self._update_trail(); self._update_ratchet()
 
@@ -961,7 +965,10 @@ class NinjaTraderSession(BaseFuturesSession):
                          "opened_at": dt.datetime.now().strftime("%H:%M"),
                          # Frozen at the fill. Nudging the step mid-trade must
                          # not move the stop under a position already running.
-                         "ratchet_on": bool(self.settings.get("ratchet_enabled")),
+                         # ALWAYS on. The toggle decides whether the ENTRY waits for a
+                         # level; it never decides whether a live position has a
+                         # stop. Same rule as the options side.
+                         "ratchet_on": True,
                          "ratchet_step": float(self.settings.get("ratchet_points") or 10.0)}
         self._update_trail(); self._update_ratchet()
         self.last_event = "SENT to NinjaTrader (%s): %s %d %s %s" % (
@@ -1185,7 +1192,10 @@ class TopstepSession(BaseFuturesSession):
         self.position = {"symbol": symbol, "side": side, "qty": int(qty), "entry": px,
                          "mark": get_price(symbol)["price"],
                          "opened_at": dt.datetime.now().strftime("%H:%M"), "contract": contract,
-                         "ratchet_on": bool(self.settings.get("ratchet_enabled")),
+                         # ALWAYS on. The toggle decides whether the ENTRY waits for a
+                         # level; it never decides whether a live position has a
+                         # stop. Same rule as the options side.
+                         "ratchet_on": True,
                          "ratchet_step": float(self.settings.get("ratchet_points") or 10.0)}
         self._update_trail(); self._update_ratchet()
         self.last_event = "Topstep: %s %d %s %s" % (
@@ -1468,7 +1478,10 @@ class WebullFuturesSession(BaseFuturesSession):
                          "opened_at": dt.datetime.now().strftime("%H:%M"),
                          # Frozen at the fill. Nudging the step mid-trade must
                          # not move the stop under a position already running.
-                         "ratchet_on": bool(self.settings.get("ratchet_enabled")),
+                         # ALWAYS on. The toggle decides whether the ENTRY waits for a
+                         # level; it never decides whether a live position has a
+                         # stop. Same rule as the options side.
+                         "ratchet_on": True,
                          "ratchet_step": float(self.settings.get("ratchet_points") or 10.0)}
         self._update_trail(); self._update_ratchet()
         self.last_event = "SENT to Webull %s: %s %d %s (%s)" % (

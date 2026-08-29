@@ -413,8 +413,8 @@
         <div class="srow"><label><input type="checkbox" id="rdE"> ON</label>
           <select id="rdV" style="flex:1;background:var(--panel2);border:1px solid var(--line);border-radius:8px;color:var(--txt);font-family:var(--ui);font-size:14px;padding:10px">
             <option value="10">every 10 points</option>
-            <option value="25">every 25 points</option>
-            <option value="50" selected>every 50 points</option>
+            <option value="25" selected>every 25 points</option>
+            <option value="50">every 50 points</option>
             <option value="100">every 100 points</option>
             <option value="250">every 250 points</option>
           </select></div>
@@ -424,8 +424,9 @@
         Ex: LONG MNQ at <b>28,716</b> on a 50-pt grid rests a buy limit at <b>28,700</b>; SHORT there
         rests a sell limit at <b>28,750</b>. On NinjaTrader / Topstep / Webull the order is really
         working at the broker (CANCEL on the amber bar pulls it). Trade-off vs a market order: if
-        price never comes back to the level, <b>you don't get filled</b>. Your Take Profit / Stop /
-        Trailing below still apply once it fills.</div>
+        price never comes back to the level, <b>you don't get filled</b>.<br><br>
+        Once it fills, the <b>RATCHET below owns the exit</b> — there is no take-profit and no
+        separate stop to set. Entry on the 25-point grid, exit on 12.5-point rungs.</div>
       </div>
 
       <div class="sgroup mine">
@@ -451,13 +452,17 @@
         which noise would take out immediately. The box is in POINTS.</div>
       </div>
 
-      <div class="sgroup">
-        <div class="glbl">TRAILING STOP (points)</div>
-        <div class="srow"><label><input type="checkbox" id="trE"> ON</label>
-          <input type="number" id="trV" min="0.25" step="0.25" placeholder="5"></div>
-        <div class="shint">Ignored while the RATCHET above is on. The stop follows the best price by this distance. Ex: LONG from 23150 with a
-        5-pt trail — price runs to 23170, the stop rides up to 23165; a pullback there closes you out,
-        keeping most of the move. Shown live under your P&amp;L while in a trade.</div>
+      <!-- TAKE PROFIT, STOP LOSS and TRAILING STOP were removed from this
+           screen. The ratchet owns the exit now, and a take-profit sitting
+           alongside it would close the trade at the exact moment the ratchet
+           is trying to let it run. The settings still exist server-side
+           because STRATEGIES set their own per-strategy TP/SL - they are
+           simply no longer hand-edited here. Hidden, not deleted, so the
+           existing save path keeps working untouched. -->
+      <div hidden>
+        <input type="checkbox" id="tpE"><input type="number" id="tpV">
+        <input type="checkbox" id="slE"><input type="number" id="slV">
+        <input type="checkbox" id="trE"><input type="number" id="trV">
       </div>
       </div><!-- /paneConfig -->
 
@@ -521,7 +526,7 @@ const FZ = (function(){
   let mode="WEBULL", sym="MNQ", qty=1, inTrade=false, poll=null, priceTimer=null, trendTimer=null, velTimer=null;
   let settings={tp_enabled:false,tp_points:10,sl_enabled:false,sl_points:5,trail_enabled:false,trail_points:5,
                 ratchet_enabled:false,ratchet_points:10,
-                round_enabled:false,round_step:50};
+                round_enabled:false,round_step:25};
   let prefs={}, prefsReady=false, prefsLoaded=null;
   const $=id=>document.getElementById(id);
   const api=(p,b)=>fetch(p,{method:b?'POST':'GET',headers:{'Content-Type':'application/json'},
@@ -822,7 +827,7 @@ const FZ = (function(){
       el.querySelector('.c').textContent=`${up?'+':'−'}${Math.abs(q.change).toFixed(2)} (${up?'+':'−'}${Math.abs(q.change_pct).toFixed(2)}%)`+(q.live?'':' ·delayed');
       if(s!==sym) return;
       if(settings.round_enabled){
-        const k=Number(settings.round_step)||50;
+        const k=Number(settings.round_step)||25;
         const lo=Math.floor(q.price/k)*k, hi=Math.ceil(q.price/k)*k;
         $('longSub').textContent='BUY LIMIT '+lo.toLocaleString();
         $('shortSub').textContent='SELL LIMIT '+hi.toLocaleString();
@@ -1002,7 +1007,7 @@ const FZ = (function(){
     $('slE').checked=settings.sl_enabled; $('slV').value=settings.sl_points;
     $('trE').checked=settings.trail_enabled; $('trV').value=settings.trail_points;
     $('raE').checked=settings.ratchet_enabled; $('raV').value=settings.ratchet_points;
-    $('rdE').checked=!!settings.round_enabled; $('rdV').value=String(settings.round_step||50);
+    $('rdE').checked=!!settings.round_enabled; $('rdV').value=String(settings.round_step||25);
     $('setScrim').classList.add('show');
   }
 
@@ -1185,7 +1190,7 @@ const FZ = (function(){
               sl_enabled:$('slE').checked, sl_points:parseFloat($('slV').value)||settings.sl_points,
               trail_enabled:$('trE').checked, trail_points:parseFloat($('trV').value)||settings.trail_points,
               ratchet_enabled:$('raE').checked, ratchet_points:parseFloat($('raV').value)||settings.ratchet_points,
-              round_enabled:$('rdE').checked, round_step:parseFloat($('rdV').value)||50};
+              round_enabled:$('rdE').checked, round_step:parseFloat($('rdV').value)||25};
     localStorage.setItem(LSS,JSON.stringify(settings));
     await api('/api/settings',settings);
     closeSettings();
