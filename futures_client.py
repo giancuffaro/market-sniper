@@ -910,6 +910,11 @@ class BaseFuturesSession:
         self._eval_strategies()       # fire any enabled strategy on an EMA cross
         ev, self.last_event = self.last_event, None
         return {"mode": self.mode, "account_id": self.account_id,
+                # What KIND of book this is. Webull labels a futures account
+                # "MARGIN" under account_type, so the useful answer lives in
+                # account_class/label - and every route in this app is futures
+                # only, so the fallback is FUTURES rather than blank.
+                "account_type": getattr(self, "account_type", None) or "FUTURES",
                 "buying_power": round(self.buying_power, 2),
                 "position": self.position, "armed": self.armed,
                 "day_realized": round(self.day_realized, 2),
@@ -1361,6 +1366,10 @@ class WebullFuturesSession(BaseFuturesSession):
             if aid and ("FUTURE" in marker
                         or any(str(aid).upper().endswith(sfx) for sfx in suffixes)):
                 acct = aid
+                # Keep what the broker actually called it, so the screen states
+                # the book rather than the app asserting it.
+                self.account_type = ("FUTURES" if "FUTURE" in marker
+                                     else (marker.strip().split(" ")[0] or "FUTURES"))
                 break
         if acct is None:
             # No clearly-futures account. This route is real money only, so we

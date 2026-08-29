@@ -333,8 +333,6 @@
         <span class="setbtn" style="color:var(--green);border-color:var(--green)" onclick="location.href='http://127.0.0.1:8000'">⇄ OPTIONS</span>
         <span class="setbtn" onclick="FZ.openSettings()">CONFIGURATION</span>
         <div class="theme-dots" role="group" aria-label="Theme color"><button class="tdot tdot-white" data-set="light" onclick="FZ.setTheme('light')" aria-label="White theme"></button><button class="tdot tdot-gray" data-set="gray" onclick="FZ.setTheme('gray')" aria-label="Gray theme"></button><button class="tdot tdot-black" data-set="dark" onclick="FZ.setTheme('dark')" aria-label="Black theme"></button></div>
-        <span class="setbtn" title="Log out of every broker" onclick="FZ.lockAll()">🔒</span>
-        <span class="quitbtn" title="Shut down the app" onclick="FZ.quitApp()">✕</span>
       </div>
     </div>
 
@@ -695,9 +693,13 @@ const FZ = (function(){
   }
   function showModeChrome(r){
     $('modePill').textContent = mode==='WEBULL' ? 'WEBULL LIVE' : mode;
+    // Say WHICH book, not just its code. Webull reports a futures account as
+    // "MARGIN" under account_type, so the app shows the class the broker gave
+    // it and falls back to FUTURES - which every route here is.
+    const book = (r.account_type||'FUTURES').toUpperCase();
     $('footMode').textContent = mode==='WEBULL'
-      ? ('● WEBULL LIVE '+(r.account_id||'')+' — REAL MONEY ●')
-      : ('● '+(r.account_id||mode)+' — REAL ORDERS ●');
+      ? ('● WEBULL LIVE '+(r.account_id||'')+' ('+book+') — REAL MONEY ●')
+      : ('● '+(r.account_id||mode)+' ('+book+') — REAL ORDERS ●');
   }
 
   // Secrets are stored in plain text in my-settings.json, which is gitignored
