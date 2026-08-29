@@ -363,7 +363,6 @@ class DisconnectReq(BaseModel):
     mode: Optional[str] = None      # None = every broker
 
 
-@app.post("/api/disconnect")
 def _pull_working_limits(sessions):
     """Cancel any limit resting at a broker before we stop watching it.
 
