@@ -295,10 +295,14 @@
         <input id="ntAccount" type="text" name="nt-book-x" autocomplete="off" spellcheck="false" data-lpignore="true" data-form-type="other" placeholder="Sim101" style="font-size:14px"></div>
       <div class="srow" style="margin-top:8px"><label style="min-width:78px">INCOMING</label>
         <input id="ntFolder" type="text" name="nt-path-x" autocomplete="off" spellcheck="false" data-lpignore="true" data-form-type="other" placeholder="leave blank = Documents\NinjaTrader 8\incoming" style="font-size:12px"></div>
-      <div class="note" style="color:var(--amber)">⚠ NinjaTrader mode sends REAL orders via its ATI. Start with
-      <b>Sim101</b> (NinjaTrader's built-in simulator) to test safely — switch to your live account name only
-      once you trust it. NinjaTrader must be running with the ATI enabled, and orders are fire-and-forget
-      (watch NinjaTrader to confirm fills).</div>
+      <div class="note" style="color:var(--amber)">⚠ Three things must be true, all on this PC.
+      There is no login here — no key, no password.<br>
+      <b>1.</b> NinjaTrader 8 open and logged in.<br>
+      <b>2.</b> Tools → Options → Automated Trading Interface → <b>Enable ATI server</b>.<br>
+      <b>3.</b> ACCOUNT spelled <b>exactly</b> as NinjaTrader's Accounts tab shows it.<br>
+      A wrong name does not error — NinjaTrader takes the file and drops it, and the order
+      silently never exists. <b>Test one micro contract first.</b> One-way: no fills or P&amp;L come
+      back, NinjaTrader is the truth.</div>
     </div>
 
     <div id="rememberRow" style="display:block;margin:2px 0 10px">
@@ -369,6 +373,10 @@
       <button onclick="FZ.disarm()">CANCEL</button>
     </div>
 
+    <!-- Loud on purpose. A file left sitting in the incoming folder means
+         nothing is watching it, so the order never reached the broker - and
+         without this the app would have said "SENT" and left it at that. -->
+    <div id="ninjaWarn" class="reject" style="display:none"></div>
     <div id="eventBanner" class="event"><div class="x" onclick="FZ.hideEvent()">✕</div>
       <div class="h" id="eventHead"></div></div>
     <div id="reject" class="reject"><div class="x" onclick="FZ.hideReject()">✕</div>
@@ -691,6 +699,13 @@ const FZ = (function(){
       return `<span class="${cls}">${x.mode} · ${what}${x.mode===active?' · ACTIVE':''}</span>`;
     }).join('') : '';
   }
+  function paintNinjaWarning(st){
+    const el=$('ninjaWarn'); if(!el) return;
+    const msg = st && st.ninja_warning;
+    el.style.display = msg ? 'block' : 'none';
+    if(msg) el.textContent = '⚠ ' + msg;
+  }
+
   function showModeChrome(r){
     $('modePill').textContent = mode==='WEBULL' ? 'WEBULL LIVE' : mode;
     // Say WHICH book, not just its code. Webull reports a futures account as
