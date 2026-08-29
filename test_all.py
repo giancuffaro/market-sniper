@@ -2244,8 +2244,10 @@ try:
           "Strategy Builder is the wrong tool" in _doc)
     check(54, "and give the exact folders to copy into",
           "bin\\Custom\\Indicators" in _doc and "bin\\Custom\\Strategies" in _doc)
-    check(54, "F5 compiles the folder, no need to open the files",
-          "F5 compiles the whole folder" in _doc)
+    # F11/F5 was the advice that did nothing for G - function keys need the
+    # Control Center focused. The notes give the menu route now.
+    check(54, "compiling does the whole folder, no need to open the files",
+          "compiling does the whole folder" in _doc)
     check(54, "there is only ONE install method described",
           _doc.count("## Installing") == 2)   # one per script, not two per script
 
