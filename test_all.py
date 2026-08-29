@@ -472,12 +472,17 @@ try:
     print("\n[19] PHANTOM POSITION - closed by hand, app still thinks you are in")
     import futures_client as _fc
     ph = _fc.make_session("TOPSTEP")
+    # Down past the ratchet's opening stop (12.5 points), so an exit really is
+    # pending. 23144 was chosen when a 5-point SL was the live bracket; the
+    # ratchet replaces it and is wider, so the price has to move to match.
     ph.position = {"symbol":"MNQ","side":"LONG","qty":1,"entry":23150.0,
-                   "mark":23144.0,"best":23160.0,"pnl":-12.0}
+                   "mark":23135.0,"best":23160.0,"pnl":-30.0,
+                   "ratchet_on":True,"ratchet_step":12.5}
     ph.settings.update({"sl_enabled":True,"sl_points":5.0})
     # Any exit will do. The point is that SOMETHING would have fired against a
-    # position the broker says you do not hold - which exit answers first (the
-    # ratchet now, being on by default) is not what this scenario is about.
+    # position the broker says you do not hold. Which one answers first is not
+    # what this scenario is about - and note the ratchet SUPPRESSES the 5-point
+    # SL entirely, by design: it owns the exit when it is on.
     check(19,"a phantom WOULD have fired a bracket", ph._bracket_hit() is not None,
           str(ph._bracket_hit()))
     r_=ph.forget_position()
@@ -539,7 +544,8 @@ try:
         x = _fc2.make_session("TOPSTEP")
         x.token="t"; x.acct={"id":1}
         x.position={"symbol":"MNQ","side":"LONG","qty":1,"entry":23150.0,
-                    "mark":23144.0,"best":23160.0,"pnl":-12.0}
+                    "mark":23135.0,"best":23160.0,"pnl":-30.0,
+                    "ratchet_on":True,"ratchet_step":12.5}
         x.settings.update({"sl_enabled":True,"sl_points":5.0})
         x.broker_positions = lambda: broker_says
         x._last_reconcile = 0
