@@ -32,7 +32,8 @@ powershell -NoProfile -ExecutionPolicy Bypass -Command ^
   "$newest=(Get-Item $ind).LastWriteTime; if((Get-Item $str).LastWriteTime -gt $newest){$newest=(Get-Item $str).LastWriteTime};" ^
   "Write-Host ('      files last changed : ' + $newest);" ^
   "Write-Host ('      last compile       : ' + $d);" ^
-  "if($d -ge $newest.AddSeconds(-60)){ Write-Host '      YES  compiled after the files were copied.' -ForegroundColor Green } else { Write-Host '      NO   the last compile predates the files.' -ForegroundColor Red; Write-Host '           Close NinjaTrader completely and reopen it.' -ForegroundColor Yellow };" ^
+  "$compiled = ($d -ge $newest.AddSeconds(-60));" ^
+  "if($compiled){ Write-Host '      YES  compiled after the files were copied.' -ForegroundColor Green } else { Write-Host '      NO   the last compile predates the files.' -ForegroundColor Red; Write-Host '           Open NinjaTrader - it compiles on startup.' -ForegroundColor Yellow };" ^
   "Write-Host '';" ^
   "Write-Host '   3. ANY COMPILE ERRORS IN NINJATRADERS OWN LOG?' -ForegroundColor Cyan;" ^
   "$logdir=Join-Path $nt 'log';" ^
@@ -40,7 +41,7 @@ powershell -NoProfile -ExecutionPolicy Bypass -Command ^
   "  $since=(Get-Date).AddDays(-2);" ^
   "  $logs=Get-ChildItem $logdir -Filter 'log.*.txt' | Where-Object { $_.LastWriteTime -gt $since };" ^
   "  $hits=@(); foreach($l in $logs){ $hits += (Select-String -Path $l.FullName -Pattern 'MarketSniper' -SimpleMatch -ErrorAction SilentlyContinue) };" ^
-  "  if($hits.Count -eq 0){ Write-Host '      nothing mentioning MarketSniper - usually means it compiled quietly.' -ForegroundColor Green }" ^
+  "  if($hits.Count -eq 0){ if($compiled){ Write-Host '      nothing mentioning MarketSniper - it compiled clean.' -ForegroundColor Green } else { Write-Host '      nothing yet, because it has not been compiled. Check again after opening NinjaTrader.' -ForegroundColor Yellow } }" ^
   "  else { Write-Host ('      ' + $hits.Count + ' mention(s):') -ForegroundColor Yellow; $hits | Select-Object -Last 12 | ForEach-Object { Write-Host ('        ' + $_.Line.Trim()) } } };" ^
   "Write-Host '';" ^
   "Write-Host '   4. IS THE ATI SERVER ON? (needed for the Sniper to send orders)' -ForegroundColor Cyan;" ^

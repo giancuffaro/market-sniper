@@ -2370,6 +2370,18 @@ try:
     check(56, "it resolves Documents the same way the installer does",
           "GetFolderPath('MyDocuments')" in _chk)
 
+    # The log section reported "compiled quietly" in GREEN while section 2 had
+    # just said nothing was compiled at all. Silence is only good news AFTER a
+    # compile has happened; before one it means nothing has been tried.
+    check(56, "the compile verdict is captured once and reused",
+          "$compiled = ($d -ge $newest.AddSeconds(-60));" in _chk)
+    check(56, "an empty log is only green once it HAS compiled",
+          "if($compiled){ Write-Host '      nothing mentioning MarketSniper - it compiled clean.'" in _chk)
+    check(56, "and says to re-check otherwise",
+          "Check again after opening NinjaTrader" in _chk)
+    check(56, "the fix tells you to OPEN NinjaTrader, not to hunt a menu",
+          "it compiles on startup" in _chk)
+
     import subprocess as _sp3
     _sm3 = _sp3.run(["node", "ui_smoke.js", "futures_index.html"], cwd=HERE,
                     capture_output=True, text=True, timeout=60)
