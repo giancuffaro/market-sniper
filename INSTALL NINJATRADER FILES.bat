@@ -41,10 +41,10 @@ if not exist "%NT%" (
   exit /b 1
 )
 
-rem  NinjaTrader recompiles everything in bin\Custom when it STARTS. Copying
-rem  while it is running means the files sit there unread until you compile by
-rem  hand - which is the step that kept going wrong. Closing it first turns
-rem  "copy, then find the right menu" into "copy, then just open NinjaTrader".
+rem  NinjaTrader must be CLOSED: it holds these files open and the copy fails
+rem  otherwise. It does NOT reliably recompile at startup - that was tested and
+rem  the compile timestamp did not move - so a manual Compile in the NinjaScript
+rem  Editor is still needed afterwards. This file does the copying, not that.
 tasklist /fi "imagename eq NinjaTrader.exe" 2>nul | find /i "NinjaTrader.exe" >nul
 if not errorlevel 1 (
   echo   ############################################################

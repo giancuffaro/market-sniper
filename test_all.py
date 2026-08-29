@@ -2286,8 +2286,12 @@ try:
     # removes the manual compile step that kept going wrong.
     check(55, "it refuses to run while NinjaTrader is open",
           "NINJATRADER IS RUNNING" in _b and "tasklist" in _b)
-    check(55, "and explains that startup does the compiling",
-          "compiles them on startup" in _b)
+    # It does NOT compile on startup - measured: G opened NinjaTrader and the
+    # compile timestamp did not move. The installer must not claim otherwise.
+    check(55, "it does not claim a startup compile",
+          "compiles on startup" not in _b and "compiles them when it starts" not in _b)
+    check(55, "and names the one manual step that is needed",
+          "NinjaScript Editor" in _b and "Compile" in _b)
 
     # COPY, never move. A drag within a drive is a move - that is how both .cs
     # files left the repo the first time. This must be re-runnable.
