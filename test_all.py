@@ -1824,7 +1824,8 @@ try:
     _fcm = importlib.reload(_fcm)
     check(47, "the futures ratchet is configured in points",
           "ratchet_points" in _fcm.DEFAULT_SETTINGS)
-    check(47, "and defaults to 10", _fcm.DEFAULT_SETTINGS["ratchet_points"] == 10.0)
+    # 12.5 points on MNQ - G's measured setting. Asserted once, further down,
+    # alongside what it costs.
     check(47, "off by default, like every other auto-exit",
           _fcm.DEFAULT_SETTINGS["ratchet_enabled"] is False)
 
@@ -1908,8 +1909,10 @@ try:
           "}else if(settings.trail_enabled" in _fx)
     check(47, "and says the trail is ignored while it runs",
           "Ignored while the RATCHET above is on" in _fx)
-    check(47, "the points-to-dollars comparison is on screen",
-          "$2 a point" in _fx and "14 points on MNQ" in _fx)
+    # The screen must be explicit that the box is POINTS. "$12.50" reads as
+    # money, and on MNQ that would be 6.25 points - half the intended stop.
+    check(47, "the screen states points, not dollars",
+          "The box is in POINTS" in _fx and "$2 a point" in _fx)
 
     import subprocess as _sp3
     _sm3 = _sp3.run(["node", "ui_smoke.js", "futures_index.html"], cwd=HERE,
