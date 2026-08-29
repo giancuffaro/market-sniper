@@ -1916,6 +1916,38 @@ try:
                     capture_output=True, text=True, timeout=60)
     check(47, "the futures page still runs", _sm3.returncode == 0,
           (_sm3.stdout + _sm3.stderr).strip()[:300])
+
+    # G's measured MNQ system: 12.5 POINTS, stop and step the same number.
+    # The units matter and were ambiguous when he described it - "$12.50" is
+    # 6.25 points on MNQ and 0.625 on NQ, which is two ticks and would be
+    # stopped out by noise instantly. The setting is POINTS.
+    check(47, "the default step is 12.5 points",
+          _fcm.DEFAULT_SETTINGS["ratchet_points"] == 12.5)
+    _f6, _r6 = _run("SHORT", 29800.0, [29800, 29787.50, 29775, 29762.50], step=12.5)
+    _by_peak = {round(x[1]["peak_points"], 2): x[1]["stop_price"] for x in _r6}
+    check(47, "short 29800: opening stop is 29812.50",
+          abs(_r6[0][1]["stop_price"] - 29812.50) < 0.01, str(_r6[0][1]["stop_price"]))
+    check(47, "+12.5 puts the stop at breakeven 29800",
+          abs(_by_peak.get(12.5, 0) - 29800.0) < 0.01, str(_by_peak))
+    check(47, "+25 puts it at 29787.50",
+          abs(_by_peak.get(25.0, 0) - 29787.50) < 0.01, str(_by_peak))
+    check(47, "+37.5 puts it at 29775",
+          abs(_by_peak.get(37.5, 0) - 29775.0) < 0.01, str(_by_peak))
+    # Fractional steps land exactly on the rung; the float fix matters more
+    # here than with whole numbers.
+    check(47, "an exact 12.5 touch is not a rung short",
+          _r6[1][1]["stop_points"] == 0.0, str(_r6[1][1]))
+    # Every stop must be a real tradable price, not something between ticks.
+    for _m, _rr, _h in _r6:
+        _tickd = round(_rr["stop_price"] / _fcm.FUT["MNQ"]["tick"], 6)
+        check(47, "stop %.2f sits on a tick" % _rr["stop_price"],
+              abs(_tickd - round(_tickd)) < 1e-6, str(_rr["stop_price"]))
+    # Sanity on what it costs.
+    check(47, "12.5 points is $25 on MNQ", 12.5 * _fcm.FUT["MNQ"]["point_value"] == 25.0)
+    check(47, "and 50 ticks wide, not 2", 12.5 / _fcm.FUT["MNQ"]["tick"] == 50.0)
+    check(47, "the screen states points, not dollars",
+          "The box is in POINTS" in _fx or "in POINTS" in
+          io.open("futures_index.html", encoding="utf-8").read())
     check(29,"and no premium/time value on the button",
           "% time" not in ix6 and "q.ask.toFixed" not in code6)
 
