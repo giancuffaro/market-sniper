@@ -51,9 +51,8 @@ if not errorlevel 1 (
   echo   #  NINJATRADER IS RUNNING.
   echo   #
   echo   #  Close it completely, then run this file again.
-  echo   #  It compiles these files when it starts, so installing
-  echo   #  while it is closed means there is nothing left to do
-  echo   #  by hand afterwards.
+  echo   #  A file it has open cannot be overwritten, so it has to
+  echo   #  be closed while these are copied in.
   echo   ############################################################
   echo.
   pause
@@ -83,8 +82,12 @@ if "%FAILED%"=="1" (
 echo   ============================================================
 echo     DONE. Both files are in place.
 echo.
-echo     NOW OPEN NINJATRADER 8. It compiles them on startup -
-echo     there is nothing else for you to click.
+echo     NOW OPEN NINJATRADER 8, then compile once:
+echo       New menu  ^>  NinjaScript Editor
+echo       right-click inside the editor  ^>  Compile
+echo.
+echo     ^(NinjaTrader does not reliably compile on startup, so this
+echo      one click is needed. It is the only one.^)
 echo.
 echo     Then they appear like anything built in:
 echo       chart right-click ^> Indicators ^> MarketSniperTrend

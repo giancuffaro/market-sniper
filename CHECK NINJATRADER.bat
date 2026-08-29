@@ -33,7 +33,7 @@ powershell -NoProfile -ExecutionPolicy Bypass -Command ^
   "Write-Host ('      files last changed : ' + $newest);" ^
   "Write-Host ('      last compile       : ' + $d);" ^
   "$compiled = ($d -ge $newest.AddSeconds(-60));" ^
-  "if($compiled){ Write-Host '      YES  compiled after the files were copied.' -ForegroundColor Green } else { Write-Host '      NO   the last compile predates the files.' -ForegroundColor Red; Write-Host '           Open NinjaTrader - it compiles on startup.' -ForegroundColor Yellow };" ^
+  "if($compiled){ Write-Host '      YES  compiled after the files were copied.' -ForegroundColor Green } else { Write-Host '      NO   the last compile predates the files.' -ForegroundColor Red; Write-Host '           In NinjaTrader: New menu > NinjaScript Editor,' -ForegroundColor Yellow; Write-Host '           then right-click inside it > Compile.' -ForegroundColor Yellow };" ^
   "Write-Host '';" ^
   "Write-Host '   3. ANY COMPILE ERRORS IN NINJATRADERS OWN LOG?' -ForegroundColor Cyan;" ^
   "$logdir=Join-Path $nt 'log';" ^

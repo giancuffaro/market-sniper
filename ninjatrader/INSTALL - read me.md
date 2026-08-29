@@ -22,11 +22,16 @@ Documents\NinjaTrader 8\bin\Custom\Strategies\MarketSniperRatchet.cs
    (Ctrl held while dragging also copies.)
    - `MarketSniperTrend.cs` → `Indicators`
    - `MarketSniperRatchet.cs` → `Strategies`
-3. In NinjaTrader, **Control Center → New → NinjaScript Editor**.
-   Use the menu, not F11: function keys only fire when the Control Center has
-   focus, and some laptops need Fn+F11.
+3. In NinjaTrader, **New → NinjaScript Editor**. The "Control Center" is
+   just NinjaTrader's main window — the one with **File / New / Tools** in the
+   menu bar and tabs along the bottom (Orders, Strategies, Log). It is often
+   hidden behind a chart; Alt+Tab to it.
+   Use the menu, not F11: function keys only fire when that window has focus,
+   and some laptops need Fn+F11.
 4. In the editor, **right-click → Compile**. You do not need to open the files
-   — compiling does the whole folder.
+   — compiling does the whole folder. **This step is required.** NinjaTrader 8
+   does not reliably recompile on startup, so copying the files alone is not
+   enough.
 5. The bottom of the editor says "Compile successful" or lists errors.
    Send me the errors if there are any.
 
@@ -121,7 +126,7 @@ This closes both.
 
 ## Installing it
 
-Already done if you copied both files above and pressed F5. To turn it on:
+Already done if you copied both files and compiled once. To turn it on:
 
 1. Control Center → **Strategies** tab → right-click → **New Strategy**.
 2. Pick `MarketSniperRatchet`.

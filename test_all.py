@@ -2379,8 +2379,23 @@ try:
           "if($compiled){ Write-Host '      nothing mentioning MarketSniper - it compiled clean.'" in _chk)
     check(56, "and says to re-check otherwise",
           "Check again after opening NinjaTrader" in _chk)
-    check(56, "the fix tells you to OPEN NinjaTrader, not to hunt a menu",
-          "it compiles on startup" in _chk)
+    # "It compiles on startup" was WRONG - G opened NinjaTrader and the compile
+    # timestamp did not move. NinjaTrader 8 does not reliably recompile at
+    # launch; the editor's Compile is the step that actually does it.
+    check(56, "the checker names the real compile step",
+          "NinjaScript Editor" in _chk and "Compile" in _chk)
+    _inst = io.open(os.path.join(HERE, "INSTALL NINJATRADER FILES.bat"),
+                    encoding="utf-8").read()
+    check(56, "the installer no longer promises a startup compile",
+          "compiles them on startup" not in _inst)
+    check(56, "and tells you the one click that is needed",
+          "NinjaScript Editor" in _inst and "Compile" in _inst)
+    _rm = io.open(os.path.join(HERE, "ninjatrader", "INSTALL - read me.md"),
+                  encoding="utf-8").read()
+    check(56, "the readme says the compile step is required",
+          "This step is required" in _rm)
+    check(56, "and explains what the Control Center actually is",
+          "just NinjaTrader's main window" in _rm)
 
     import subprocess as _sp3
     _sm3 = _sp3.run(["node", "ui_smoke.js", "futures_index.html"], cwd=HERE,
