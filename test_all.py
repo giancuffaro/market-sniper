@@ -2009,6 +2009,38 @@ try:
     check(49, "the long explanations moved to code comments, not deleted",
           "clutter on a screen" in _fx3)
 
+    # --- 50. Futures: on by default, and no SAVE button -------------------
+    # BOTH ON at launch. Neither opens a trade unattended: round entry only
+    # changes HOW a button press is routed (a resting limit instead of a market
+    # order) and the ratchet only manages a position that already exists.
+    # Strategies, which DO fire on their own, stay off.
+    check(50, "round entry is on by default", _fcm.DEFAULT_SETTINGS["round_enabled"] is True)
+    check(50, "the ratchet is on by default", _fcm.DEFAULT_SETTINGS["ratchet_enabled"] is True)
+    check(50, "at 25 and 12.5", _fcm.DEFAULT_SETTINGS["round_step"] == 25.0
+          and _fcm.DEFAULT_SETTINGS["ratchet_points"] == 12.5)
+    check(50, "the browser fallback agrees",
+          "ratchet_enabled:true" in _fx3 and "round_enabled:true" in _fx3)
+    # Strategies must NOT have been switched on with them.
+    _strats_on = [st for st in (_fcm._restore_strategies(None) or []) if st.get("enabled")]
+    check(50, "no strategy is armed by default", not _strats_on, str(_strats_on)[:120])
+
+    # NO SAVE BUTTON. Same as the options screen: nothing half-applied.
+    check(50, "the SAVE button is gone", "FZ.saveSettings()" not in _fx3)
+    check(50, "and CANCEL with it",
+          "CANCEL" not in _fx3.split('<div class="sactions">', 1)[1].split("</div>", 1)[0])
+    check(50, "DONE just closes",
+          'onclick="FZ.closeSettings()">DONE<' in _fx3)
+    check(50, "the entry toggle writes on change",
+          'id="rdE" onchange="FZ.applySettings()"' in _fx3)
+    check(50, "the ratchet toggle writes on change",
+          'id="raE" onchange="FZ.applySettings()"' in _fx3)
+    check(50, "the step box writes on change and on blur",
+          'onchange="FZ.applySettings()" onblur="FZ.applySettings()"' in _fx3)
+    check(50, "applying does NOT close the window",
+          "await api('/api/settings',settings);\n    closeSettings();" not in _fx3)
+    check(50, "there is a SAVED confirmation", 'id="savedTag"' in _fx3)
+    check(50, "and applySettings is exported", "applySettings,hideEvent" in _fx3)
+
     import subprocess as _sp3
     _sm3 = _sp3.run(["node", "ui_smoke.js", "futures_index.html"], cwd=HERE,
                     capture_output=True, text=True, timeout=60)
@@ -2095,7 +2127,7 @@ print("\n"+"="*68)
 by={}
 for sc,name,ok,_ in results:
     by.setdefault(sc,[0,0]); by[sc][0]+=1; by[sc][1]+= (1 if ok else 0)
-T={49:"Toggles + short hints",48:"Futures config stripped",47:"Futures ratchet",46:"NinjaScript in step",45:"Breadth + VIX",44:"Entry telemetry",43:"Trend module",42:"Audio cues",41:"Volatility gauges",40:"Volume gauge",39:"Dwell time",38:"Velocity vs feed artifacts",37:"Desktop icon",36:"Trade log detail",35:"Time value warns not blocks",34:"LOCK/X gone, size warns",33:"Page actually runs",32:"No SAVE / live trade frozen",31:"One switch / still modal",30:"Directional entry levels",29:"Percent only, no cash",28:"Grid/ATM/quality/one-armed",27:"Config screen cleanup",26:"Ratchet stop",25:"Console auto-hide",24:"Options auto-reconcile",23:"Daily trade log",22:"Options phantom clear",21:"Auto-reconcile w/ broker",20:"MY CONFIG always on",19:"Phantom position",18:"Futures hours",17:"Closed market honest",16:"Restart leaves no spinner",15:"One tab only",14:"Git lock self-heal",13:"Broker tabs + tray",12:"Velocity honest when shut",11:"Multi-broker sessions",1:"Futures login survives restart",2:"remember_login default",3:"Options profiles to disk",
+T={50:"Futures on by default",49:"Toggles + short hints",48:"Futures config stripped",47:"Futures ratchet",46:"NinjaScript in step",45:"Breadth + VIX",44:"Entry telemetry",43:"Trend module",42:"Audio cues",41:"Volatility gauges",40:"Volume gauge",39:"Dwell time",38:"Velocity vs feed artifacts",37:"Desktop icon",36:"Trade log detail",35:"Time value warns not blocks",34:"LOCK/X gone, size warns",33:"Page actually runs",32:"No SAVE / live trade frozen",31:"One switch / still modal",30:"Directional entry levels",29:"Percent only, no cash",28:"Grid/ATM/quality/one-armed",27:"Config screen cleanup",26:"Ratchet stop",25:"Console auto-hide",24:"Options auto-reconcile",23:"Daily trade log",22:"Options phantom clear",21:"Auto-reconcile w/ broker",20:"MY CONFIG always on",19:"Phantom position",18:"Futures hours",17:"Closed market honest",16:"Restart leaves no spinner",15:"One tab only",14:"Git lock self-heal",13:"Broker tabs + tray",12:"Velocity honest when shut",11:"Multi-broker sessions",1:"Futures login survives restart",2:"remember_login default",3:"Options profiles to disk",
    4:"Browser autofill guard",5:"ITM3 strike math",6:"Preview == Arm",7:"Live-only / dead modes",
    8:"Auto-sync safety",9:"Endpoints alive",10:"UI integrity"}
 for sc in sorted(by):
