@@ -2296,7 +2296,11 @@ try:
     # COPY, never move. A drag within a drive is a move - that is how both .cs
     # files left the repo the first time. This must be re-runnable.
     check(55, "it copies", "copy /y" in _b)
-    check(55, "it never moves", " move " not in _b.lower())
+    # Look for the MOVE COMMAND, not the English word - a comment saying "the
+    # timestamp did not move" is not a file operation.
+    _movecmd = [l for l in _b.splitlines()
+                if re.match(r"\s*(move|robocopy .*\/mov)\b", l.strip(), re.I)]
+    check(55, "it never moves", not _movecmd, str(_movecmd)[:120])
     check(55, "it says so when the source is missing, and why",
           "a drag within the same drive is a move" in _b.lower()
           or "MOVED it" in _b)
