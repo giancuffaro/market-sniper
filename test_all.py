@@ -2048,6 +2048,29 @@ try:
     check(50, "there is a SAVED confirmation", 'id="savedTag"' in _fx3)
     check(50, "and applySettings is exported", "applySettings,hideEvent" in _fx3)
 
+    # --- 51. Futures header cleaned, footer names the book ----------------
+    _fx4 = io.open("futures_index.html", encoding="utf-8").read()
+    check(51, "the lock-out button is gone", "FZ.lockAll()" not in _fx4)
+    check(51, "the quit X is gone", "FZ.quitApp()" not in _fx4)
+    # Closing the browser tab is the way out now, and that already stops the
+    # servers via the launcher window - so nothing is orphaned by removing it.
+    check(51, "the in-trade lockdown still exists", "function lockdown(" in _fx4)
+
+    # The footer must say WHICH book, not just its code. Webull labels a
+    # futures account "MARGIN" under account_type, so the class/label is read
+    # instead and FUTURES is the fallback - every route in this app is futures.
+    check(51, "the footer shows the account class", "(r.account_type||'FUTURES')" in _fx4)
+    check(51, "in parentheses beside the code", "+' ('+book+') — REAL MONEY" in _fx4)
+    check(51, "on the other brokers too", "+' ('+book+') — REAL ORDERS" in _fx4)
+    _fsrc2 = io.open("futures_client.py", encoding="utf-8").read()
+    check(51, "the server sends it", '"account_type": getattr(self, "account_type", None)' in _fsrc2)
+    check(51, "and it defaults to FUTURES rather than blank", 'or "FUTURES",' in _fsrc2)
+    check(51, "the broker's own label is captured at connect",
+          'self.account_type = ("FUTURES" if "FUTURE" in marker' in _fsrc2)
+    _st51 = _fcm.make_session("TOPSTEP").state()
+    check(51, "state carries account_type", _st51.get("account_type") == "FUTURES",
+          str(_st51.get("account_type")))
+
     import subprocess as _sp3
     _sm3 = _sp3.run(["node", "ui_smoke.js", "futures_index.html"], cwd=HERE,
                     capture_output=True, text=True, timeout=60)
@@ -2134,7 +2157,7 @@ print("\n"+"="*68)
 by={}
 for sc,name,ok,_ in results:
     by.setdefault(sc,[0,0]); by[sc][0]+=1; by[sc][1]+= (1 if ok else 0)
-T={50:"Futures on by default",49:"Toggles + short hints",48:"Futures config stripped",47:"Futures ratchet",46:"NinjaScript in step",45:"Breadth + VIX",44:"Entry telemetry",43:"Trend module",42:"Audio cues",41:"Volatility gauges",40:"Volume gauge",39:"Dwell time",38:"Velocity vs feed artifacts",37:"Desktop icon",36:"Trade log detail",35:"Time value warns not blocks",34:"LOCK/X gone, size warns",33:"Page actually runs",32:"No SAVE / live trade frozen",31:"One switch / still modal",30:"Directional entry levels",29:"Percent only, no cash",28:"Grid/ATM/quality/one-armed",27:"Config screen cleanup",26:"Ratchet stop",25:"Console auto-hide",24:"Options auto-reconcile",23:"Daily trade log",22:"Options phantom clear",21:"Auto-reconcile w/ broker",20:"MY CONFIG always on",19:"Phantom position",18:"Futures hours",17:"Closed market honest",16:"Restart leaves no spinner",15:"One tab only",14:"Git lock self-heal",13:"Broker tabs + tray",12:"Velocity honest when shut",11:"Multi-broker sessions",1:"Futures login survives restart",2:"remember_login default",3:"Options profiles to disk",
+T={51:"Futures header + footer",50:"Futures on by default",49:"Toggles + short hints",48:"Futures config stripped",47:"Futures ratchet",46:"NinjaScript in step",45:"Breadth + VIX",44:"Entry telemetry",43:"Trend module",42:"Audio cues",41:"Volatility gauges",40:"Volume gauge",39:"Dwell time",38:"Velocity vs feed artifacts",37:"Desktop icon",36:"Trade log detail",35:"Time value warns not blocks",34:"LOCK/X gone, size warns",33:"Page actually runs",32:"No SAVE / live trade frozen",31:"One switch / still modal",30:"Directional entry levels",29:"Percent only, no cash",28:"Grid/ATM/quality/one-armed",27:"Config screen cleanup",26:"Ratchet stop",25:"Console auto-hide",24:"Options auto-reconcile",23:"Daily trade log",22:"Options phantom clear",21:"Auto-reconcile w/ broker",20:"MY CONFIG always on",19:"Phantom position",18:"Futures hours",17:"Closed market honest",16:"Restart leaves no spinner",15:"One tab only",14:"Git lock self-heal",13:"Broker tabs + tray",12:"Velocity honest when shut",11:"Multi-broker sessions",1:"Futures login survives restart",2:"remember_login default",3:"Options profiles to disk",
    4:"Browser autofill guard",5:"ITM3 strike math",6:"Preview == Arm",7:"Live-only / dead modes",
    8:"Auto-sync safety",9:"Endpoints alive",10:"UI integrity"}
 for sc in sorted(by):
