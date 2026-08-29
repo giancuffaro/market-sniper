@@ -446,20 +446,24 @@
       <div class="sgroup mine">
         <div class="glbl">★ RATCHET (points)</div>
         <div class="srow"><label><input type="checkbox" id="raE"> ON</label>
-          <input type="number" id="raV" min="0.25" step="0.25" placeholder="10"></div>
+          <input type="number" id="raV" min="0.25" step="0.25" placeholder="12.5"></div>
         <div class="shint">The same system as the options side, in points instead of percent.
         The stop climbs a rung at a time and <b>never comes back down</b>, always sitting
         <b>one step below the best you have seen</b>.<br><br>
-        MNQ LONG from 23000 with a 10-point step:<br>
-        open → stop <b>22990</b> · touch +10 → <b>breakeven</b> · touch +20 → <b>23010</b> ·
-        touch +30 → <b>23020</b> … no cap.<br><br>
+        <b>MNQ SHORT from 29800 with a 12.5-point step</b> — stop and step are the
+        same number, one unit of risk per rung:<br>
+        open → stop <b>29812.50</b> · touch <b>29787.50</b> (+12.5) → stop to
+        <b>breakeven 29800</b> · touch <b>29775</b> (+25) → stop <b>29787.50</b> ·
+        touch <b>29762.50</b> (+37.5) → stop <b>29775</b> … no cap.<br>
+        LONG mirrors it. 12.5 points on MNQ is $25 a contract and 50 ticks, so it
+        sits clear of the noise that stops out a 1–2 tick trail.<br><br>
         <b>This replaces the trailing stop and the take-profit while it is on.</b> A trailing
         stop slides on every tick and gets shaken out by noise; the ratchet only moves when a
         whole rung is taken. A take-profit alongside it would close the trade at the exact
         moment the ratchet is trying to let it run.<br><br>
-        <b>Matching your options risk:</b> MNQ is $2 a point, MES is $5. A 10% stop on a
-        $2.75 option risks about $27.50 a contract — that is <b>≈14 points on MNQ</b> or
-        <b>≈5.5 on MES</b>.</div>
+        <b>Points, not dollars.</b> MNQ is $2 a point and $0.50 a tick, MES is $5 and
+        $1.25. "$12.50" would be 6.25 points on MNQ and only 0.625 on NQ — two ticks,
+        which noise would take out immediately. The box is in POINTS.</div>
       </div>
 
       <div class="sgroup">

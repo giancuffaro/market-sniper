@@ -57,7 +57,11 @@ DEFAULT_SETTINGS = {
     # This REPLACES trail_points when it is on. The old trailing stop slides
     # continuously - best minus five, moving on every tick - which is a
     # different instrument and gets shaken out by noise the ratchet ignores.
-    "ratchet_enabled": False, "ratchet_points": 10.0,
+    # 12.50 points on MNQ is G's measured setting: $25 risk a contract, and
+    # 50 ticks, so it sits well clear of the noise a 1-2 tick stop lives in.
+    # Stop AND step are the same number by design - one unit of risk per rung,
+    # exactly the shape of the options ratchet.
+    "ratchet_enabled": False, "ratchet_points": 12.5,
     "round_enabled": False, "round_step": 50.0,
 }
 
