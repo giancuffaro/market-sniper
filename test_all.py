@@ -2077,6 +2077,51 @@ try:
     check(51, "state carries account_type", _st51.get("account_type") == "FUTURES",
           str(_st51.get("account_type")))
 
+    # --- 52. NinjaTrader: catch the silent failure ------------------------
+    # The link is one-way, so the app normally cannot tell a delivered order
+    # from a lost one. But NinjaTrader DELETES an order-instruction file once
+    # it reads it - and that one fact catches the two ways an order vanishes
+    # with no error anywhere: the ATI server switched off, or the wrong folder.
+    import tempfile as _tf4, os as _os4
+    _d4 = _tf4.mkdtemp(prefix="nt_oif")
+    _nt = _fcm.NinjaTraderSession("NINJA")
+    _nt.folder = _d4; _nt.account = "Sim101"; _nt._oif_n = 0
+    _pth = _nt._write_oif("PLACE;Sim101;BUY;1;MNQ 12-26;MARKET;;;DAY;;msid;;;")
+    check(52, "the order file is written", _os4.path.exists(_pth))
+    check(52, "immediately after, the verdict is 'too early'", _nt.oif_pickup() is None)
+    # Still sitting there after the grace period: nothing is watching.
+    _nt._pending_oif = (_pth, time.time() - 5)
+    check(52, "a file left behind reports NOT picked up", _nt.oif_pickup() is False)
+    _st52 = _nt.state()
+    check(52, "and the warning reaches the screen",
+          "ninja_warning" in _st52 and "DID NOT REACH THE BROKER" in _st52["ninja_warning"],
+          str(_st52.get("ninja_warning"))[:80])
+    check(52, "it names both causes",
+          "ATI server is off" in _st52["ninja_warning"] and "folder path" in _st52["ninja_warning"])
+    # Consumed: no warning.
+    _os4.remove(_pth)
+    check(52, "once NinjaTrader takes it, the check passes", _nt.oif_pickup() is True)
+    check(52, "and it clears rather than latching", _nt.oif_pickup() is None)
+    check(52, "no warning on a clean state", "ninja_warning" not in _nt.state())
+    # The grace period must be long enough that a healthy pickup is never
+    # called a failure, and short enough to be useful.
+    check(52, "the grace period is sane", 2.0 <= _nt.OIF_PICKUP_SECONDS <= 10.0,
+          str(_nt.OIF_PICKUP_SECONDS))
+
+    _fx5 = io.open("futures_index.html", encoding="utf-8").read()
+    check(52, "the screen renders the warning", 'id="ninjaWarn"' in _fx5
+          and "paintNinjaWarning(st)" in _fx5)
+    # The one failure this CANNOT catch must be stated on the connect screen:
+    # a mistyped account name is consumed and dropped by NinjaTrader.
+    check(52, "the connect screen warns about a mistyped account",
+          "does not error" in _fx5 and "silently never exists" in _fx5)
+    check(52, "and says to test with one micro first", "one micro contract" in _fx5)
+    check(52, "the ATI steps are on screen", "Enable ATI server" in _fx5)
+    check(52, "it is honest that there is no login here", "no key, no password" in _fx5)
+    _fsrc3 = io.open("futures_client.py", encoding="utf-8").read()
+    check(52, "the limit of the check is documented, not glossed over",
+          "does NOT catch a mistyped ACCOUNT name" in _fsrc3)
+
     import subprocess as _sp3
     _sm3 = _sp3.run(["node", "ui_smoke.js", "futures_index.html"], cwd=HERE,
                     capture_output=True, text=True, timeout=60)
@@ -2163,7 +2208,7 @@ print("\n"+"="*68)
 by={}
 for sc,name,ok,_ in results:
     by.setdefault(sc,[0,0]); by[sc][0]+=1; by[sc][1]+= (1 if ok else 0)
-T={51:"Futures header + footer",50:"Futures on by default",49:"Toggles + short hints",48:"Futures config stripped",47:"Futures ratchet",46:"NinjaScript in step",45:"Breadth + VIX",44:"Entry telemetry",43:"Trend module",42:"Audio cues",41:"Volatility gauges",40:"Volume gauge",39:"Dwell time",38:"Velocity vs feed artifacts",37:"Desktop icon",36:"Trade log detail",35:"Time value warns not blocks",34:"LOCK/X gone, size warns",33:"Page actually runs",32:"No SAVE / live trade frozen",31:"One switch / still modal",30:"Directional entry levels",29:"Percent only, no cash",28:"Grid/ATM/quality/one-armed",27:"Config screen cleanup",26:"Ratchet stop",25:"Console auto-hide",24:"Options auto-reconcile",23:"Daily trade log",22:"Options phantom clear",21:"Auto-reconcile w/ broker",20:"MY CONFIG always on",19:"Phantom position",18:"Futures hours",17:"Closed market honest",16:"Restart leaves no spinner",15:"One tab only",14:"Git lock self-heal",13:"Broker tabs + tray",12:"Velocity honest when shut",11:"Multi-broker sessions",1:"Futures login survives restart",2:"remember_login default",3:"Options profiles to disk",
+T={52:"NinjaTrader delivery check",51:"Futures header + footer",50:"Futures on by default",49:"Toggles + short hints",48:"Futures config stripped",47:"Futures ratchet",46:"NinjaScript in step",45:"Breadth + VIX",44:"Entry telemetry",43:"Trend module",42:"Audio cues",41:"Volatility gauges",40:"Volume gauge",39:"Dwell time",38:"Velocity vs feed artifacts",37:"Desktop icon",36:"Trade log detail",35:"Time value warns not blocks",34:"LOCK/X gone, size warns",33:"Page actually runs",32:"No SAVE / live trade frozen",31:"One switch / still modal",30:"Directional entry levels",29:"Percent only, no cash",28:"Grid/ATM/quality/one-armed",27:"Config screen cleanup",26:"Ratchet stop",25:"Console auto-hide",24:"Options auto-reconcile",23:"Daily trade log",22:"Options phantom clear",21:"Auto-reconcile w/ broker",20:"MY CONFIG always on",19:"Phantom position",18:"Futures hours",17:"Closed market honest",16:"Restart leaves no spinner",15:"One tab only",14:"Git lock self-heal",13:"Broker tabs + tray",12:"Velocity honest when shut",11:"Multi-broker sessions",1:"Futures login survives restart",2:"remember_login default",3:"Options profiles to disk",
    4:"Browser autofill guard",5:"ITM3 strike math",6:"Preview == Arm",7:"Live-only / dead modes",
    8:"Auto-sync safety",9:"Endpoints alive",10:"UI integrity"}
 for sc in sorted(by):

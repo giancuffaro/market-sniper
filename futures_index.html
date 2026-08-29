@@ -971,6 +971,7 @@ const FZ = (function(){
       return `<div class="trow"><span>${t.time}</span><span class="s">&nbsp;${t.desc}</span>
         <span>${t.move}${sub}</span><span class="pl ${up?'up':'dn'}">&nbsp;${up?'+':'−'}$${Math.abs(t.pnl).toFixed(2)}</span></div>`;
     }).join('');
+    paintNinjaWarning(st);
     const pos=st.position, armed=st.armed; inTrade=!!pos;
     lockdown(inTrade, !!armed);
     if(armed && !pos){
