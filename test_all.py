@@ -475,7 +475,11 @@ try:
     ph.position = {"symbol":"MNQ","side":"LONG","qty":1,"entry":23150.0,
                    "mark":23144.0,"best":23160.0,"pnl":-12.0}
     ph.settings.update({"sl_enabled":True,"sl_points":5.0})
-    check(19,"a phantom WOULD have fired a bracket", ph._bracket_hit()=="SL")
+    # Any exit will do. The point is that SOMETHING would have fired against a
+    # position the broker says you do not hold - which exit answers first (the
+    # ratchet now, being on by default) is not what this scenario is about.
+    check(19,"a phantom WOULD have fired a bracket", ph._bracket_hit() is not None,
+          str(ph._bracket_hit()))
     r_=ph.forget_position()
     check(19,"forget clears it", r_["cleared"] is True and ph.position is None)
     check(19,"nothing can fire afterwards", ph._bracket_hit() is None)
@@ -1826,8 +1830,8 @@ try:
           "ratchet_points" in _fcm.DEFAULT_SETTINGS)
     # 12.5 points on MNQ - G's measured setting. Asserted once, further down,
     # alongside what it costs.
-    check(47, "off by default, like every other auto-exit",
-          _fcm.DEFAULT_SETTINGS["ratchet_enabled"] is False)
+    # ON by default - see scenario 50 for why that is safe: it manages a
+    # position, it never opens one.
 
     class _FR(_fcm.BaseFuturesSession):
         def __init__(self):

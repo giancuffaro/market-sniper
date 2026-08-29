@@ -526,7 +526,7 @@ const FZ = (function(){
   let marketClosed=false;
   let mode="WEBULL", sym="MNQ", qty=1, inTrade=false, poll=null, priceTimer=null, trendTimer=null, velTimer=null;
   let settings={tp_enabled:false,tp_points:10,sl_enabled:false,sl_points:5,trail_enabled:false,trail_points:5,
-                ratchet_enabled:false,ratchet_points:10,
+                ratchet_enabled:true,ratchet_points:12.5,
                 round_enabled:true,round_step:25};
   let prefs={}, prefsReady=false, prefsLoaded=null;
   const $=id=>document.getElementById(id);
