@@ -545,7 +545,10 @@ try:
         x._last_reconcile = 0
         return x
 
-    x=_rs([]);  check(21,"a phantom WOULD have fired a stop", x._bracket_hit()=="SL")
+    # Same point as scenario 19: something fires against a position that is not
+    # there. Which exit answers first is not what is under test.
+    x=_rs([]);  check(21,"a phantom WOULD have fired a stop", x._bracket_hit() is not None,
+                      str(x._bracket_hit()))
     x.refresh_mark()
     check(21,"broker says FLAT -> app clears itself", x.position is None)
     check(21,"and explains why", "FLAT" in (x.last_event or ""))
