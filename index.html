@@ -52,7 +52,7 @@
     font-family:var(--ui);font-size:16px;padding:14px;outline:none}
   .livewarn{border:1px solid var(--amber);border-radius:10px;background:var(--panel2);color:var(--amber);
     padding:12px 14px;margin-bottom:16px;font-size:12px;letter-spacing:.04em;line-height:1.5}
-  .remember{display:flex;align-items:center;gap:9px;margin:4px 2px 16px;color:var(--dim);font-size:12.5px;cursor:pointer}
+  .remember{display:flex;align-items:center;gap:9px;display:flex;align-items:center;gap:9px;margin:4px 2px 16px;color:var(--dim);font-size:12.5px;cursor:pointer}
   .remember input{width:16px;height:16px;accent-color:var(--green)}
   .connect .go{width:100%;border:0;border-radius:12px;padding:18px 0;background:var(--green-btn);color:#fff;
     font-family:var(--ui);font-weight:800;font-size:18.5px;letter-spacing:.08em;cursor:pointer;margin-top:2px}
@@ -345,8 +345,8 @@
     <div class="field"><label>SECRET</label>
       <input id="appSecret" type="password" autocomplete="off" spellcheck="false" placeholder="paste your secret"></div>
 
-    <label class="remember"><input type="checkbox" id="remember" checked> Remember my accounts and keys on this PC</label>
-    <label class="remember"><input type="checkbox" id="showSecrets" checked> Show keys instead of dots</label>
+    <label class="remember"><span class="sw"><input type="checkbox" id="remember" checked><i></i></span> Remember my accounts and keys on this PC</label>
+    <label class="remember"><span class="sw"><input type="checkbox" id="showSecrets" checked><i></i></span> Show keys instead of dots</label>
     <button class="go" id="connectBtn">CONNECT</button>
 
     <!-- shown when one key exposes multiple accounts -->

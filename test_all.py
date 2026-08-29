@@ -1956,8 +1956,45 @@ try:
     check(48, "the ratchet is armed on every futures position",
           _fsrc.count('"ratchet_on": True,') >= 3,
           str(_fsrc.count('"ratchet_on": True,')))
-    check(48, "the screen says the ratchet owns the exit after a fill",
-          "RATCHET below owns the exit" in _cfg2)
+    # (that long paragraph was cut - the hints are one line now, checked below)
+
+    # --- 49. Toggles everywhere, short hints, no pointless picker --------
+    _fx3 = io.open("futures_index.html", encoding="utf-8").read()
+    _ix3 = io.open("index.html", encoding="utf-8").read()
+    _cfg3 = _fx3.split('id="paneConfig"', 1)[1].split("/paneConfig", 1)[0]
+
+    # TOGGLES, never checkboxes. Standing rule from here on.
+    check(49, "the futures page has the toggle styling", ".sw input:checked + i" in _fx3)
+    for _id in ("rdE", "raE", "rememberLogin", "showSecrets"):
+        _seg = _fx3.split('id="%s"' % _id, 1)[0][-90:]
+        check(49, "%s is a toggle, not a bare checkbox" % _id, 'class="sw"' in _seg, _seg[-60:])
+    check(49, "strategy cards use a toggle too",
+          '<span class="sw"><input type="checkbox" ${s.enabled' in _fx3)
+    check(49, "the options login uses toggles as well",
+          '<span class="sw"><input type="checkbox" id="remember"' in _ix3 and
+          '<span class="sw"><input type="checkbox" id="showSecrets"' in _ix3)
+    _bare = [l for l in _fx3.splitlines()
+             if 'type="checkbox"' in l and 'class="sw"' not in l and "hidden" not in l]
+    check(49, "no bare checkboxes left on the futures screen", not _bare, str(_bare)[:160])
+
+    # THE PICKER IS GONE. 25 is the level G trades; a choice he will never
+    # change is clutter on a screen he reads with money on.
+    check(49, "the round-step dropdown is gone",
+          "every 50 points" not in _fx3 and "<select id=\"rdV\"" not in _fx3)
+    check(49, "but rdV survives, because the save path reads it by id",
+          'id="rdV"' in _fx3 and 'value="25"' in _fx3)
+    check(49, "and it still saves as 25",
+          "round_step:parseFloat($('rdV').value)||25" in _fx3)
+
+    # SHORT HINTS. These were ~700 and ~900 characters.
+    import re as _re2
+    _hints = _re2.findall(r'<div class="shint">(.*?)</div>', _cfg3, _re2.S)
+    check(49, "the config pane has exactly two hints", len(_hints) == 2, str(len(_hints)))
+    for _h in _hints:
+        _n = len(" ".join(_h.split()))
+        check(49, "a hint is one line (%d chars)" % _n, _n <= 130, _h[:80])
+    check(49, "the long explanations moved to code comments, not deleted",
+          "clutter on a screen" in _fx3)
 
     import subprocess as _sp3
     _sm3 = _sp3.run(["node", "ui_smoke.js", "futures_index.html"], cwd=HERE,
@@ -2048,7 +2085,7 @@ print("\n"+"="*68)
 by={}
 for sc,name,ok,_ in results:
     by.setdefault(sc,[0,0]); by[sc][0]+=1; by[sc][1]+= (1 if ok else 0)
-T={48:"Futures config stripped",47:"Futures ratchet",46:"NinjaScript in step",45:"Breadth + VIX",44:"Entry telemetry",43:"Trend module",42:"Audio cues",41:"Volatility gauges",40:"Volume gauge",39:"Dwell time",38:"Velocity vs feed artifacts",37:"Desktop icon",36:"Trade log detail",35:"Time value warns not blocks",34:"LOCK/X gone, size warns",33:"Page actually runs",32:"No SAVE / live trade frozen",31:"One switch / still modal",30:"Directional entry levels",29:"Percent only, no cash",28:"Grid/ATM/quality/one-armed",27:"Config screen cleanup",26:"Ratchet stop",25:"Console auto-hide",24:"Options auto-reconcile",23:"Daily trade log",22:"Options phantom clear",21:"Auto-reconcile w/ broker",20:"MY CONFIG always on",19:"Phantom position",18:"Futures hours",17:"Closed market honest",16:"Restart leaves no spinner",15:"One tab only",14:"Git lock self-heal",13:"Broker tabs + tray",12:"Velocity honest when shut",11:"Multi-broker sessions",1:"Futures login survives restart",2:"remember_login default",3:"Options profiles to disk",
+T={49:"Toggles + short hints",48:"Futures config stripped",47:"Futures ratchet",46:"NinjaScript in step",45:"Breadth + VIX",44:"Entry telemetry",43:"Trend module",42:"Audio cues",41:"Volatility gauges",40:"Volume gauge",39:"Dwell time",38:"Velocity vs feed artifacts",37:"Desktop icon",36:"Trade log detail",35:"Time value warns not blocks",34:"LOCK/X gone, size warns",33:"Page actually runs",32:"No SAVE / live trade frozen",31:"One switch / still modal",30:"Directional entry levels",29:"Percent only, no cash",28:"Grid/ATM/quality/one-armed",27:"Config screen cleanup",26:"Ratchet stop",25:"Console auto-hide",24:"Options auto-reconcile",23:"Daily trade log",22:"Options phantom clear",21:"Auto-reconcile w/ broker",20:"MY CONFIG always on",19:"Phantom position",18:"Futures hours",17:"Closed market honest",16:"Restart leaves no spinner",15:"One tab only",14:"Git lock self-heal",13:"Broker tabs + tray",12:"Velocity honest when shut",11:"Multi-broker sessions",1:"Futures login survives restart",2:"remember_login default",3:"Options profiles to disk",
    4:"Browser autofill guard",5:"ITM3 strike math",6:"Preview == Arm",7:"Live-only / dead modes",
    8:"Auto-sync safety",9:"Endpoints alive",10:"UI integrity"}
 for sc in sorted(by):
