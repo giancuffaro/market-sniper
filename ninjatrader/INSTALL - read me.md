@@ -79,3 +79,77 @@ The thresholds are duplicated in `trend.py` and in the `.cs` file, because
 NinjaScript can't call Python. **If you change one, change the other** — the
 constants are at the top of both files under the same names. Two copies of a
 number drift apart unless someone is deliberate about it.
+
+
+---
+
+# MarketSniperRatchet — the ratchet, running inside NinjaTrader
+
+Same rungs as the futures app, but the stop is a **real order at the
+exchange**. It survives Market Sniper being closed, the browser being closed,
+and the laptop going to sleep.
+
+## Why you want this
+
+The Sniper's link to NinjaTrader is one-way — it fires order files and hears
+nothing back. So the ratchet ran *in the app*, on a one-second poll, and only
+while the app was open. That leaves two real holes:
+
+- a limit resting overnight can fill at Sunday's 18:00 ET reopen with nothing
+  managing it
+- closing the laptop mid-trade leaves the position unprotected
+
+This closes both.
+
+## Installing it
+
+Same as the indicator, but under **Strategies**:
+
+1. **F11** → NinjaScript Editor.
+2. Right-click **Strategies → New Strategy**, click through, name it anything.
+3. Replace the contents with `MarketSniperRatchet.cs`, press **F5**.
+4. Control Center → **Strategies** tab → right-click → **New Strategy** →
+   `MarketSniperRatchet`.
+5. Set **Account**, **Instrument** (MNQ), and **Step (points)** = `12.5`.
+6. **Start behavior must be `Adopt account position`.** It's the default in the
+   code, but check it — without it the strategy ignores any position it didn't
+   open itself, which is every position, because it never opens one.
+7. Tick **Enabled**.
+
+## What it does, and only this
+
+**It never enters a trade.** It watches whatever the account already holds —
+opened by hand, by the Sniper, by anything — and keeps a stop behind it:
+
+| best excursion | stop sits at |
+|---|---|
+| 0 | entry − 12.5 |
+| +12.5 | breakeven |
+| +25 | entry + 12.5 |
+| +37.5 | entry + 25 |
+
+The stop only moves in your favour. Never widened, never pulled back, never
+cancelled while you're in.
+
+## Three things it protects against
+
+- **A stop through the market** would be rejected and leave you with *no* stop
+  — worse than the one it replaced. It skips the move and retries next tick.
+- **Amend spam.** It only sends when the price actually changes.
+- **Carrying state between trades.** Going flat resets the peak, so the next
+  trade's stop isn't set from the last trade's high.
+
+## Keeping it honest
+
+`StepPoints` here and `ratchet_points` in `futures_client.py` are the same
+number in two places, because NinjaScript can't call Python. **Change one,
+change the other.** The test suite compares the rung maths of both against the
+same price sequence and fails if they ever disagree.
+
+## While both are running
+
+If the Sniper is open *and* this strategy is enabled, both will try to manage
+the exit. They compute the identical stop, so they agree — but you'll get two
+close attempts. **Pick one:** either switch the ratchet off in the Sniper's
+futures CONFIGURATION and let NinjaTrader own the exit, or leave this strategy
+disabled and let the app own it. NinjaTrader owning it is the safer choice.

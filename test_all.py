@@ -2170,6 +2170,72 @@ try:
           _fasrc.count('@app.post("/api/disconnect")') == 1,
           str(_fasrc.count('@app.post("/api/disconnect")')))
 
+    # --- 54. The ratchet, ported into NinjaTrader -------------------------
+    # Same rungs, but a REAL stop order at the exchange - so it survives the
+    # app, the browser and the machine sleeping. Duplicated logic drifts, so
+    # the two are compared on the same price sequence rather than trusted.
+    _rc_path = os.path.join(HERE, "ninjatrader", "MarketSniperRatchet.cs")
+    check(54, "the strategy exists", os.path.exists(_rc_path))
+    _rc = io.open(_rc_path, encoding="utf-8").read() if os.path.exists(_rc_path) else ""
+
+    import math as _m2
+
+    def _cs_stop(entry, last, peak, step, is_long, tick=0.25):
+        """The C# arithmetic, transcribed line for line."""
+        pts = (last - entry) if is_long else (entry - last)
+        peak = max(peak, pts)
+        rung = _m2.floor(peak / step + 1e-9) * step
+        stop_pts = rung - step
+        raw = entry + stop_pts if is_long else entry - stop_pts
+        return peak, round(round(raw / tick) * tick, 2)
+
+    class _RB(_fcm.BaseFuturesSession):
+        def __init__(self):
+            self.settings = dict(_fcm.DEFAULT_SETTINGS); self.position = None; self.mode = "T"
+        def _points_pnl(self):
+            p = self.position
+            return (p["mark"] - p["entry"]) * (1 if p["side"] == "LONG" else -1)
+
+    for _side, _long, _seq in (("SHORT", False, [29800, 29787.5, 29775, 29762.5, 29770]),
+                               ("LONG", True, [29800, 29812.5, 29825, 29837.5, 29830])):
+        _rb = _RB()
+        _rb.settings.update({"ratchet_enabled": True, "ratchet_points": 12.5})
+        _rb.position = {"symbol": "MNQ", "side": _side, "qty": 1, "entry": 29800.0,
+                        "mark": 29800.0, "ratchet_on": True, "ratchet_step": 12.5}
+        _pk = 0.0
+        for _m in _seq:
+            _rb.position["mark"] = float(_m)
+            _rb._update_ratchet()
+            _py = _rb.position["ratchet"]["stop_price"]
+            _pk, _cs = _cs_stop(29800.0, float(_m), _pk, 12.5, _long)
+            check(54, "%s at %.2f: python and C# agree on %.2f" % (_side, _m, _py),
+                  abs(_py - _cs) < 1e-9, "py=%s cs=%s" % (_py, _cs))
+
+    check(54, "the step defaults to 12.5, as in futures_client",
+          "StepPoints  = 12.5;" in _rc and _fcm.DEFAULT_SETTINGS["ratchet_points"] == 12.5)
+    check(54, "the same float guard is carried across", "1e-9" in _rc)
+    check(54, "prices are snapped to the tick", "RoundToTickSize" in _rc)
+    # It must adopt a position it did not open, or it does nothing at all -
+    # it never enters, so every position is one it did not open.
+    check(54, "it adopts the account position",
+          "StartBehavior.AdoptAccountPosition" in _rc and "IsAdoptAccountPositionAware = true" in _rc)
+    check(54, "it never enters a trade",
+          "EnterLong" not in _rc and "EnterShort" not in _rc)
+    check(54, "it only ever sets a stop", "SetStopLoss" in _rc)
+    # A stop already through the market is rejected, leaving NO stop - worse
+    # than the one being replaced.
+    check(54, "a stop through the market is skipped, not sent",
+          "stopPrice >= last) return" in _rc and "stopPrice <= last) return" in _rc)
+    check(54, "the stop never moves against you",
+          "stopPrice <= lastStopPrice) return" in _rc and "stopPrice >= lastStopPrice) return" in _rc)
+    # Peak must reset, or the next trade inherits the last one's high-water mark.
+    check(54, "going flat clears the peak", "peakPoints    = 0;" in _rc)
+    check(54, "and so does a change of size", "Position.Quantity != lastQty" in _rc)
+    check(54, "it runs on every tick, not on bar close", "Calculate.OnEachTick" in _rc)
+    check(54, "the double-management risk is written down",
+          "Pick one:" in io.open(os.path.join(HERE, "ninjatrader", "INSTALL - read me.md"),
+                                 encoding="utf-8").read())
+
     import subprocess as _sp3
     _sm3 = _sp3.run(["node", "ui_smoke.js", "futures_index.html"], cwd=HERE,
                     capture_output=True, text=True, timeout=60)
@@ -2256,7 +2322,7 @@ print("\n"+"="*68)
 by={}
 for sc,name,ok,_ in results:
     by.setdefault(sc,[0,0]); by[sc][0]+=1; by[sc][1]+= (1 if ok else 0)
-T={53:"Limits die with the app",52:"NinjaTrader delivery check",51:"Futures header + footer",50:"Futures on by default",49:"Toggles + short hints",48:"Futures config stripped",47:"Futures ratchet",46:"NinjaScript in step",45:"Breadth + VIX",44:"Entry telemetry",43:"Trend module",42:"Audio cues",41:"Volatility gauges",40:"Volume gauge",39:"Dwell time",38:"Velocity vs feed artifacts",37:"Desktop icon",36:"Trade log detail",35:"Time value warns not blocks",34:"LOCK/X gone, size warns",33:"Page actually runs",32:"No SAVE / live trade frozen",31:"One switch / still modal",30:"Directional entry levels",29:"Percent only, no cash",28:"Grid/ATM/quality/one-armed",27:"Config screen cleanup",26:"Ratchet stop",25:"Console auto-hide",24:"Options auto-reconcile",23:"Daily trade log",22:"Options phantom clear",21:"Auto-reconcile w/ broker",20:"MY CONFIG always on",19:"Phantom position",18:"Futures hours",17:"Closed market honest",16:"Restart leaves no spinner",15:"One tab only",14:"Git lock self-heal",13:"Broker tabs + tray",12:"Velocity honest when shut",11:"Multi-broker sessions",1:"Futures login survives restart",2:"remember_login default",3:"Options profiles to disk",
+T={54:"Ratchet inside NinjaTrader",53:"Limits die with the app",52:"NinjaTrader delivery check",51:"Futures header + footer",50:"Futures on by default",49:"Toggles + short hints",48:"Futures config stripped",47:"Futures ratchet",46:"NinjaScript in step",45:"Breadth + VIX",44:"Entry telemetry",43:"Trend module",42:"Audio cues",41:"Volatility gauges",40:"Volume gauge",39:"Dwell time",38:"Velocity vs feed artifacts",37:"Desktop icon",36:"Trade log detail",35:"Time value warns not blocks",34:"LOCK/X gone, size warns",33:"Page actually runs",32:"No SAVE / live trade frozen",31:"One switch / still modal",30:"Directional entry levels",29:"Percent only, no cash",28:"Grid/ATM/quality/one-armed",27:"Config screen cleanup",26:"Ratchet stop",25:"Console auto-hide",24:"Options auto-reconcile",23:"Daily trade log",22:"Options phantom clear",21:"Auto-reconcile w/ broker",20:"MY CONFIG always on",19:"Phantom position",18:"Futures hours",17:"Closed market honest",16:"Restart leaves no spinner",15:"One tab only",14:"Git lock self-heal",13:"Broker tabs + tray",12:"Velocity honest when shut",11:"Multi-broker sessions",1:"Futures login survives restart",2:"remember_login default",3:"Options profiles to disk",
    4:"Browser autofill guard",5:"ITM3 strike math",6:"Preview == Arm",7:"Live-only / dead modes",
    8:"Auto-sync safety",9:"Endpoints alive",10:"UI integrity"}
 for sc in sorted(by):
