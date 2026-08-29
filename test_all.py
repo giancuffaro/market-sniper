@@ -1916,8 +1916,10 @@ try:
     # nothing left to caveat - scenario 48 checks it is off the config pane.
     # The screen must be explicit that the box is POINTS. "$12.50" reads as
     # money, and on MNQ that would be 6.25 points - half the intended stop.
-    check(47, "the screen states points, not dollars",
-          "The box is in POINTS" in _fx and "$2 a point" in _fx)
+    # The paragraph explaining points-vs-dollars was cut when the hints were
+    # shortened. The unit now lives where it cannot be missed: next to the box.
+    check(47, "the step box is labelled in points",
+          'id="raV"' in _fx and "> pts" in _fx.split('id="raV"', 1)[1][:220])
 
     # --- 48. Futures config stripped to ENTRY + RATCHET -------------------
     _fx2 = io.open("futures_index.html", encoding="utf-8").read()
@@ -1934,7 +1936,10 @@ try:
 
     # 25-point entry grid.
     check(48, "the server default grid is 25", _fcm.DEFAULT_SETTINGS["round_step"] == 25.0)
-    check(48, "25 is preselected on screen", 'value="25" selected' in _cfg2)
+    # The dropdown is gone; 25 is fixed and stated on the toggle itself.
+    check(48, "25 is stated on screen", "EVERY 25 POINTS" in _cfg2)
+    check(48, "and carried by a hidden input the save path reads",
+          '<input type="hidden" id="rdV" value="25">' in _cfg2)
     check(48, "and the browser fallback agrees", "round_step:25}" in _fx2)
     # LONG rests below, SHORT rests above - a limit that can only fill at the
     # level or better.
@@ -1973,8 +1978,16 @@ try:
     check(49, "the options login uses toggles as well",
           '<span class="sw"><input type="checkbox" id="remember"' in _ix3 and
           '<span class="sw"><input type="checkbox" id="showSecrets"' in _ix3)
+    # The retired TP/SL/TRAIL inputs live inside a <div hidden> block. They are
+    # kept because the save path still reads them by id, and they are never on
+    # screen - so they are excluded by BLOCK, not by whether the word "hidden"
+    # happens to appear on the same line.
+    _visible = _fx3.split("<div hidden>", 1)[0] + _fx3.split("</div>", 1)[-1] \
+        if "<div hidden>" in _fx3 else _fx3
+    _hid = _fx3.split("<div hidden>", 1)[1].split("</div>", 1)[0] if "<div hidden>" in _fx3 else ""
     _bare = [l for l in _fx3.splitlines()
-             if 'type="checkbox"' in l and 'class="sw"' not in l and "hidden" not in l]
+             if 'type="checkbox"' in l and 'class="sw"' not in l
+             and l.strip() not in [x.strip() for x in _hid.splitlines()]]
     check(49, "no bare checkboxes left on the futures screen", not _bare, str(_bare)[:160])
 
     # THE PICKER IS GONE. 25 is the level G trades; a choice he will never
