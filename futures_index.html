@@ -222,6 +222,20 @@
   .btstat .v.pos{color:var(--green)} .btstat .v.neg{color:var(--red)}
   .btnote{color:var(--amber);font-size:10.5px;line-height:1.4;margin-top:12px}
   .btfoot{color:var(--dimmer);font-size:10px;line-height:1.4;margin-top:10px}
+  /* Sliding toggle. The checkbox stays in the DOM (hidden) so every .checked
+     read and write in the JS keeps working untouched. */
+  .sw{position:relative;display:inline-block;width:46px;height:25px;flex:none}
+  .sw input{position:absolute;opacity:0;width:0;height:0;margin:0}
+  .sw i{position:absolute;inset:0;border-radius:999px;background:var(--panel2);
+        border:1px solid var(--line);transition:background .16s,border-color .16s}
+  .sw i:after{content:"";position:absolute;left:3px;top:3px;width:17px;height:17px;
+        border-radius:50%;background:var(--dim);transition:transform .16s,background .16s}
+  .sw input:checked + i{background:var(--green-deep,rgba(62,207,142,.12));border-color:var(--green)}
+  .sw input:checked + i:after{transform:translateX(21px);background:var(--green)}
+  .sw input:focus-visible + i{outline:2px solid var(--green);outline-offset:2px}
+  label.tog{display:flex;align-items:center;gap:9px;cursor:pointer;color:var(--dim);
+        font-size:12.5px;font-weight:700;letter-spacing:.06em}
+  label.tog input:checked ~ .lbl{color:var(--green)}
   .srow{display:flex;align-items:center;gap:10px;margin-top:6px}
   .srow input[type=number]{flex:1;background:var(--panel2);border:1px solid var(--line);border-radius:8px;color:var(--txt);font-family:var(--ui);font-size:16px;padding:10px;min-width:0}
   .srow label{display:flex;align-items:center;gap:8px;color:var(--dim);font-size:12.5px}
@@ -286,10 +300,10 @@
 
     <div id="rememberRow" style="display:block;margin:2px 0 10px">
       <label style="display:flex;align-items:center;gap:8px;color:var(--dim);font-size:12px;cursor:pointer">
-        <input type="checkbox" id="rememberLogin" checked> Remember my login on this PC
+        <span class="sw"><input type="checkbox" id="rememberLogin" checked><i></i></span> Remember my login on this PC
       </label>
       <label style="display:flex;align-items:center;gap:8px;color:var(--dim);font-size:12px;cursor:pointer;margin-top:6px">
-        <input type="checkbox" id="showSecrets" checked> Show keys instead of dots
+        <span class="sw"><input type="checkbox" id="showSecrets" checked><i></i></span> Show keys instead of dots
       </label>
       <div class="note" style="margin-top:6px">Your username, account and folder are always remembered.
       Tick this to also save the <b>password / API key</b> — stored in plain text in
@@ -410,46 +424,30 @@
       <div id="paneConfig" class="pane">
       <div class="sgroup" style="border-color:var(--amber)">
         <div class="glbl" style="color:var(--amber)">★ ROUND-NUMBER ENTRY</div>
-        <div class="srow"><label><input type="checkbox" id="rdE"> ON</label>
-          <select id="rdV" style="flex:1;background:var(--panel2);border:1px solid var(--line);border-radius:8px;color:var(--txt);font-family:var(--ui);font-size:14px;padding:10px">
-            <option value="10">every 10 points</option>
-            <option value="25" selected>every 25 points</option>
-            <option value="50">every 50 points</option>
-            <option value="100">every 100 points</option>
-            <option value="250">every 250 points</option>
-          </select></div>
-        <div class="shint">When ON, <b>BUY / SELL rests a LIMIT order</b> on the nearest level instead
-        of firing at market. <b>LONG</b> buys the level <b>below</b> price, <b>SHORT</b> sells the level
-        <b>above</b> — so the order can only fill at that price <b>or better. No slippage.</b>
-        Ex: LONG MNQ at <b>28,716</b> on a 50-pt grid rests a buy limit at <b>28,700</b>; SHORT there
-        rests a sell limit at <b>28,750</b>. On NinjaTrader / Topstep / Webull the order is really
-        working at the broker (CANCEL on the amber bar pulls it). Trade-off vs a market order: if
-        price never comes back to the level, <b>you don't get filled</b>.<br><br>
-        Once it fills, the <b>RATCHET below owns the exit</b> — there is no take-profit and no
-        separate stop to set. Entry on the 25-point grid, exit on 12.5-point rungs.</div>
+        <div class="srow">
+          <label class="tog"><span class="sw"><input type="checkbox" id="rdE"><i></i></span>
+            <span class="lbl">EVERY 25 POINTS</span></label>
+        </div>
+        <!-- The 10/50/100/250 picker is gone: 25 is the level G trades and a
+             choice he will never change is clutter on a screen he reads with
+             money on. The input survives hidden because the save path reads
+             it by id. -->
+        <input type="hidden" id="rdV" value="25">
+        <div class="shint">Rests a limit on the nearest 25 — fills at that price or better,
+        or not at all.</div>
       </div>
 
       <div class="sgroup mine">
         <div class="glbl">★ RATCHET (points)</div>
-        <div class="srow"><label><input type="checkbox" id="raE"> ON</label>
-          <input type="number" id="raV" min="0.25" step="0.25" placeholder="12.5"></div>
-        <div class="shint">The same system as the options side, in points instead of percent.
-        The stop climbs a rung at a time and <b>never comes back down</b>, always sitting
-        <b>one step below the best you have seen</b>.<br><br>
-        <b>MNQ SHORT from 29800 with a 12.5-point step</b> — stop and step are the
-        same number, one unit of risk per rung:<br>
-        open → stop <b>29812.50</b> · touch <b>29787.50</b> (+12.5) → stop to
-        <b>breakeven 29800</b> · touch <b>29775</b> (+25) → stop <b>29787.50</b> ·
-        touch <b>29762.50</b> (+37.5) → stop <b>29775</b> … no cap.<br>
-        LONG mirrors it. 12.5 points on MNQ is $25 a contract and 50 ticks, so it
-        sits clear of the noise that stops out a 1–2 tick trail.<br><br>
-        <b>This replaces the trailing stop and the take-profit while it is on.</b> A trailing
-        stop slides on every tick and gets shaken out by noise; the ratchet only moves when a
-        whole rung is taken. A take-profit alongside it would close the trade at the exact
-        moment the ratchet is trying to let it run.<br><br>
-        <b>Points, not dollars.</b> MNQ is $2 a point and $0.50 a tick, MES is $5 and
-        $1.25. "$12.50" would be 6.25 points on MNQ and only 0.625 on NQ — two ticks,
-        which noise would take out immediately. The box is in POINTS.</div>
+        <div class="srow">
+          <label class="tog"><span class="sw"><input type="checkbox" id="raE"><i></i></span>
+            <span class="lbl">RATCHET</span></label>
+          <span style="flex:1"></span>
+          step <input id="raV" type="number" min="0.25" step="0.25" placeholder="12.5"
+                      style="width:70px;text-align:center"> pts
+        </div>
+        <div class="shint">Stop climbs a rung at a time and never drops. 12.5 → breakeven,
+        25 → +12.5, 37.5 → +25. No take-profit.</div>
       </div>
 
       <!-- TAKE PROFIT, STOP LOSS and TRAILING STOP were removed from this
@@ -1038,7 +1036,7 @@ const FZ = (function(){
     const el=$('stratList'); if(!el) return;
     el.innerHTML = strategies.map(s=>`
       <div class="scard ${s.enabled?'act':''}">
-        <label class="stitle"><input type="checkbox" ${s.enabled?'checked':''} onchange="FZ.toggleStrategy('${s.id}')"> ${s.name}</label>
+        <label class="stitle"><span class="sw"><input type="checkbox" ${s.enabled?'checked':''} onchange="FZ.toggleStrategy('${s.id}')"><i></i></span> ${s.name}</label>
         <div class="sdesc">${s.desc||''}</div>
         <div class="srow2"><label>SYMBOL</label>
           <select onchange="FZ.setStrategyField('${s.id}','symbol',this.value)">
