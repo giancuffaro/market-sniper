@@ -1900,15 +1900,20 @@ try:
     check(47, "a take-profit cannot fire underneath the ratchet",
           _f5._bracket_hit() is None, str(_f5.position.get("ratchet")))
     # Terms frozen at the fill, same as options.
-    check(47, "terms are frozen when the position opens",
-          _fsrc.count('"ratchet_on": bool(self.settings.get("ratchet_enabled"))') >= 3)
+    # ratchet_on is now unconditionally True on every entry path - the toggle
+    # decides whether the ENTRY waits for a level, never whether a live trade
+    # has a stop. Scenario 48 asserts that. What must still be frozen at the
+    # fill is the STEP, so nudging it mid-trade cannot move a running stop.
+    check(47, "the step is frozen when the position opens",
+          _fsrc.count('"ratchet_step": float(self.settings.get("ratchet_points")') >= 3,
+          str(_fsrc.count('"ratchet_step": float(self.settings.get("ratchet_points")')))
     # Screen must show ONE stop, not two.
     _fx = io.open("futures_index.html", encoding="utf-8").read()
     check(47, "the futures screen has the toggle", 'id="raE"' in _fx and 'id="raV"' in _fx)
     check(47, "it shows the ratchet stop instead of the trail when on",
           "}else if(settings.trail_enabled" in _fx)
-    check(47, "and says the trail is ignored while it runs",
-          "Ignored while the RATCHET above is on" in _fx)
+    # The trailing stop is gone from the screen entirely now, so there is
+    # nothing left to caveat - scenario 48 checks it is off the config pane.
     # The screen must be explicit that the box is POINTS. "$12.50" reads as
     # money, and on MNQ that would be 6.25 points - half the intended stop.
     check(47, "the screen states points, not dollars",
