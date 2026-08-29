@@ -2122,6 +2122,54 @@ try:
     check(52, "the limit of the check is documented, not glossed over",
           "does NOT catch a mistyped ACCOUNT name" in _fsrc3)
 
+    # --- 53. A resting limit must not outlive the app ---------------------
+    # An armed round-number entry is a REAL limit at the broker, but the
+    # ratchet that protects the fill runs only while this app is open. Left
+    # working over a weekend it can fill at Sunday's 18:00 ET reopen with
+    # nothing managing it - a naked position until someone notices.
+    import futures_app as _fa
+    _fa = importlib.reload(_fa)
+
+    class _FakeBroker:
+        def __init__(self, ok=True):
+            self.armed = {"order_id": "X1", "side": "SHORT",
+                          "symbol": "MNQ", "target": 29800.0}
+            self.ok = ok; self.cancelled = []
+        def cancel_limit(self, oid):
+            if not self.ok:
+                raise RuntimeError("broker refused")
+            self.cancelled.append(oid)
+
+    _good = _FakeBroker(); _bad = _FakeBroker(ok=False)
+    _pulled, _failed = _fa._pull_working_limits({"NINJA": _good, "TOPSTEP": _bad})
+    check(53, "a working limit is cancelled", _good.cancelled == ["X1"], str(_good.cancelled))
+    check(53, "and reported by name", _pulled == ["NINJA SHORT MNQ @ 29800"], str(_pulled))
+    check(53, "the armed state is cleared with it", _good.armed is None)
+    # A broker that refuses must not stop the app closing - but must never fail
+    # silently either, or you would think it had been pulled.
+    check(53, "a refusal is reported, not swallowed", len(_failed) == 1 and "TOPSTEP" in _failed[0],
+          str(_failed))
+    check(53, "and that order is left visible rather than pretended gone",
+          _bad.armed is not None)
+    check(53, "nothing armed is a clean no-op",
+          _fa._pull_working_limits({"X": type("E", (), {"armed": None})()}) == ([], []))
+
+    _fasrc = io.open("futures_app.py", encoding="utf-8").read()
+    check(53, "shutdown pulls limits before the process dies",
+          "_pull_working_limits(SESSIONS)" in _fasrc.split("def shutdown", 1)[1][:400])
+    check(53, "disconnect-all pulls them too",
+          "pulled, failed = _pull_working_limits(SESSIONS)" in _fasrc)
+    check(53, "so does dropping a single broker",
+          "_pull_working_limits({target: s})" in _fasrc)
+    check(53, "both endpoints report what was cancelled",
+          _fasrc.count('"cancelled": pulled') >= 1 and _fasrc.count("cancel_failed") >= 2)
+    check(53, "the reason is recorded where the code is",
+          "the ratchet that would protect the fill" in _fasrc)
+    # One route, not two - an earlier edit left a duplicate decorator.
+    check(53, "only one /api/disconnect route exists",
+          _fasrc.count('@app.post("/api/disconnect")') == 1,
+          str(_fasrc.count('@app.post("/api/disconnect")')))
+
     import subprocess as _sp3
     _sm3 = _sp3.run(["node", "ui_smoke.js", "futures_index.html"], cwd=HERE,
                     capture_output=True, text=True, timeout=60)
@@ -2208,7 +2256,7 @@ print("\n"+"="*68)
 by={}
 for sc,name,ok,_ in results:
     by.setdefault(sc,[0,0]); by[sc][0]+=1; by[sc][1]+= (1 if ok else 0)
-T={52:"NinjaTrader delivery check",51:"Futures header + footer",50:"Futures on by default",49:"Toggles + short hints",48:"Futures config stripped",47:"Futures ratchet",46:"NinjaScript in step",45:"Breadth + VIX",44:"Entry telemetry",43:"Trend module",42:"Audio cues",41:"Volatility gauges",40:"Volume gauge",39:"Dwell time",38:"Velocity vs feed artifacts",37:"Desktop icon",36:"Trade log detail",35:"Time value warns not blocks",34:"LOCK/X gone, size warns",33:"Page actually runs",32:"No SAVE / live trade frozen",31:"One switch / still modal",30:"Directional entry levels",29:"Percent only, no cash",28:"Grid/ATM/quality/one-armed",27:"Config screen cleanup",26:"Ratchet stop",25:"Console auto-hide",24:"Options auto-reconcile",23:"Daily trade log",22:"Options phantom clear",21:"Auto-reconcile w/ broker",20:"MY CONFIG always on",19:"Phantom position",18:"Futures hours",17:"Closed market honest",16:"Restart leaves no spinner",15:"One tab only",14:"Git lock self-heal",13:"Broker tabs + tray",12:"Velocity honest when shut",11:"Multi-broker sessions",1:"Futures login survives restart",2:"remember_login default",3:"Options profiles to disk",
+T={53:"Limits die with the app",52:"NinjaTrader delivery check",51:"Futures header + footer",50:"Futures on by default",49:"Toggles + short hints",48:"Futures config stripped",47:"Futures ratchet",46:"NinjaScript in step",45:"Breadth + VIX",44:"Entry telemetry",43:"Trend module",42:"Audio cues",41:"Volatility gauges",40:"Volume gauge",39:"Dwell time",38:"Velocity vs feed artifacts",37:"Desktop icon",36:"Trade log detail",35:"Time value warns not blocks",34:"LOCK/X gone, size warns",33:"Page actually runs",32:"No SAVE / live trade frozen",31:"One switch / still modal",30:"Directional entry levels",29:"Percent only, no cash",28:"Grid/ATM/quality/one-armed",27:"Config screen cleanup",26:"Ratchet stop",25:"Console auto-hide",24:"Options auto-reconcile",23:"Daily trade log",22:"Options phantom clear",21:"Auto-reconcile w/ broker",20:"MY CONFIG always on",19:"Phantom position",18:"Futures hours",17:"Closed market honest",16:"Restart leaves no spinner",15:"One tab only",14:"Git lock self-heal",13:"Broker tabs + tray",12:"Velocity honest when shut",11:"Multi-broker sessions",1:"Futures login survives restart",2:"remember_login default",3:"Options profiles to disk",
    4:"Browser autofill guard",5:"ITM3 strike math",6:"Preview == Arm",7:"Live-only / dead modes",
    8:"Auto-sync safety",9:"Endpoints alive",10:"UI integrity"}
 for sc in sorted(by):
