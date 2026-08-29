@@ -364,27 +364,68 @@ class DisconnectReq(BaseModel):
 
 
 @app.post("/api/disconnect")
+def _pull_working_limits(sessions):
+    """Cancel any limit resting at a broker before we stop watching it.
+
+    THIS IS THE HOLE IT CLOSES. An armed round-number entry is a REAL limit
+    order sitting at the broker, but the ratchet that would protect the fill
+    lives in this app and only runs while it is open. Leave a limit working
+    over a weekend and it can fill at Sunday's 18:00 ET reopen with nothing
+    managing it - a naked position until someone notices.
+
+    Best-effort by design: a broker that will not take the cancel must not stop
+    the app shutting down. What it must never do is fail silently, so every
+    outcome is reported back.
+    """
+    pulled, failed = [], []
+    for mode, sess in list(sessions.items()):
+        a = getattr(sess, "armed", None)
+        if not (a and a.get("order_id") and hasattr(sess, "cancel_limit")):
+            continue
+        try:
+            sess.cancel_limit(a["order_id"])
+            sess.armed = None
+            pulled.append("%s %s %s @ %g" % (mode, a.get("side"), a.get("symbol"),
+                                             a.get("target", 0)))
+        except Exception as e:                               # noqa: BLE001
+            failed.append("%s: %s" % (mode, str(e)[:80]))
+    return pulled, failed
+
+
+@app.post("/api/disconnect")
 def disconnect(req: DisconnectReq = None):
     """Drop one broker, or all of them when no mode is given."""
     target = fc.normalize_mode(req.mode) if (req and req.mode) else None
     if target:
         s = SESSIONS.pop(target, None)
+        if s is not None:
+            _pull_working_limits({target: s})
         if ACTIVE["mode"] == target:
             ACTIVE["mode"] = next(iter(SESSIONS), None)
         return {"ok": True, "disconnected": target, "active": ACTIVE["mode"],
                 "sessions": [_summary(m, x) for m, x in SESSIONS.items()]}
+    pulled, failed = _pull_working_limits(SESSIONS)
     SESSIONS.clear()
     ACTIVE["mode"] = None
-    return {"ok": True, "disconnected": "all", "active": None, "sessions": []}
+    return {"ok": True, "disconnected": "all", "active": None, "sessions": [],
+            "cancelled": pulled, "cancel_failed": failed}
 
 @app.post("/api/shutdown")
 def shutdown():
     import threading, time
+    # Pull anything resting BEFORE the process goes away. See
+    # _pull_working_limits: the ratchet dies with this app, the limit does not.
+    pulled, failed = _pull_working_limits(SESSIONS)
+    if pulled:
+        print("[SHUTDOWN] cancelled working limits: %s" % ", ".join(pulled), flush=True)
+    if failed:
+        print("[SHUTDOWN] COULD NOT cancel: %s - check the broker by hand"
+              % ", ".join(failed), flush=True)
     def _die():
         time.sleep(0.4)
         os._exit(0)
     threading.Thread(target=_die, daemon=True).start()
-    return {"ok": True}
+    return {"ok": True, "cancelled": pulled, "cancel_failed": failed}
 
 
 if __name__ == "__main__":
