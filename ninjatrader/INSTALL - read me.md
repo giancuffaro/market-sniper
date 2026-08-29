@@ -16,11 +16,18 @@ Documents\NinjaTrader 8\bin\Custom\Strategies\MarketSniperRatchet.cs
 ```
 
 1. Open `Documents\NinjaTrader 8\bin\Custom\` in File Explorer.
-2. Drag **MarketSniperTrend.cs** into the `Indicators` folder.
-3. Drag **MarketSniperRatchet.cs** into the `Strategies` folder.
-4. In NinjaTrader press **F11** (NinjaScript Editor), then **F5** to compile.
-   You do not need to open the files — F5 compiles the whole folder.
-5. Bottom of the editor says either "Compile successful" or lists errors.
+2. **COPY, do not drag.** Right-click the file → Copy, then paste into the
+   folder. Desktop and Documents are both on C:, and a drag between two places
+   on the SAME drive is a MOVE — the file leaves the Market Sniper folder.
+   (Ctrl held while dragging also copies.)
+   - `MarketSniperTrend.cs` → `Indicators`
+   - `MarketSniperRatchet.cs` → `Strategies`
+3. In NinjaTrader, **Control Center → New → NinjaScript Editor**.
+   Use the menu, not F11: function keys only fire when the Control Center has
+   focus, and some laptops need Fn+F11.
+4. In the editor, **right-click → Compile**. You do not need to open the files
+   — compiling does the whole folder.
+5. The bottom of the editor says "Compile successful" or lists errors.
    Send me the errors if there are any.
 
 Then they show up like any built-in:

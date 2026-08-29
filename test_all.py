@@ -2249,6 +2249,23 @@ try:
     check(54, "there is only ONE install method described",
           _doc.count("## Installing") == 2)   # one per script, not two per script
 
+    # G dragged the files into NinjaTrader's folders. Desktop and Documents are
+    # both on C:, and a drag WITHIN a drive is a MOVE - so they left the Market
+    # Sniper folder entirely, and auto-sync recorded the deletion.
+    check(54, "the notes say copy, not drag", "COPY, do not drag" in _doc)
+    check(54, "and explain why a drag moves it", "same drive" in _doc.lower()
+          and "MOVE" in _doc)
+    check(54, "menus are given instead of function keys",
+          "New → NinjaScript Editor" in _doc and "not F11" in _doc)
+    # Both files must actually be present - they have been lost once already.
+    for _f in ("MarketSniperTrend.cs", "MarketSniperRatchet.cs"):
+        _p54 = os.path.join(HERE, "ninjatrader", _f)
+        check(54, "%s is present in the repo" % _f, os.path.exists(_p54))
+        if os.path.exists(_p54):
+            check(54, "%s is not truncated" % _f,
+                  len(io.open(_p54, encoding="utf-8").read()) > 3000,
+                  str(os.path.getsize(_p54)))
+
     import subprocess as _sp3
     _sm3 = _sp3.run(["node", "ui_smoke.js", "futures_index.html"], cwd=HERE,
                     capture_output=True, text=True, timeout=60)
