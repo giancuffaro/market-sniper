@@ -61,9 +61,13 @@ DEFAULT_SETTINGS = {
     # 50 ticks, so it sits well clear of the noise a 1-2 tick stop lives in.
     # Stop AND step are the same number by design - one unit of risk per rung,
     # exactly the shape of the options ratchet.
-    "ratchet_enabled": False, "ratchet_points": 12.5,
+    # BOTH ON by default. Neither opens a trade on its own - the entry
+    # only changes HOW a button press is routed (a resting limit rather
+    # than a market order) and the ratchet only manages a position that
+    # already exists. Strategies, which DO open trades unattended, stay off.
+    "ratchet_enabled": True, "ratchet_points": 12.5,
     # 25-point grid: G's measured entry level on MNQ.
-    "round_enabled": False, "round_step": 25.0,
+    "round_enabled": True, "round_step": 25.0,
 }
 
 ROUND_STEPS = (10.0, 25.0, 50.0, 100.0, 250.0)

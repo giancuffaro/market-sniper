@@ -418,7 +418,7 @@
   <!-- CONFIGURATION -->
   <div id="setScrim" class="scrim">
     <div class="smodal">
-      <h2>FUTURES SETTINGS</h2>
+      <h2>FUTURES SETTINGS <span id="savedTag" class="savedtag">SAVED</span></h2>
       <div class="tabs">
         <button id="tabConfig" class="tab on" onclick="FZ.showTab('config')">CONFIGURATION</button>
         <button id="tabStrat" class="tab" onclick="FZ.showTab('strat')">STRATEGIES</button>
@@ -527,7 +527,7 @@ const FZ = (function(){
   let mode="WEBULL", sym="MNQ", qty=1, inTrade=false, poll=null, priceTimer=null, trendTimer=null, velTimer=null;
   let settings={tp_enabled:false,tp_points:10,sl_enabled:false,sl_points:5,trail_enabled:false,trail_points:5,
                 ratchet_enabled:false,ratchet_points:10,
-                round_enabled:false,round_step:25};
+                round_enabled:true,round_step:25};
   let prefs={}, prefsReady=false, prefsLoaded=null;
   const $=id=>document.getElementById(id);
   const api=(p,b)=>fetch(p,{method:b?'POST':'GET',headers:{'Content-Type':'application/json'},
@@ -1308,7 +1308,7 @@ const FZ = (function(){
     }catch(e){ /* no BroadcastChannel - harmless, tabs just do not auto-close */ }
   })();
 
-  return {step,open,close,disarm,back,lockAll,pickBroker,refreshSessions,forgetPosition,toggleTheme,setTheme,openSettings,closeSettings,saveSettings,hideEvent,hideReject,
+  return {step,open,close,disarm,back,lockAll,pickBroker,refreshSessions,forgetPosition,toggleTheme,setTheme,openSettings,closeSettings,applySettings,hideEvent,hideReject,
           showTab,toggleStrategy,setStrategyField,backtestStrategy,closeBacktest,uploadData,quitApp};
 })();
 </script>
