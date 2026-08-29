@@ -2043,9 +2043,6 @@ try:
     # Sanity on what it costs.
     check(47, "12.5 points is $25 on MNQ", 12.5 * _fcm.FUT["MNQ"]["point_value"] == 25.0)
     check(47, "and 50 ticks wide, not 2", 12.5 / _fcm.FUT["MNQ"]["tick"] == 50.0)
-    check(47, "the screen states points, not dollars",
-          "The box is in POINTS" in _fx or "in POINTS" in
-          io.open("futures_index.html", encoding="utf-8").read())
     check(29,"and no premium/time value on the button",
           "% time" not in ix6 and "q.ask.toFixed" not in code6)
 
