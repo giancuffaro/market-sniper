@@ -3,20 +3,31 @@
 The same trend logic as the Sniper's `DIRECTION` panel, running on your
 NinjaTrader charts. Three signals, and it only calls a trend when they agree.
 
-## Installing it
+## Installing — copy the file, do not use Strategy Builder
 
-1. Open NinjaTrader 8.
-2. **New → NinjaScript Editor** (or press `F11`).
-3. In the left tree, right-click **Indicators → New Indicator**, click through
-   the wizard and name it anything — you're about to replace the contents.
-4. Delete everything in the new file, paste in all of `MarketSniperTrend.cs`,
-   and press **F5** to compile.
-5. If it compiles clean, the indicator is available on any chart:
-   right-click a chart → **Indicators** → `MarketSniperTrend`.
+**Strategy Builder is the wrong tool.** It is a visual wizard that writes code
+for you, and there is nowhere in it to paste a file. Ignore it entirely.
 
-Compile errors will show at the bottom of the editor with a line number. Send
-them to me rather than guessing — NinjaScript is fussy about its `using`
-statements between minor versions.
+Copy the files instead. NinjaTrader reads whatever is in these folders:
+
+```
+Documents\NinjaTrader 8\bin\Custom\Indicators\MarketSniperTrend.cs
+Documents\NinjaTrader 8\bin\Custom\Strategies\MarketSniperRatchet.cs
+```
+
+1. Open `Documents\NinjaTrader 8\bin\Custom\` in File Explorer.
+2. Drag **MarketSniperTrend.cs** into the `Indicators` folder.
+3. Drag **MarketSniperRatchet.cs** into the `Strategies` folder.
+4. In NinjaTrader press **F11** (NinjaScript Editor), then **F5** to compile.
+   You do not need to open the files — F5 compiles the whole folder.
+5. Bottom of the editor says either "Compile successful" or lists errors.
+   Send me the errors if there are any.
+
+Then they show up like any built-in:
+
+- **Indicator** — right-click a chart → Indicators → `MarketSniperTrend`
+- **Strategy** — Control Center → **Strategies** tab → right-click →
+  **New Strategy** → `MarketSniperRatchet`
 
 ## Reading it
 
@@ -103,18 +114,15 @@ This closes both.
 
 ## Installing it
 
-Same as the indicator, but under **Strategies**:
+Already done if you copied both files above and pressed F5. To turn it on:
 
-1. **F11** → NinjaScript Editor.
-2. Right-click **Strategies → New Strategy**, click through, name it anything.
-3. Replace the contents with `MarketSniperRatchet.cs`, press **F5**.
-4. Control Center → **Strategies** tab → right-click → **New Strategy** →
-   `MarketSniperRatchet`.
-5. Set **Account**, **Instrument** (MNQ), and **Step (points)** = `12.5`.
-6. **Start behavior must be `Adopt account position`.** It's the default in the
-   code, but check it — without it the strategy ignores any position it didn't
-   open itself, which is every position, because it never opens one.
-7. Tick **Enabled**.
+1. Control Center → **Strategies** tab → right-click → **New Strategy**.
+2. Pick `MarketSniperRatchet`.
+3. Set **Account**, **Instrument** = MNQ, **Step (points)** = `12.5`.
+4. Check **Start behavior** = `Adopt account position`. It is the default in
+   the code, but confirm it — without it the strategy ignores any position it
+   did not open itself, which is every position, because it never opens one.
+5. Tick **Enabled**.
 
 ## What it does, and only this
 

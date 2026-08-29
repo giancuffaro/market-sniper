@@ -2236,6 +2236,19 @@ try:
           "Pick one:" in io.open(os.path.join(HERE, "ninjatrader", "INSTALL - read me.md"),
                                  encoding="utf-8").read())
 
+    _doc = io.open(os.path.join(HERE, "ninjatrader", "INSTALL - read me.md"),
+                   encoding="utf-8").read()
+    # G opened Strategy Builder and got stuck - it is a visual wizard with
+    # nowhere to paste code. The notes now say so and give the file-copy route.
+    check(54, "the notes warn Strategy Builder is the wrong tool",
+          "Strategy Builder is the wrong tool" in _doc)
+    check(54, "and give the exact folders to copy into",
+          "bin\\Custom\\Indicators" in _doc and "bin\\Custom\\Strategies" in _doc)
+    check(54, "F5 compiles the folder, no need to open the files",
+          "F5 compiles the whole folder" in _doc)
+    check(54, "there is only ONE install method described",
+          _doc.count("## Installing") == 2)   # one per script, not two per script
+
     import subprocess as _sp3
     _sm3 = _sp3.run(["node", "ui_smoke.js", "futures_index.html"], cwd=HERE,
                     capture_output=True, text=True, timeout=60)
