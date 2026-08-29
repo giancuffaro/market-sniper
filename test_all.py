@@ -1914,6 +1914,46 @@ try:
     check(47, "the screen states points, not dollars",
           "The box is in POINTS" in _fx and "$2 a point" in _fx)
 
+    # --- 48. Futures config stripped to ENTRY + RATCHET -------------------
+    _fx2 = io.open("futures_index.html", encoding="utf-8").read()
+    _cfg2 = _fx2.split('id="paneConfig"', 1)[1].split("/paneConfig", 1)[0]
+    for _gone in ("TAKE PROFIT (points)", "STOP LOSS (points)", "TRAILING STOP (points)"):
+        check(48, "%s is off the config screen" % _gone, _gone not in _cfg2)
+    check(48, "round-number entry stays", "ROUND-NUMBER ENTRY" in _cfg2)
+    check(48, "the ratchet stays", "RATCHET (points)" in _cfg2)
+    # Hidden, not deleted: strategies still set their own TP/SL server-side and
+    # the existing save path reads these ids every time it runs.
+    for _id in ("tpE", "tpV", "slE", "slV", "trE", "trV"):
+        check(48, "%s still exists so saving cannot break" % _id, ('id="%s"' % _id) in _fx2)
+    check(48, "and they are hidden rather than removed", "<div hidden>" in _fx2)
+
+    # 25-point entry grid.
+    check(48, "the server default grid is 25", _fcm.DEFAULT_SETTINGS["round_step"] == 25.0)
+    check(48, "25 is preselected on screen", 'value="25" selected' in _cfg2)
+    check(48, "and the browser fallback agrees", "round_step:25}" in _fx2)
+    # LONG rests below, SHORT rests above - a limit that can only fill at the
+    # level or better.
+    check(48, "LONG at 29812 rests at 29800",
+          _fcm.round_target(29812.0, "LONG", 25.0) == 29800.0)
+    check(48, "SHORT at 29812 rests at 29825",
+          _fcm.round_target(29812.0, "SHORT", 25.0) == 29825.0)
+    check(48, "SHORT at 29788 rests at 29800",
+          _fcm.round_target(29788.0, "SHORT", 25.0) == 29800.0)
+
+    # Entry on 25s, exit on 12.5s - two different numbers, both live.
+    _f7, _r7 = _run("SHORT", 29800.0, [29800, 29787.50, 29775], step=12.5)
+    check(48, "entry grid and ratchet step are independent",
+          _fcm.DEFAULT_SETTINGS["round_step"] != _fcm.DEFAULT_SETTINGS["ratchet_points"])
+    check(48, "a 25-point fill still ratchets in 12.5s",
+          abs(_r7[1][1]["stop_price"] - 29800.0) < 0.01, str(_r7[1][1]))
+
+    # The ratchet protects EVERY fill, armed or market - the options-side rule.
+    check(48, "the ratchet is armed on every futures position",
+          _fsrc.count('"ratchet_on": True,') >= 3,
+          str(_fsrc.count('"ratchet_on": True,')))
+    check(48, "the screen says the ratchet owns the exit after a fill",
+          "RATCHET below owns the exit" in _cfg2)
+
     import subprocess as _sp3
     _sm3 = _sp3.run(["node", "ui_smoke.js", "futures_index.html"], cwd=HERE,
                     capture_output=True, text=True, timeout=60)
@@ -2003,7 +2043,7 @@ print("\n"+"="*68)
 by={}
 for sc,name,ok,_ in results:
     by.setdefault(sc,[0,0]); by[sc][0]+=1; by[sc][1]+= (1 if ok else 0)
-T={47:"Futures ratchet",46:"NinjaScript in step",45:"Breadth + VIX",44:"Entry telemetry",43:"Trend module",42:"Audio cues",41:"Volatility gauges",40:"Volume gauge",39:"Dwell time",38:"Velocity vs feed artifacts",37:"Desktop icon",36:"Trade log detail",35:"Time value warns not blocks",34:"LOCK/X gone, size warns",33:"Page actually runs",32:"No SAVE / live trade frozen",31:"One switch / still modal",30:"Directional entry levels",29:"Percent only, no cash",28:"Grid/ATM/quality/one-armed",27:"Config screen cleanup",26:"Ratchet stop",25:"Console auto-hide",24:"Options auto-reconcile",23:"Daily trade log",22:"Options phantom clear",21:"Auto-reconcile w/ broker",20:"MY CONFIG always on",19:"Phantom position",18:"Futures hours",17:"Closed market honest",16:"Restart leaves no spinner",15:"One tab only",14:"Git lock self-heal",13:"Broker tabs + tray",12:"Velocity honest when shut",11:"Multi-broker sessions",1:"Futures login survives restart",2:"remember_login default",3:"Options profiles to disk",
+T={48:"Futures config stripped",47:"Futures ratchet",46:"NinjaScript in step",45:"Breadth + VIX",44:"Entry telemetry",43:"Trend module",42:"Audio cues",41:"Volatility gauges",40:"Volume gauge",39:"Dwell time",38:"Velocity vs feed artifacts",37:"Desktop icon",36:"Trade log detail",35:"Time value warns not blocks",34:"LOCK/X gone, size warns",33:"Page actually runs",32:"No SAVE / live trade frozen",31:"One switch / still modal",30:"Directional entry levels",29:"Percent only, no cash",28:"Grid/ATM/quality/one-armed",27:"Config screen cleanup",26:"Ratchet stop",25:"Console auto-hide",24:"Options auto-reconcile",23:"Daily trade log",22:"Options phantom clear",21:"Auto-reconcile w/ broker",20:"MY CONFIG always on",19:"Phantom position",18:"Futures hours",17:"Closed market honest",16:"Restart leaves no spinner",15:"One tab only",14:"Git lock self-heal",13:"Broker tabs + tray",12:"Velocity honest when shut",11:"Multi-broker sessions",1:"Futures login survives restart",2:"remember_login default",3:"Options profiles to disk",
    4:"Browser autofill guard",5:"ITM3 strike math",6:"Preview == Arm",7:"Live-only / dead modes",
    8:"Auto-sync safety",9:"Endpoints alive",10:"UI integrity"}
 for sc in sorted(by):
