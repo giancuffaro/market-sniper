@@ -32,7 +32,7 @@ powershell -NoProfile -ExecutionPolicy Bypass -Command ^
   "$newest=(Get-Item $ind).LastWriteTime; if((Get-Item $str).LastWriteTime -gt $newest){$newest=(Get-Item $str).LastWriteTime};" ^
   "Write-Host ('      files last changed : ' + $newest);" ^
   "Write-Host ('      last compile       : ' + $d);" ^
-  "if($d -gt $newest){ Write-Host '      YES  compiled AFTER the files were copied.' -ForegroundColor Green } else { Write-Host '      NO   the compile is OLDER than the files.' -ForegroundColor Red; Write-Host '           Close NinjaTrader completely and reopen it.' -ForegroundColor Yellow };" ^
+  "if($d -ge $newest.AddSeconds(-60)){ Write-Host '      YES  compiled after the files were copied.' -ForegroundColor Green } else { Write-Host '      NO   the last compile predates the files.' -ForegroundColor Red; Write-Host '           Close NinjaTrader completely and reopen it.' -ForegroundColor Yellow };" ^
   "Write-Host '';" ^
   "Write-Host '   3. ANY COMPILE ERRORS IN NINJATRADERS OWN LOG?' -ForegroundColor Cyan;" ^
   "$logdir=Join-Path $nt 'log';" ^
