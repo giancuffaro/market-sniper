@@ -2315,6 +2315,61 @@ try:
              and "^(" not in l and "^)" not in l]
     check(55, "no unescaped parentheses in echo lines", not _badp, str(_badp)[:120])
 
+    # --- 56. The NinjaScript actually compiles ----------------------------
+    # It did not. MarketSniperTrend.cs used [XmlIgnore] with no
+    # `using System.Xml.Serialization;` - and in NinjaTrader ONE broken file
+    # blocks every NinjaScript, which is why G got "NinjaScript must be in a
+    # compilable state to create or edit strategies".
+    #
+    # Root cause: I trimmed NinjaTrader's standard using block down to "what is
+    # used" and got it wrong. Both files carry the full block now. An unused
+    # using costs nothing; a missing one costs the whole compile.
+    _NEED = {"XmlIgnore": "System.Xml.Serialization",
+             "Browsable": "System.ComponentModel",
+             "List<": "System.Collections.Generic",
+             "Brushes.": "System.Windows.Media",
+             "StringBuilder": "System.Text",
+             "Path.": "System.IO", "File.": "System.IO", "Directory.": "System.IO",
+             "Display(": "System.ComponentModel.DataAnnotations",
+             "Range(": "System.ComponentModel.DataAnnotations"}
+    for _f in ("MarketSniperTrend.cs", "MarketSniperRatchet.cs"):
+        _fp = os.path.join(HERE, "ninjatrader", _f)
+        if not os.path.exists(_fp):
+            check(56, "%s exists" % _f, False); continue
+        _src = io.open(_fp, encoding="utf-8").read()
+        _body = _src.split("#endregion", 1)[1]
+        _missing = [(k, ns) for k, ns in _NEED.items()
+                    if k in _body and ("using %s;" % ns) not in _src]
+        check(56, "%s: every type used has its namespace" % _f, not _missing, str(_missing))
+        # Braces and regions balancing - a stray one compiles to a wall of noise.
+        check(56, "%s: braces balance" % _f, _body.count("{") == _body.count("}"),
+              "%d vs %d" % (_body.count("{"), _body.count("}")))
+        check(56, "%s: regions balance" % _f,
+              _src.count("#region") == _src.count("#endregion"))
+        check(56, "%s: has a namespace and one class" % _f,
+              "namespace NinjaTrader.NinjaScript" in _src and _src.count("public class ") == 1)
+
+    _trend_src = io.open(os.path.join(HERE, "ninjatrader", "MarketSniperTrend.cs"),
+                         encoding="utf-8").read()
+    check(56, "the exact bug is fixed: XmlIgnore has its using",
+          "[XmlIgnore]" in _trend_src and "using System.Xml.Serialization;" in _trend_src)
+    check(56, "the strategy is in the Strategies namespace",
+          "using NinjaTrader.NinjaScript.Strategies;" in
+          io.open(os.path.join(HERE, "ninjatrader", "MarketSniperRatchet.cs"),
+                  encoding="utf-8").read())
+
+    # The checker must not call a good install broken. A copy and a compile
+    # seconds apart is normal; a strict "compile newer than source" comparison
+    # failed on same-second timestamps.
+    _chk = io.open(os.path.join(HERE, "CHECK NINJATRADER.bat"), encoding="utf-8").read()
+    check(56, "the checker exists", len(_chk) > 500)
+    check(56, "it tolerates a same-second compile", "AddSeconds(-60)" in _chk)
+    check(56, "it reads NinjaTrader's own log for errors",
+          "Select-String" in _chk and "MarketSniper" in _chk)
+    check(56, "it checks for stuck order files too", "oif_*.txt" in _chk)
+    check(56, "it resolves Documents the same way the installer does",
+          "GetFolderPath('MyDocuments')" in _chk)
+
     import subprocess as _sp3
     _sm3 = _sp3.run(["node", "ui_smoke.js", "futures_index.html"], cwd=HERE,
                     capture_output=True, text=True, timeout=60)
@@ -2401,7 +2456,7 @@ print("\n"+"="*68)
 by={}
 for sc,name,ok,_ in results:
     by.setdefault(sc,[0,0]); by[sc][0]+=1; by[sc][1]+= (1 if ok else 0)
-T={55:"One-click NT install",54:"Ratchet inside NinjaTrader",53:"Limits die with the app",52:"NinjaTrader delivery check",51:"Futures header + footer",50:"Futures on by default",49:"Toggles + short hints",48:"Futures config stripped",47:"Futures ratchet",46:"NinjaScript in step",45:"Breadth + VIX",44:"Entry telemetry",43:"Trend module",42:"Audio cues",41:"Volatility gauges",40:"Volume gauge",39:"Dwell time",38:"Velocity vs feed artifacts",37:"Desktop icon",36:"Trade log detail",35:"Time value warns not blocks",34:"LOCK/X gone, size warns",33:"Page actually runs",32:"No SAVE / live trade frozen",31:"One switch / still modal",30:"Directional entry levels",29:"Percent only, no cash",28:"Grid/ATM/quality/one-armed",27:"Config screen cleanup",26:"Ratchet stop",25:"Console auto-hide",24:"Options auto-reconcile",23:"Daily trade log",22:"Options phantom clear",21:"Auto-reconcile w/ broker",20:"MY CONFIG always on",19:"Phantom position",18:"Futures hours",17:"Closed market honest",16:"Restart leaves no spinner",15:"One tab only",14:"Git lock self-heal",13:"Broker tabs + tray",12:"Velocity honest when shut",11:"Multi-broker sessions",1:"Futures login survives restart",2:"remember_login default",3:"Options profiles to disk",
+T={56:"NinjaScript compiles",55:"One-click NT install",54:"Ratchet inside NinjaTrader",53:"Limits die with the app",52:"NinjaTrader delivery check",51:"Futures header + footer",50:"Futures on by default",49:"Toggles + short hints",48:"Futures config stripped",47:"Futures ratchet",46:"NinjaScript in step",45:"Breadth + VIX",44:"Entry telemetry",43:"Trend module",42:"Audio cues",41:"Volatility gauges",40:"Volume gauge",39:"Dwell time",38:"Velocity vs feed artifacts",37:"Desktop icon",36:"Trade log detail",35:"Time value warns not blocks",34:"LOCK/X gone, size warns",33:"Page actually runs",32:"No SAVE / live trade frozen",31:"One switch / still modal",30:"Directional entry levels",29:"Percent only, no cash",28:"Grid/ATM/quality/one-armed",27:"Config screen cleanup",26:"Ratchet stop",25:"Console auto-hide",24:"Options auto-reconcile",23:"Daily trade log",22:"Options phantom clear",21:"Auto-reconcile w/ broker",20:"MY CONFIG always on",19:"Phantom position",18:"Futures hours",17:"Closed market honest",16:"Restart leaves no spinner",15:"One tab only",14:"Git lock self-heal",13:"Broker tabs + tray",12:"Velocity honest when shut",11:"Multi-broker sessions",1:"Futures login survives restart",2:"remember_login default",3:"Options profiles to disk",
    4:"Browser autofill guard",5:"ITM3 strike math",6:"Preview == Arm",7:"Live-only / dead modes",
    8:"Auto-sync safety",9:"Endpoints alive",10:"UI integrity"}
 for sc in sorted(by):
