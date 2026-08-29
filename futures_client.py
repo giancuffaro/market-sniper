@@ -909,7 +909,18 @@ class BaseFuturesSession:
         self._maybe_trigger_entry()   # fire an armed round-number entry if price got there
         self._eval_strategies()       # fire any enabled strategy on an EMA cross
         ev, self.last_event = self.last_event, None
-        return {"mode": self.mode, "account_id": self.account_id,
+        extra = {}
+        if hasattr(self, "oif_pickup"):
+            picked = self.oif_pickup()
+            if picked is False:
+                extra["ninja_warning"] = (
+                    "NinjaTrader has NOT picked up your order. The file is still "
+                    "sitting in the incoming folder, which means nothing is "
+                    "watching it: either the ATI server is off "
+                    "(Tools > Options > Automated Trading Interface > Enable ATI "
+                    "server) or the folder path is wrong. YOUR ORDER DID NOT "
+                    "REACH THE BROKER.")
+        return {**extra, "mode": self.mode, "account_id": self.account_id,
                 # What KIND of book this is. Webull labels a futures account
                 # "MARGIN" under account_type, so the useful answer lives in
                 # account_class/label - and every route in this app is futures
@@ -949,11 +960,49 @@ class NinjaTraderSession(BaseFuturesSession):
         self.buying_power = 0.0
         return self.state()
 
+    # NinjaTrader DELETES an order-instruction file once it has read it. That
+    # single fact is the only feedback this one-way link gives us, and it is
+    # enough to catch the two silent failures that otherwise lose an order with
+    # no error anywhere:
+    #
+    #   ATI server switched off   -> nothing is watching the folder
+    #   wrong folder typed        -> nothing is watching THIS folder
+    #
+    # In both cases the file just sits there. Without this check the app says
+    # "SENT to NinjaTrader", the order never exists, and you find out from the
+    # position that is not on your broker screen.
+    #
+    # It does NOT catch a mistyped ACCOUNT name - NinjaTrader consumes the file
+    # and rejects it internally, so the file disappears either way. That one is
+    # covered by the warning on the connect screen and by testing with a single
+    # micro contract.
+    OIF_PICKUP_SECONDS = 4.0
+
     def _write_oif(self, text):
         self._oif_n += 1
         name = "oif_ms_%d_%d.txt" % (int(time.time() * 1000), self._oif_n)
-        with open(os.path.join(self.folder, name), "w") as fh:
+        path = os.path.join(self.folder, name)
+        with open(path, "w") as fh:
             fh.write(text.strip() + "\n")
+        self._pending_oif = (path, time.time())
+        return path
+
+    def oif_pickup(self):
+        """Did NinjaTrader actually take the last order file?
+
+        Returns None while it is too early to tell, True once the file is gone,
+        and False if it is still sitting there after the grace period.
+        """
+        pend = getattr(self, "_pending_oif", None)
+        if not pend:
+            return None
+        path, dropped = pend
+        if not os.path.exists(path):
+            self._pending_oif = None
+            return True
+        if time.time() - dropped < self.OIF_PICKUP_SECONDS:
+            return None                      # still within the grace period
+        return False
 
     def place(self, symbol, side, qty, limit=None):
         self._guard_open(qty)
