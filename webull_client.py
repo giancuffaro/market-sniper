@@ -260,6 +260,93 @@ def _is_futures_account(aid, raw_account):
     return "FUTURE" in str(raw_account).upper()
 
 
+# =========================================================================
+# THE RATE BUDGET — one app key, 300 requests / 60 s, THREE processes
+#
+# Market Sniper is not alone on this key. The discord-sniper bridge and the
+# Fill Announcer share it. On 2026-09-02 the announcer alone produced 76,991
+# rate-limit errors in one night and every other process 429'd with it -
+# including the bot's stops, which is the part that costs money.
+#
+# Market Sniper had NO pacing at all. At one /api/state per second, with a
+# position open and a mirror account attached, it was issuing roughly 2-3
+# calls a second - 120-180 a minute against a 300 budget shared three ways.
+#
+# So: every call through this gate, spaced, and a hard stop after a 429.
+# =========================================================================
+
+MIN_CALL_INTERVAL = 0.20      # seconds between ANY two Webull calls
+BACKOFF_AFTER_429 = 20.0      # dead time once the broker says slow down
+
+
+class _Budget:
+    """Serialises and paces every Webull request this process makes.
+
+    A lock, not just a timestamp: /api/state, the mirror session and the
+    strategy engine all call in from different threads, and two threads
+    reading the same "last call" moment would both decide they were clear
+    to go.
+    """
+
+    def __init__(self, min_interval=MIN_CALL_INTERVAL):
+        self.min_interval = min_interval
+        self._lock = threading.Lock()
+        self._last = 0.0
+        self._blocked_until = 0.0
+        self.calls = 0
+        self.paced = 0.0          # total seconds spent waiting
+        self.rate_limits = 0
+
+    def pace(self):
+        with self._lock:
+            now = time.time()
+            wait = 0.0
+            if now < self._blocked_until:
+                wait = self._blocked_until - now
+            gap = self._last + self.min_interval - (now + wait)
+            if gap > 0:
+                wait += gap
+            if wait > 0:
+                time.sleep(wait)
+                self.paced += wait
+            self._last = time.time()
+            self.calls += 1
+
+    def note_rate_limit(self):
+        with self._lock:
+            self.rate_limits += 1
+            self._blocked_until = time.time() + BACKOFF_AFTER_429
+        print("[BUDGET ] Webull said rate limit - holding all calls for %.0fs "
+              "(total %d)" % (BACKOFF_AFTER_429, self.rate_limits), flush=True)
+
+    def stats(self):
+        return {"calls": self.calls, "rate_limits": self.rate_limits,
+                "paced_seconds": round(self.paced, 1),
+                "blocked_for": max(0.0, round(self._blocked_until - time.time(), 1))}
+
+
+BUDGET = _Budget()
+
+_RATE_WORDS = ("RATE_LIMIT", "TOO_MANY_REQUEST", "RATELIMIT", "429")
+
+
+def paced(fn, *args, **kwargs):
+    """Run one Webull call through the budget.
+
+    Any exception is re-raised untouched - the callers already turn these
+    into plain English. The only thing added is noticing a 429 so the whole
+    process backs off instead of hammering a door that is already shut.
+    """
+    BUDGET.pace()
+    try:
+        return fn(*args, **kwargs)
+    except Exception as e:                                   # noqa: BLE001
+        if any(w in str(e).upper() for w in _RATE_WORDS):
+            BUDGET.note_rate_limit()
+        raise
+
+
+
 class OptionData:
     def __init__(self, api_client):
         self._api = api_client
