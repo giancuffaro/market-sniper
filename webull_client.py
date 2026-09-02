@@ -546,6 +546,127 @@ class OptionData:
             else:
                 self._snap_cache.pop(occ, None)
 
+    # ---- BATCHED QUOTES ---------------------------------------------------
+    # Webull's option snapshot endpoint takes a LIST - up to 20 contracts per
+    # call, confirmed in the installed SDK (webull/data/quotes/
+    # option_market_data.py: "For each request, up to 20 symbols").
+    #
+    # Market Sniper asked per contract, per poll, and the mirror account asked
+    # again. Two open positions plus a mirror was four calls a second against a
+    # budget of 300 a minute shared with two other processes.
+    #
+    # Ported from discord-sniper/webull_options.py, including the part that
+    # matters most: REMEMBER the argument shape that worked. A full shape hunt
+    # on every sweep is a dozen real failing HTTP requests a second, which is
+    # worse than the problem it was solving.
+    BATCH_MAX = 20
+
+    def ask_bid_many(self, occs):
+        """{occ: (ask, bid, mark, row)} for many contracts in ONE call."""
+        occs = [str(o) for o in (occs or []) if o]
+        if not occs:
+            return {}
+        if len(occs) > self.BATCH_MAX:
+            out = {}
+            for i in range(0, len(occs), self.BATCH_MAX):
+                out.update(self.ask_bid_many(occs[i:i + self.BATCH_MAX]))
+            return out
+
+        fns, _holders = self._fns()
+        if not fns:
+            return self._one_at_a_time(occs)
+
+        joined = ",".join(occs)
+        shapes = [((occs,), {}), ((joined,), {}),
+                  ((), {"symbols": occs}), ((), {"symbols": joined}),
+                  ((occs, "US_OPTION"), {}), ((joined, "US_OPTION"), {}),
+                  ((), {"symbols": occs, "category": "US_OPTION"}),
+                  ((), {"symbols": joined, "category": "US_OPTION"})]
+        remembered = getattr(self, "_batch_shape", None)
+        if remembered is not None:
+            shapes = [remembered] + [x for x in shapes if x != remembered]
+
+        for _name, fn in fns:
+            for shape in shapes:
+                args, kwargs = shape
+                try:
+                    body = self._result(paced(fn, *args, **kwargs))
+                except Exception:                        # noqa: BLE001
+                    continue
+                parsed = self._parse_batch(body, occs)
+                # Only remember a shape that returned EVERY contract asked for.
+                # A shape that answers one of three looks like success and
+                # silently starves the rest.
+                if parsed and len(parsed) == len(occs):
+                    self._batch_shape = shape
+                    return parsed
+                if parsed:
+                    return parsed
+
+        if not getattr(self, "_warned_no_batch", False):
+            self._warned_no_batch = True
+            print("[webull] batched option quotes not available on this SDK - "
+                  "falling back to one call per contract. Polls will use more "
+                  "of the shared rate budget.", flush=True)
+        return self._one_at_a_time(occs)
+
+    def _one_at_a_time(self, occs):
+        out = {}
+        for occ in occs:
+            try:
+                out[occ] = self.ask_bid_mark(occ)
+            except Exception:                            # noqa: BLE001
+                continue
+        return out
+
+    def _parse_batch(self, body, occs):
+        """Pull {occ: (ask, bid, mark, row)} out of whatever shape came back.
+
+        A row that cannot be matched to a REQUESTED contract is DROPPED, never
+        guessed at. A price attached to the wrong contract would price an exit
+        against a position you do not hold.
+        """
+        rows = body
+        if isinstance(body, dict):
+            for k in ("data", "result", "list", "snapshots", "items"):
+                if isinstance(body.get(k), list):
+                    rows = body[k]
+                    break
+        if not isinstance(rows, list):
+            return {}
+        want = {o.upper(): o for o in occs}
+        out = {}
+        for row in rows:
+            if not isinstance(row, dict):
+                continue
+            sym = None
+            for k in ("symbol", "instrument_id", "instrumentId", "occ",
+                      "option_symbol", "optionSymbol", "tickerId", "ticker"):
+                v = row.get(k)
+                if v is not None and str(v).upper() in want:
+                    sym = want[str(v).upper()]
+                    break
+            if sym is None:
+                continue
+
+            def _num(*names):
+                v = _find_key(row, *names)
+                try:
+                    return float(v)
+                except (TypeError, ValueError):
+                    return None
+            ask = _num("ask", "ask_price", "askPrice", "bestAsk", "best_ask")
+            bid = _num("bid", "bid_price", "bidPrice", "bestBid", "best_bid")
+            mark = _num("price", "close", "mark", "last")
+            if ask is None and bid is None and mark is None:
+                continue
+            out[sym] = (ask, bid, mark, row)
+            # Feed the single-quote cache too, so a follow-up ask_bid_mark for
+            # any of these costs nothing.
+            with self._snap_lock:
+                self._snap_cache[sym] = (time.time(), row)
+        return out
+
     def ask_bid_mark(self, occ, max_age=None):
         row = self.snapshot_cached(occ, max_age=max_age)
         def f(*names):
