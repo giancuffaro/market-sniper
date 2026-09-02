@@ -754,6 +754,16 @@ class BaseFuturesSession:
         d = p["mark"] - p["entry"]
         return d if p["side"] == "LONG" else -d
 
+    @staticmethod
+    def _track_excursion_pts(p, pts):
+        """Best and worst this futures trade ever got to, in points."""
+        if p.get("best_points") is None or pts > p["best_points"]:
+            p["best_points"] = round(pts, 2)
+        if p.get("worst_points") is None or pts < p["worst_points"]:
+            p["worst_points"] = round(pts, 2)
+        p["best_points"] = max(p.get("best_points", 0.0), 0.0)
+        p["worst_points"] = min(p.get("worst_points", 0.0), 0.0)
+
     def _update_ratchet(self):
         """Discrete rungs, in points. The stop climbs and never comes back.
 
@@ -770,6 +780,7 @@ class BaseFuturesSession:
             return
         step = float(p.get("ratchet_step") or s.get("ratchet_points") or 10.0)
         pts = self._points_pnl()
+        self._track_excursion_pts(p, pts)
         p["peak_points"] = max(p.get("peak_points", 0.0), pts)
         try:
             from webull_client import LiveSession as _LS
@@ -832,6 +843,15 @@ class BaseFuturesSession:
         return None
 
     def _log_trade(self, p, exit_price, pnl, reason="CLOSE"):
+        # Points moved, and the risk that was taken to make them. R is the one
+        # measure that compares a futures scalp with an options scalp.
+        try:
+            sign = 1.0 if p.get("side") == "LONG" else -1.0
+            pts_moved = (float(exit_price) - float(p["entry"])) * sign
+        except (TypeError, ValueError, KeyError):
+            pts_moved = None
+        risk_pts = float(p.get("ratchet_step")
+                         or self.settings.get("ratchet_points") or 0) or None
         """Write a finished futures trade to the daily log. Never raises."""
         try:
             import trade_log, datetime as _dt
@@ -851,7 +871,16 @@ class BaseFuturesSession:
                 "entry": p.get("entry"),
                 "exit": exit_price,
                 "pnl": pnl,
+                # Deliberately blank: a percent of a futures price is a number
+                # with no meaning. Points and R carry it instead.
                 "pnl_pct": "",
+                "points": round(pts_moved, 2) if pts_moved is not None else "",
+                "best_points": p.get("best_points", ""),
+                "worst_points": p.get("worst_points", ""),
+                "gave_back_points": (round(p["best_points"] - pts_moved, 2)
+                                     if p.get("best_points") and pts_moved is not None else ""),
+                "r_multiple": (round(pts_moved / risk_pts, 2)
+                               if (pts_moved is not None and risk_pts) else ""),
                 "exit_reason": reason,
                 "held_secs": "",
                 "note": "",

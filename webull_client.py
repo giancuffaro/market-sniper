@@ -1318,6 +1318,11 @@ class BaseSession:
                 "strike_mode": self.settings.get("strike_mode", ""),
                 "held_secs": (int(time.time() - p["opened_ts"])
                               if p.get("opened_ts") else ""),
+                # R = what you made divided by what you risked. The only
+                # number that reads the same across options and futures.
+                "r_multiple": (round(((float(exit_price) - p["entry"]) / p["entry"] * 100.0)
+                                     / float(p.get("ratchet_step") or 10.0), 2)
+                               if p.get("entry") else ""),
                 "underlying_in": p.get("underlying_in", ""),
                 "underlying_out": p.get("underlying_out", ""),
                 "underlying_move": (round(float(p["underlying_out"]) - float(p["underlying_in"]), 2)

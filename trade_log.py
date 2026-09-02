@@ -64,6 +64,12 @@ FIELDS = [
     # for it: an option P&L on its own does not tell you whether the underlying
     # actually went your way, and that is the question a review starts with.
     "underlying_in", "underlying_out", "underlying_move",
+    # FUTURES move in POINTS, not percent - "percent of what?" has no answer on
+    # a contract. So futures rows carry points, and BOTH books carry the one
+    # number that compares across them: R, the profit divided by the risk
+    # taken. A +2R options scalp and a +2R futures scalp are the same trade,
+    # which is the only way a mixed journal can be read at all.
+    "points", "best_points", "worst_points", "gave_back_points", "r_multiple",
     "exit_reason", "note",
 ]
 
@@ -73,7 +79,8 @@ _NUM = {"strike", "qty", "entry", "exit", "pnl", "pnl_pct", "held_secs",
         "ratchet_stop_pct", "ratchet_step",
         "in_trend_agree", "in_breadth", "in_vel_score", "in_dwell_above",
         "in_dwell_below", "in_vol_pctl", "in_rv_pct", "in_iv_pct",
-        "underlying_in", "underlying_out", "underlying_move"}
+        "underlying_in", "underlying_out", "underlying_move",
+        "points", "best_points", "worst_points", "gave_back_points", "r_multiple"}
 
 
 def _rows():
