@@ -104,6 +104,21 @@ def health():
 
 @app.get("/api/prices")
 def prices():
+    """Live prices for the chips.
+
+    PREFERS the broker. Yahoo caches for 5 seconds, so polling the screen
+    faster than that re-reads the same number - the browser was never the
+    limit, the source was. Webull's snapshot takes every symbol in ONE call,
+    so a once-a-second chip costs one request no matter how many are shown."""
+    syms = [s for s in config.SYMBOLS if config.SYMBOLS[s].get("enabled")]
+    e = SESSION.get("s")
+    if e is not None and hasattr(e, "stock_snapshot"):
+        try:
+            rows = e.stock_snapshot(syms)
+            if rows:
+                return rows
+        except Exception:
+            pass          # fall through to Yahoo rather than blank the chips
     if quotes is None:
         return {}
     try:

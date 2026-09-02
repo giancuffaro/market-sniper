@@ -608,7 +608,7 @@ const EZ = (function(){
   // Buying power is never shown. It exists to answer one question: can this
   // account cover the number of contracts currently selected?
   let buyingPower=0, lastAsks={CALLS:null, PUTS:null};
-  let sym="QQQ", side="CALLS", qty=1, inTrade=false, poll=null, priceTimer=null, trendTimer=null, velTimer=null, dirTimer=null;
+  let sym="QQQ", side="CALLS", qty=1, inTrade=false, poll=null, priceTimer=null, trendTimer=null, velTimer=null, dirTimer=null, quoteTimer=null;
   let profiles=[], activeProf=null, mirrorOn=false;
   let settings={strike_mode:"ITM2",ratchet_step_pct:10,tp_enabled:false,tp_value:30,tp_unit:"cents",
                 sl_enabled:false,sl_value:20,sl_unit:"cents",my_enabled:true};
@@ -798,7 +798,11 @@ const EZ = (function(){
     api('/api/settings',settings);
     syncStrategies();
     poll=setInterval(tick,1000);
-    priceTimer=setInterval(()=>{ refreshPrices(); if(!inTrade) refreshQuote(); },5000);
+    // Prices every second (one batched broker call), option quotes still on
+    // the slower beat - a 0DTE quote does not need a 1s refresh and each one
+    // is a separate request.
+    priceTimer=setInterval(refreshPrices,1000);
+    quoteTimer=setInterval(()=>{ if(!inTrade) refreshQuote(); },5000);
     trendTimer=setInterval(refreshTrend,20000);
     // 15s, as asked for.
     dirTimer=setInterval(refreshDirection,15000); refreshDirection();
@@ -817,7 +821,7 @@ const EZ = (function(){
   async function lockNow(auto){
     if(inTrade && !auto && !confirm('You have an OPEN position. Lock anyway?')) return;
     await api('/api/disconnect',{});
-    clearInterval(poll); clearInterval(priceTimer); clearInterval(trendTimer); clearInterval(dirTimer); clearInterval(velTimer);
+    clearInterval(poll); clearInterval(priceTimer); clearInterval(quoteTimer); clearInterval(trendTimer); clearInterval(dirTimer); clearInterval(velTimer);
     location.reload();
   }
 
@@ -1273,7 +1277,7 @@ const EZ = (function(){
     if(st && st.detail){                       // 400: this session is gone
       if(++lostCount >= 2){                    // one blip is not a disconnect
         connected = false;
-        clearInterval(poll); clearInterval(priceTimer);
+        clearInterval(poll); clearInterval(priceTimer); clearInterval(quoteTimer);
         clearInterval(trendTimer); clearInterval(dirTimer); clearInterval(velTimer);
         $('dash').classList.add('hidden');
         $('connectScreen').classList.remove('hidden');
@@ -1540,17 +1544,17 @@ const EZ = (function(){
   async function switchAccount(){
     if(inTrade && !confirm('You have an OPEN position. Leave anyway?')) return;
     await api('/api/disconnect',{});
-    clearInterval(poll); clearInterval(priceTimer); clearInterval(trendTimer); clearInterval(dirTimer); clearInterval(velTimer);
+    clearInterval(poll); clearInterval(priceTimer); clearInterval(quoteTimer); clearInterval(trendTimer); clearInterval(dirTimer); clearInterval(velTimer);
     location.reload();
   }
   async function disconnect(){
     localStorage.removeItem(LSP); localStorage.removeItem(LSPA); localStorage.removeItem(LSK);
-    await api('/api/disconnect',{}); clearInterval(poll); clearInterval(priceTimer); clearInterval(trendTimer); clearInterval(dirTimer); clearInterval(velTimer); location.reload();
+    await api('/api/disconnect',{}); clearInterval(poll); clearInterval(priceTimer); clearInterval(quoteTimer); clearInterval(trendTimer); clearInterval(dirTimer); clearInterval(velTimer); location.reload();
   }
   async function quitApp(){
     if(inTrade && !confirm('You have an OPEN position. Shut the app down anyway?')) return;
     if(!inTrade && !confirm('Shut the app down completely?')) return;
-    try{ clearInterval(poll); clearInterval(priceTimer); clearInterval(trendTimer); clearInterval(dirTimer); clearInterval(velTimer); }catch(e){}
+    try{ clearInterval(poll); clearInterval(priceTimer); clearInterval(quoteTimer); clearInterval(trendTimer); clearInterval(dirTimer); clearInterval(velTimer); }catch(e){}
     try{ await fetch('/api/shutdown',{method:'POST'}); }catch(e){}
     // also stop the sibling futures app (8010) so everything closes
     try{ await fetch('http://127.0.0.1:8010/api/shutdown',{method:'POST'}); }catch(e){}
@@ -1587,7 +1591,7 @@ const EZ = (function(){
 
       function standDown(){
         try{ clearInterval(poll); }catch(e){}
-        try{ clearInterval(priceTimer); }catch(e){}
+        try{ clearInterval(priceTimer); clearInterval(quoteTimer); }catch(e){}
         try{ clearInterval(trendTimer); clearInterval(dirTimer); }catch(e){}
         try{ clearInterval(velTimer); }catch(e){}
         try{ window.close(); }catch(e){}

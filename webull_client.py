@@ -1875,6 +1875,102 @@ class LiveSession(BaseSession):
             pass
         return out
 
+    # ---- BATCHED STOCK SNAPSHOT ------------------------------------------
+    # The price chips read Yahoo, which caches for 5 seconds - so polling the
+    # screen faster than that just re-reads the same number. Webull's own
+    # snapshot is the broker feed and takes up to 100 symbols in ONE call, so a
+    # once-a-second price costs one request regardless of how many symbols are
+    # on screen: 60 a minute out of a 300 budget shared three ways.
+    _STOCK_TTL = 0.9          # just under the 1s poll, so one poll = one call
+    _stock_cache = {"t": 0.0, "rows": {}}
+
+    def stock_snapshot(self, symbols):
+        """{SYM: {price, prev, change, change_pct}} from the broker, or None."""
+        syms = [s for s in (symbols or []) if s]
+        if not syms:
+            return {}
+        now = time.time()
+        c = self._stock_cache
+        if now - c["t"] < self._STOCK_TTL and all(s in c["rows"] for s in syms):
+            return {s: c["rows"][s] for s in syms}
+        try:
+            dc = self._od._client()
+        except Exception:                                    # noqa: BLE001
+            return None
+        holders = [dc]
+        for attr in dir(dc):
+            if not attr.startswith("_") and any(
+                    k in attr.lower() for k in ("market", "quote", "data")):
+                try:
+                    holders.append(getattr(dc, attr))
+                except Exception:                            # noqa: BLE001
+                    pass
+        joined = ",".join(syms)
+        for h in holders:
+            fn = getattr(h, "get_snapshot", None)
+            if not callable(fn):
+                continue
+            for args, kw in (((joined, "US_STOCK"), {}), ((syms, "US_STOCK"), {}),
+                             ((), {"symbols": joined, "category": "US_STOCK"}),
+                             ((), {"symbols": syms, "category": "US_STOCK"})):
+                try:
+                    body = self._od._result(paced(fn, *args, **kw))
+                except Exception:                            # noqa: BLE001
+                    continue
+                rows = self._parse_stock_snapshot(body, syms)
+                if rows:
+                    c["rows"].update(rows)
+                    c["t"] = time.time()
+                    return {s: rows[s] for s in syms if s in rows}
+        return None
+
+    @staticmethod
+    def _parse_stock_snapshot(body, syms):
+        rows = body
+        if isinstance(body, dict):
+            for k in ("data", "result", "list", "items", "snapshots"):
+                if isinstance(body.get(k), list):
+                    rows = body[k]
+                    break
+        if not isinstance(rows, list):
+            return {}
+        want = {s.upper(): s for s in syms}
+        out = {}
+        for row in rows:
+            if not isinstance(row, dict):
+                continue
+            sym = None
+            for k in ("symbol", "ticker", "tickerSymbol", "instrument_id"):
+                v = row.get(k)
+                if v is not None and str(v).upper() in want:
+                    sym = want[str(v).upper()]
+                    break
+            if sym is None:
+                continue
+
+            def _n(*names):
+                v = _find_key(row, *names)
+                try:
+                    return float(v)
+                except (TypeError, ValueError):
+                    return None
+            px = _n("price", "close", "last", "lastPrice", "tradePrice")
+            prev = _n("preClose", "pre_close", "previousClose", "prevClose")
+            if px is None:
+                continue
+            chg = (px - prev) if prev else _n("change")
+            pct = ((chg / prev * 100.0) if (prev and chg is not None)
+                   else _n("changeRatio", "change_ratio"))
+            # changeRatio arrives as a fraction on some endpoints.
+            if pct is not None and abs(pct) < 1 and chg and prev and abs(chg / prev) > 0.001:
+                pct *= 100.0
+            out[sym] = {"price": round(px, 2),
+                        "prev": round(prev, 2) if prev else None,
+                        "change": round(chg, 2) if chg is not None else 0.0,
+                        "change_pct": round(pct, 2) if pct is not None else 0.0,
+                        "live": True, "source": "webull"}
+        return out
+
     def recent_ticks(self, symbol, count=400):
         """Raw time-and-sales for the UNDERLYING, or None if unavailable.
 
