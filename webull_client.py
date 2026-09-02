@@ -2651,8 +2651,15 @@ class LiveSession(BaseSession):
             pass                              # never let this break the poll
 
         try:
-            a, b, m, _ = self._od.ask_bid_mark(
-                occ_symbol(p["symbol"], p["expiration"], p["option_type"], p["strike"]))
+            # CRITICAL. This one call is your P&L, your ratchet's input and the
+            # trigger for every automatic exit. It is the LAST thing that should
+            # be given up to save request budget - on 9/2 it was stalled behind
+            # a 20-second backoff caused by a balance refresh, and the screen
+            # sat there showing nothing while a live trade moved.
+            with call_priority(CRITICAL):
+                a, b, m, _ = self._od.ask_bid_mark(
+                    occ_symbol(p["symbol"], p["expiration"],
+                               p["option_type"], p["strike"]))
             real = m or ((a + b) / 2 if a and b else a or b)
             if real:
                 p["mark"] = round(float(real), 3)
