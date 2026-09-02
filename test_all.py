@@ -3442,6 +3442,42 @@ finally:
     check(69, "and read before the network is touched",
           _cn.index("_ACCOUNTS_CACHE.get") < _cn.index("paced_retry"))
 
+    # LOCKED OUT BY SOMEONE ELSE'S TRAFFIC. 9/2, twice: the Fill Announcer was
+    # making ~100 calls a minute on the same key, Webull refused to list his
+    # accounts, and he could not sign in to his own app at all. His account
+    # list does not change because another program is noisy, so a launch that
+    # is rate limited falls back to the list remembered from last time.
+    import user_config as uc
+    _KEY69 = "test-app-key-abc"
+    check(69, "nothing is remembered before a first sign-in",
+          wb._remembered_accounts(_KEY69) is None)
+    _rows69 = {"data": [{"account_id": "ACCT1", "account_type": "MARGIN"}]}
+    wb._remember_accounts(_KEY69, _rows69)
+    check(69, "a good sign-in is remembered",
+          wb._remembered_accounts(_KEY69) == _rows69)
+    check(69, "and is keyed to that app key only",
+          wb._remembered_accounts("a-different-key") is None)
+    # The app key itself must never be written down - only a fingerprint.
+    _book = uc.load("known_accounts", {}) or {}
+    check(69, "the raw app key is not used as the index",
+          _KEY69 not in _book and len(_book) >= 1, str(list(_book)[:3]))
+
+    _wasrl = wb.BUDGET.rate_limits
+    wb.BUDGET.rate_limits = 0
+    wb.BUDGET._blocked_until = 0.0
+    check(69, "a healthy key does not use the remembered list",
+          wb._rate_limited_now() is False)
+    wb.BUDGET.rate_limits = 3
+    check(69, "a rate-limited key does", wb._rate_limited_now() is True)
+    wb.BUDGET.rate_limits = _wasrl
+    _cn69 = _w69.split("def connect(self, app_key", 1)[1].split("\n    def ", 1)[0]
+    check(69, "the fallback is only reached when rate limited",
+          "_rate_limited_now()" in _cn69)
+    check(69, "and only after the live call is tried",
+          _cn69.index("_ACCOUNTS_CACHE.get") < _cn69.index("_remembered_accounts"))
+    check(69, "a successful list is written down for next time",
+          "_remember_accounts(app_key, data)" in _cn69)
+
     # The message has to name the cause. "account list failed: 429" reads like
     # a broken app; it is a shared budget, and it clears on its own.
     check(69, "a rate limit says it is a rate limit",
