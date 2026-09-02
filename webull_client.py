@@ -447,8 +447,42 @@ class OptionData:
         raise OrderRejected("Couldn't load the option quote from Webull right now. Try again in a "
                             "moment; if it keeps failing, the market may be closed. (" + joined[:150] + ")")
 
-    def ask_bid_mark(self, occ):
+    # A one-second screen refresh with a mirror account attached asked Webull
+    # for the SAME contract twice a second. The second call cannot have learned
+    # anything the first did not - so it is served from here instead.
+    # 0.8s, not longer: this quote prices a marketable limit, and stale is a
+    # worse fill.
+    _SNAP_TTL = 0.8
+    _snap_cache = {}
+    _snap_lock = threading.Lock()
+
+    def snapshot_cached(self, occ, max_age=None):
+        ttl = self._SNAP_TTL if max_age is None else max_age
+        now = time.time()
+        if ttl > 0:
+            with self._snap_lock:
+                hit = self._snap_cache.get(occ)
+            if hit and now - hit[0] < ttl:
+                return hit[1]
         row = self.snapshot_row(occ)
+        with self._snap_lock:
+            self._snap_cache[occ] = (time.time(), row)
+            # Never let this grow into a leak on a long session.
+            if len(self._snap_cache) > 64:
+                for k in sorted(self._snap_cache, key=lambda k: self._snap_cache[k][0])[:32]:
+                    self._snap_cache.pop(k, None)
+        return row
+
+    def forget_snapshot(self, occ=None):
+        """Drop the cache before pricing a real order."""
+        with self._snap_lock:
+            if occ is None:
+                self._snap_cache.clear()
+            else:
+                self._snap_cache.pop(occ, None)
+
+    def ask_bid_mark(self, occ, max_age=None):
+        row = self.snapshot_cached(occ, max_age=max_age)
         def f(*names):
             v = _find_key(row, *names)
             try:
