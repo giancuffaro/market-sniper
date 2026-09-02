@@ -3303,6 +3303,41 @@ finally:
     _p2._on_message(None, "t", [{"symbol": "QQQ", "bid": 1.0, "ask": 1.1}])
     check(68, "bid/ask without a trade is not a price", _p2.price("QQQ") is None)
 
+    # ONE PAYLOAD TYPE PER CALL. Passing ["quote","snapshot"] came back
+    # `UNSUPPORTED_SUB_TYPE: Subtype not supported:quotesnapshot` from his live
+    # account at 14:16:51 - the server concatenates the list instead of reading
+    # it as two types. The stream looked connected and delivered nothing.
+    class _FakeSub:
+        def __init__(self, fail=()):
+            self.calls = []
+            self.fail = fail
+        def subscribe(self, syms, cat, types):
+            self.calls.append(tuple(types))
+            if types and types[0] in self.fail:
+                raise Exception("UNSUPPORTED_SUB_TYPE")
+    _p4 = _st.PriceStream("k", "s")
+    _fk = _FakeSub()
+    _p4._sub(_fk, ["SPY"])
+    check(68, "never sends two payload types in one call",
+          all(len(c) == 1 for c in _fk.calls), str(_fk.calls))
+    check(68, "and does not send the string that was rejected",
+          not any("quotesnapshot" in "".join(c) for c in _fk.calls), str(_fk.calls))
+    check(68, "it asks for snapshot and quote separately",
+          len(_fk.calls) == 2, str(_fk.calls))
+    check(68, "snapshot first — it carries the previous close",
+          _fk.calls[0] == (_st.PAYLOAD_TYPE_SHAPSHOT,), str(_fk.calls))
+    # One type failing must not lose the other.
+    _p5 = _st.PriceStream("k", "s")
+    _fk2 = _FakeSub(fail=(_st.PAYLOAD_TYPE_SHAPSHOT,))
+    check(68, "one rejected type still leaves a stream",
+          _p5._sub(_fk2, ["SPY"]) is True and _p5._connected is True)
+    _p6 = _st.PriceStream("k", "s")
+    _fk3 = _FakeSub(fail=(_st.PAYLOAD_TYPE_SHAPSHOT, _st.PAYLOAD_TYPE_QUOTE))
+    check(68, "both failing is reported, not raised",
+          _p6._sub(_fk3, ["SPY"]) is False and _p6._connected is False)
+    check(68, "and the reason is kept", "subscribe(" in (_p6._last_error or ""),
+          str(_p6._last_error))
+
     # Starting must never raise, whatever is or is not installed.
     _p3 = _st.PriceStream("bad", "bad")
     try:
