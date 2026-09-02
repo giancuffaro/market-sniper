@@ -624,6 +624,28 @@ def forget_position():
     return {"ok": True, **_sess().forget_position()}
 
 
+@app.post("/api/position/manage")
+def manage_position():
+    """Hand an adopted position to the ratchet. Sends NOTHING to Webull now -
+    it only clears the flag that stops the brackets firing, so from here the
+    normal exit logic applies.
+
+    He presses this. Not the app - because only he knows whether the
+    discord-sniper bot is also holding that contract, and two tools resting a
+    sell on one contract is how you get flattened twice.
+    """
+    sess = _sess()
+    p = sess.position
+    if not p:
+        raise HTTPException(400, "nothing to manage — you're flat")
+    p.pop("needs_manage_ok", None)
+    p["ratchet_on"] = True
+    p["ratchet_step"] = float(sess.settings.get("ratchet_step_pct") or 10.0)
+    sess.last_event = ("Managing the %s %s now — the ratchet is live on it."
+                       % (p["symbol"], p.get("option_type", "")))
+    return {"ok": True, "position": p}
+
+
 @app.post("/api/disconnect")
 def disconnect():
     SESSION["s"] = None
