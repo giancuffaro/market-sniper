@@ -1,7 +1,7 @@
 """MARKET SNIPER — Webull session wrapper. v3.1
 (Symbols: SPY/QQQ daily-0DTE, TSLA weekly via nearest-Friday expiry.)"""
 
-import os, re, time, uuid, math, random, threading, functools
+import os, re, time, uuid, math, random, threading, functools, hashlib
 import datetime as dt
 try:
     from zoneinfo import ZoneInfo
@@ -417,6 +417,41 @@ ACCOUNTS_TTL = 90.0
 # KEYED BY APP KEY. A cache that ignored which key asked would hand a second
 # key the first key's accounts - a wrong account id is a wrong account traded.
 _ACCOUNTS_CACHE = {"key": None, "rows": None, "at": 0.0}
+
+
+def _rate_limited_now():
+    """True when the budget is currently holding calls back after a 429."""
+    try:
+        return BUDGET.stats().get("blocked_for", 0) > 0 or BUDGET.rate_limits > 0
+    except Exception:
+        return False
+
+
+def _acct_key(app_key):
+    # Only ever a fingerprint of the key, never the key itself, so nothing
+    # secret is written to a file that gets shared or synced.
+    return hashlib.sha256((app_key or "").encode("utf-8")).hexdigest()[:16]
+
+
+def _remember_accounts(app_key, data):
+    """Keep this key's account list on disk so a rate-limited launch can still
+    show the picker. 9/2: another program on the same key was making ~100 calls
+    a minute, Webull refused to list his accounts, and he could not sign in to
+    his own app at all - twice."""
+    try:
+        book = uc.load("known_accounts", {}) or {}
+        book[_acct_key(app_key)] = {"rows": data, "at": time.time()}
+        uc.save("known_accounts", book)
+    except Exception:
+        pass
+
+
+def _remembered_accounts(app_key):
+    try:
+        got = (uc.load("known_accounts", {}) or {}).get(_acct_key(app_key))
+        return got.get("rows") if isinstance(got, dict) else None
+    except Exception:
+        return None
 
 class _Budget:
     """Serialises and paces every Webull request this process makes.
@@ -1910,6 +1945,16 @@ class LiveSession(BaseSession):
         if (cached and _ACCOUNTS_CACHE.get("key") == app_key
                 and time.time() - _ACCOUNTS_CACHE.get("at", 0) < ACCOUNTS_TTL):
             data = cached
+        elif _remembered_accounts(app_key) is not None and _rate_limited_now():
+            # LAST RESORT: the key is in backoff and we already know what this
+            # key's accounts are from a previous sign-in. Your account list does
+            # not change because another program is being noisy, and being
+            # locked out of your own app by someone else's traffic is worse
+            # than reading a list that is minutes old. The account ID is then
+            # verified against the broker on the very next call anyway.
+            data = _remembered_accounts(app_key)
+            print("[CONNECT] rate limited - using the account list remembered "
+                  "from your last sign-in", flush=True)
         else:
             try:
                 res = paced_retry(self.trade.account_v2.get_account_list)
@@ -1936,6 +1981,7 @@ class LiveSession(BaseSession):
                 raise OrderRejected("account list failed: %s" % code)
             data = res.json()
             _ACCOUNTS_CACHE.update({"key": app_key, "rows": data, "at": time.time()})
+            _remember_accounts(app_key, data)
         if isinstance(data, list):
             accounts = data
         elif isinstance(data, dict):
