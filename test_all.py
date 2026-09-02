@@ -2514,13 +2514,20 @@ try:
         _sp = wb.stop_below(_ref, _pct)
         check(58, "stop_below(%.2f, %g%%) sits strictly below" % (_ref, _pct),
               _sp < _ref - 1e-9, "%.2f vs %.2f" % (_sp, _ref))
-        check(58, "stop_below(%.2f, %g%%) is on the grid" % (_ref, _pct), _legal(_sp), str(_sp))
+        # 0.01 is the absolute floor, not a grid price. On a contract already
+        # AT one tick there is no legal price below it, so the floor is the
+        # only honest answer - and a protective stop on a 0.05 contract is
+        # academic anyway. Same behaviour as discord-sniper.
+        check(58, "stop_below(%.2f, %g%%) is on the grid, or the 0.01 floor"
+              % (_ref, _pct), _legal(_sp) or _sp == 0.01, str(_sp))
         check(58, "stop_below(%.2f, %g%%) is a real order" % (_ref, _pct), _sp >= 0.01)
 
     # A tiny percentage on a cheap contract is where naive rounding lands ON
     # the reference - the whole reason the guard drops a full step.
     check(58, "a 1% stop on a 0.20 contract still clears it",
           wb.stop_below(0.20, 1) < 0.20, str(wb.stop_below(0.20, 1)))
+    check(58, "a contract at one tick falls back to the floor",
+          wb.stop_below(0.05, 50) == 0.01, str(wb.stop_below(0.05, 50)))
     check(58, "the ported reason is recorded", "stopped out seven seconds after" in
           io.open("webull_client.py", encoding="utf-8").read())
 
