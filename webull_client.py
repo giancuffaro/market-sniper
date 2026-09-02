@@ -2537,8 +2537,10 @@ class LiveSession(BaseSession):
             return None
         step = config.SYMBOLS.get(symbol, {}).get("strike_step", 1.0)
         strike = pick_strike(spot, "CALLS", step, "ATM1")
-        a, b, m, row = self._od.ask_bid_mark(
-            occ_symbol(symbol, _expiry_for(symbol), "CALL", strike))
+        # LOW: this feeds the volatility gauge, nothing more.
+        with call_priority(LOW):
+            a, b, m, row = self._od.ask_bid_mark(
+                occ_symbol(symbol, _expiry_for(symbol), "CALL", strike))
         mid = m or ((a + b) / 2.0 if (a and b) else (a or b))
         if not mid:
             return None
@@ -2752,8 +2754,10 @@ class LiveSession(BaseSession):
         p = self.position
         bid = p.get("bid")
         try:
-            a, b, m, _ = self._od.ask_bid_mark(
-                occ_symbol(p["symbol"], p["expiration"], p["option_type"], p["strike"]))
+            # IMMEDIATE: this is the EXIT. Never dropped to save budget.
+            with call_priority(IMMEDIATE):
+                a, b, m, _ = self._od.ask_bid_mark(
+                    occ_symbol(p["symbol"], p["expiration"], p["option_type"], p["strike"]))
             if b:
                 bid = b
         except Exception:
