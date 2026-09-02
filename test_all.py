@@ -3730,7 +3730,7 @@ finally:
 
     # Sign-in must finish well inside the request timeout, or the worker is
     # abandoned every single time and the pool drains.
-    _TMO72 = int(re.search(r'CONNECT_TIMEOUT_S = (\\d+)', _m72).group(1))
+    _TMO72 = int(re.search(r"CONNECT_TIMEOUT_S = (\d+)", _m72).group(1))
     _mi72, _bo72 = wb.MIN_CALL_INTERVAL, wb.BACKOFF_AFTER_429
     wb.BUDGET.min_interval = 0.0
     try:
