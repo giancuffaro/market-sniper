@@ -2560,6 +2560,15 @@ class LiveSession(BaseSession):
                 "gamma": _num("gamma"), "vega": _num("vega")}
 
     def quote(self, symbol, side):
+        """The quote behind the BUY button.
+
+        IMMEDIATE, not NORMAL. He pressed a button and is watching the screen,
+        so this is the one read that must not be quietly dropped to protect the
+        request budget - "Couldn't load the option quote... skipped: the API is
+        backing off" is a dead end with nothing he can do about it. It is one
+        request per press, self-limiting by definition, and Webull's limit is a
+        ROLLING minute, so a single call now is the right trade.
+        """
         if not config.SYMBOLS.get(symbol, {}).get("enabled", False):
             raise OrderRejected(
                 f"{symbol} isn't enabled for trading here. Use SPY, QQQ or TSLA.")
@@ -2569,8 +2578,9 @@ class LiveSession(BaseSession):
         step = config.SYMBOLS[symbol]["strike_step"]
         strike = pick_strike(spot, side, step, self.settings["strike_mode"])
         option_type = "CALL" if side == "CALLS" else "PUT"
-        a, b, m, row = self._od.ask_bid_mark(
-            occ_symbol(symbol, _expiry_for(symbol), option_type, strike))
+        with call_priority(IMMEDIATE):
+            a, b, m, row = self._od.ask_bid_mark(
+                occ_symbol(symbol, _expiry_for(symbol), option_type, strike))
         if not a or a <= 0:
             raise OrderRejected(f"no ask in snapshot — response: {str(row)[:150]}")
         q = self.contract_quality(spot, strike, option_type, a, b)
