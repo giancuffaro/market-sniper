@@ -1432,6 +1432,42 @@ class BaseSession:
                     return rows
         return None
 
+    def _last_known_exit(self, p):
+        """Best guess at where a trade ended when we were not told.
+
+        The bid is what a sale would actually have got; the mark is the
+        fallback. Marked ESTIMATED wherever it is used, because a guess that
+        looks like a fact is worse than no row at all.
+        """
+        for k in ("bid", "mark"):
+            v = p.get(k)
+            try:
+                if v and float(v) > 0:
+                    return float(v)
+            except (TypeError, ValueError):
+                continue
+        return None
+
+    def _record_vanished(self, p, why):
+        """Write a trade that ended OUTSIDE the app to the journal.
+
+        Neither the auto-clear nor the CLEAR IT button used to do this - they
+        cleared the screen and the trade was simply gone. G closes at the
+        broker regularly, so the journal was quietly losing whole trades and
+        the day's numbers were wrong by however many.
+        """
+        px = self._last_known_exit(p)
+        if px is None:
+            print("[journal] %s %s cleared with no last price - NOT recorded"
+                  % (p.get("symbol"), why), flush=True)
+            return
+        p["exit_reason"] = why
+        try:
+            self._record_close(p, px, estimated=True)
+        except Exception as e:                               # noqa: BLE001
+            print("[journal] could not record the cleared trade: %s"
+                  % str(e)[:120], flush=True)
+
     def reconcile(self, force=False):
         """Clear our position if Webull says we hold nothing. Sends no orders."""
         now = time.time()
@@ -1449,6 +1485,8 @@ class BaseSession:
             p, self.position = self.position, None
             self.armed = None
         if p:
+            # RECORD IT. You closed it somewhere else, but it was still a trade.
+            self._record_vanished(p, "CLOSED-ELSEWHERE")
             self.last_event = (
                 "Webull says you hold nothing, so the app cleared its %s %s%s. "
                 "You closed it outside the app. No order was sent."
@@ -1465,6 +1503,7 @@ class BaseSession:
             p, self.position = self.position, None
             self.armed = None
         if p:
+            self._record_vanished(p, "CLEARED-BY-HAND")
             self.last_event = (f"Cleared {p['symbol']} {int(p['strike'])}"
                                f"{'C' if p['side'] == 'CALLS' else 'P'} from the screen. "
                                f"No order was sent — check Webull to be sure you're flat.")
