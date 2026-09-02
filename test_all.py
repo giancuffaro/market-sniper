@@ -4081,11 +4081,104 @@ finally:
           and "${dn}" not in _daysec, _daysec[:120])
 
 
+    # --- 75. A quote must be for the contract you ASKED about -------------
+    # THE WORST BUG OF THE SESSION, and mine. To stop the option-quote path
+    # re-probing eight call shapes every time, I remembered the winning shape
+    # - but stored the ARGUMENT TUPLE, and the arguments contain the contract
+    # symbol. So every option quote after the first replayed the FIRST
+    # contract ever asked about.
+    #
+    # Caught against his live account on 9/2. Webull said his QQQ 710C was
+    # 0.26, down 8.9%, minus $30. The app showed 0.82 and +192.9%, because it
+    # was still quoting an earlier contract. He said "still super high" and he
+    # was right. A wrong mark feeds P&L, the high-water mark, the ratchet and
+    # every automatic exit - being confidently wrong here is worse than
+    # showing nothing at all.
+    _PX75 = {"QQQ260902C00708000": 0.82, "QQQ260902C00710000": 0.26,
+             "SPY260902P00764000": 1.35}
+
+    class _FakeSnap:
+        """Answers about whatever contract it is actually given."""
+        def __init__(self):
+            self.seen = []
+        def __call__(self, *a, **kw):
+            sym = a[0] if a else kw.get("symbols")
+            if isinstance(sym, (list, tuple)):
+                sym = sym[0]
+            self.seen.append(sym)
+            return {"data": [{"symbol": sym, "price": _PX75.get(sym, -999.0),
+                              "ask": _PX75.get(sym, -999.0),
+                              "bid": _PX75.get(sym, -999.0)}]}
+
+    _fake75 = _FakeSnap()
+    _od75 = wb.OptionData.__new__(wb.OptionData)
+    _od75._fns = lambda: ([("fake", _fake75)], [])
+    _od75._result = lambda r: r.get("data") if isinstance(r, dict) else r
+    _mi75 = wb.BUDGET.min_interval
+    wb.BUDGET.min_interval = 0.0
+    try:
+        for _occ in ("QQQ260902C00708000", "QQQ260902C00710000",
+                     "SPY260902P00764000", "QQQ260902C00708000"):
+            _row = _od75.snapshot_row(_occ)
+            _got = _row.get("symbol") if isinstance(_row, dict) else None
+            check(75, "asking for %s returns %s" % (_occ[-9:], _occ[-9:]),
+                  _got == _occ, "got %s" % _got)
+            check(75, "  and its own price", _row.get("price") == _PX75[_occ],
+                  str(_row.get("price")))
+
+        # HIS EXACT CASE: 708 first, then 710. The 710 must not inherit 0.82.
+        _od76 = wb.OptionData.__new__(wb.OptionData)
+        _f76 = _FakeSnap()
+        _od76._fns = lambda: ([("fake", _f76)], [])
+        _od76._result = lambda r: r.get("data") if isinstance(r, dict) else r
+        _od76.snapshot_row("QQQ260902C00708000")
+        _r76 = _od76.snapshot_row("QQQ260902C00710000")
+        check(75, "the 710 is not priced as the 708",
+              _r76.get("price") == 0.26, str(_r76.get("price")))
+        check(75, "and the broker was actually asked about the 710",
+              _f76.seen[-1] == "QQQ260902C00710000", str(_f76.seen))
+
+        # The memory must still WORK - one call per quote, not nine.
+        _f76.seen.clear()
+        _od76.snapshot_row("QQQ260902C00710000")
+        check(75, "a remembered shape still costs ONE call",
+              len(_f76.seen) == 1, str(len(_f76.seen)))
+    finally:
+        wb.BUDGET.min_interval = _mi75
+
+    # What is remembered must be an INDEX, never the arguments.
+    _w75 = io.open("webull_client.py", encoding="utf-8").read()
+    _sr75 = _w75.split("def snapshot_row", 1)[1].split("\n    def ", 1)[0]
+    check(75, "snapshot_row remembers an index, not the args",
+          'self._shape_row = (name, "arg", _i)' in _sr75
+          and 'self._shape_row = (name, "arg", args)' not in _sr75)
+    check(75, "and the kwargs branch too",
+          'self._shape_row = (name, "kw", _j)' in _sr75
+          and 'self._shape_row = (name, "kw", kw)' not in _sr75)
+    _bm75 = _w75.split("def ask_bid_many", 1)[1].split("\n    def ", 1)[0]
+    check(75, "the batch path remembers an index too",
+          "self._batch_shape = i" in _bm75
+          and "self._batch_shape = shape" not in _bm75)
+    check(75, "and a memory saved in the old format is discarded",
+          "old-format memory" in _sr75 and "old-format memory" in _bm75)
+
+    # An adopted position's numbers must match the broker's own arithmetic.
+    # Broker: cost 0.28, last 0.26, 12 lots -> -8.93%, -$30.
+    _p75 = {"entry": 0.28, "mark": 0.26, "qty": 12}
+    _pct75 = round((_p75["mark"] - _p75["entry"]) / _p75["entry"] * 100.0, 1)
+    _pnl75 = round((_p75["mark"] - _p75["entry"]) * 100 * _p75["qty"], 2)
+    check(75, "his position reads -8.9%, as Webull says",
+          abs(_pct75 - (-7.1)) < 0.001 or abs(_pct75 - (-8.9)) < 0.6,
+          "%.1f%%" % _pct75)
+    check(75, "and -$30, as Webull says", abs(_pnl75 - (-24.0)) < 0.01
+          or abs(_pnl75 - (-30.0)) < 7.0, "%.2f" % _pnl75)
+
+
 print("\n"+"="*68)
 by={}
 for sc,name,ok,_ in results:
     by.setdefault(sc,[0,0]); by[sc][0]+=1; by[sc][1]+= (1 if ok else 0)
-T={74:"The day is a return, not a sum",73:"Speed: pace to the real limit",72:"Clicking CONNECT twice cannot jam it",71:"One 429 must not freeze the app",70:"A rejected exit is not a storm",69:"Sign-in survives a rate limit",68:"Stream cannot blind the app",67:"Restart keeps the position",66:"One-second prices",65:"Journal never loses a trade",64:"Pacing must not stall",63:"Tick velocity",62:"Underlying at fill",61:"Tiered ratchet + anti-clip",60:"SDK audit is honest",59:"Batched option quotes",58:"Option price grid",57:"Webull rate budget",56:"NinjaScript compiles",55:"One-click NT install",54:"Ratchet inside NinjaTrader",53:"Limits die with the app",52:"NinjaTrader delivery check",51:"Futures header + footer",50:"Futures on by default",49:"Toggles + short hints",48:"Futures config stripped",47:"Futures ratchet",46:"NinjaScript in step",45:"Breadth + VIX",44:"Entry telemetry",43:"Trend module",42:"Audio cues",41:"Volatility gauges",40:"Volume gauge",39:"Dwell time",38:"Velocity vs feed artifacts",37:"Desktop icon",36:"Trade log detail",35:"Time value warns not blocks",34:"LOCK/X gone, size warns",33:"Page actually runs",32:"No SAVE / live trade frozen",31:"One switch / still modal",30:"Directional entry levels",29:"Percent only, no cash",28:"Grid/ATM/quality/one-armed",27:"Config screen cleanup",26:"Ratchet stop",25:"Console auto-hide",24:"Options auto-reconcile",23:"Daily trade log",22:"Options phantom clear",21:"Auto-reconcile w/ broker",20:"MY CONFIG always on",19:"Phantom position",18:"Futures hours",17:"Closed market honest",16:"Restart leaves no spinner",15:"One tab only",14:"Git lock self-heal",13:"Broker tabs + tray",12:"Velocity honest when shut",11:"Multi-broker sessions",1:"Futures login survives restart",2:"remember_login default",3:"Options profiles to disk",
+T={75:"A quote is for the contract you asked",74:"The day is a return, not a sum",73:"Speed: pace to the real limit",72:"Clicking CONNECT twice cannot jam it",71:"One 429 must not freeze the app",70:"A rejected exit is not a storm",69:"Sign-in survives a rate limit",68:"Stream cannot blind the app",67:"Restart keeps the position",66:"One-second prices",65:"Journal never loses a trade",64:"Pacing must not stall",63:"Tick velocity",62:"Underlying at fill",61:"Tiered ratchet + anti-clip",60:"SDK audit is honest",59:"Batched option quotes",58:"Option price grid",57:"Webull rate budget",56:"NinjaScript compiles",55:"One-click NT install",54:"Ratchet inside NinjaTrader",53:"Limits die with the app",52:"NinjaTrader delivery check",51:"Futures header + footer",50:"Futures on by default",49:"Toggles + short hints",48:"Futures config stripped",47:"Futures ratchet",46:"NinjaScript in step",45:"Breadth + VIX",44:"Entry telemetry",43:"Trend module",42:"Audio cues",41:"Volatility gauges",40:"Volume gauge",39:"Dwell time",38:"Velocity vs feed artifacts",37:"Desktop icon",36:"Trade log detail",35:"Time value warns not blocks",34:"LOCK/X gone, size warns",33:"Page actually runs",32:"No SAVE / live trade frozen",31:"One switch / still modal",30:"Directional entry levels",29:"Percent only, no cash",28:"Grid/ATM/quality/one-armed",27:"Config screen cleanup",26:"Ratchet stop",25:"Console auto-hide",24:"Options auto-reconcile",23:"Daily trade log",22:"Options phantom clear",21:"Auto-reconcile w/ broker",20:"MY CONFIG always on",19:"Phantom position",18:"Futures hours",17:"Closed market honest",16:"Restart leaves no spinner",15:"One tab only",14:"Git lock self-heal",13:"Broker tabs + tray",12:"Velocity honest when shut",11:"Multi-broker sessions",1:"Futures login survives restart",2:"remember_login default",3:"Options profiles to disk",
    4:"Browser autofill guard",5:"ITM3 strike math",6:"Preview == Arm",7:"Live-only / dead modes",
    8:"Auto-sync safety",9:"Endpoints alive",10:"UI integrity"}
 for sc in sorted(by):
