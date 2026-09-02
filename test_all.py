@@ -3352,11 +3352,87 @@ finally:
           'account list failed: %s' in _cn)
 
 
+    import futures_client as fc
+
+    # --- 70. A rejected exit must not become a storm -----------------------
+    # 9/2, measured from his own log: 1,472 rate-limit errors in seventeen
+    # minutes, 313 of them on order/place. The stop was hit, close() was
+    # refused because the key was rate limited, the position stayed - so one
+    # second later the same bracket fired and sent the order again. Forever.
+    # It ate the shared budget, so quotes 429'd too, which is why he reported
+    # "trades not polling fast" and "PNL not even showing". The retry storm
+    # WAS the blindness.
+    def _stuck(mod, cls_name="LiveSession"):
+        z = getattr(mod, cls_name).__new__(getattr(mod, cls_name))
+        z._order_lock = threading.RLock(); z.last_event = ""; z.blotter = []
+        z.position = {"symbol": "SPY", "side": "PUTS", "qty": 1, "strike": 764.0}
+        z._bracket_hit = lambda: "SL"
+        z._n = {"n": 0}
+        def _boom():
+            z._n["n"] += 1
+            raise mod.OrderRejected("HTTP Status: 429, Code: TOO_MANY_REQUESTS")
+        z.close = _boom
+        return z
+
+    _z = _stuck(wb)
+    for _ in range(200):
+        _z._maybe_auto_close()
+    check(70, "200 ticks do not send 200 orders", _z._n["n"] <= 3, str(_z._n))
+    check(70, "but it DOES keep trying", _z._n["n"] >= 1, str(_z._n))
+    check(70, "and says the broker is rate limiting",
+          "RATE LIMITING" in _z.last_event, _z.last_event[:80])
+    check(70, "and tells him where to close it by hand",
+          "Webull app" in _z.last_event, _z.last_event[:80])
+
+    # It must still get out within a sane time - stuck in a trade is worse
+    # than any request cost.
+    check(70, "never waits longer than 15s", wb.CLOSE_RETRY_MAX <= 15.0,
+          str(wb.CLOSE_RETRY_MAX))
+    _z._close_retry_at = 0.0
+    _z._maybe_auto_close()
+    check(70, "and retries once the wait is up", _z._n["n"] >= 2, str(_z._n))
+
+    # A SUCCESSFUL close clears the backoff, or the next trade inherits it.
+    _z2 = _stuck(wb)
+    _z2._maybe_auto_close()
+    check(70, "a failure sets a backoff", _z2._close_retry_at > time.time())
+    _z2.close = lambda: {"pnl": 5.0}
+    _z2._close_retry_at = 0.0
+    _z2._maybe_auto_close()
+    check(70, "a success clears it", _z2._close_retry_at == 0.0
+          and _z2._close_fails == 0, str(_z2._close_retry_at))
+
+    # The futures side had the identical fault.
+    _f = fc.FuturesSession.__new__(fc.FuturesSession)
+    _f.last_event = ""; _f.blotter = []
+    _f.position = {"symbol": "MNQ", "side": "SHORT", "qty": 1}
+    _f._bracket_hit = lambda: "SL"
+    _fn = {"n": 0}
+    def _fboom():
+        _fn["n"] += 1
+        raise fc.OrderRejected("rejected")
+    _f.close = _fboom
+    for _ in range(200):
+        _f._maybe_auto_close()
+    check(70, "futures: 200 ticks do not send 200 orders", _fn["n"] <= 3, str(_fn))
+    check(70, "futures: but it does keep trying", _fn["n"] >= 1, str(_fn))
+    check(70, "futures: and names the wait", "retrying in" in _f.last_event,
+          _f.last_event[:70])
+    check(70, "futures: capped too", fc.CLOSE_RETRY_MAX <= 15.0,
+          str(fc.CLOSE_RETRY_MAX))
+
+    # The ENTRY side was already safe and must stay that way: it clears `armed`
+    # BEFORE placing, so a rejected buy cannot re-fire on the next tick.
+    _ent = _w69.split("def _maybe_trigger_entry", 1)[1].split("\n    def ", 1)[0]
+    check(70, "an armed entry is cleared before the order goes",
+          _ent.index("self.armed = None") < _ent.index("self.place("))
+
+
 print("\n"+"="*68)
 by={}
 for sc,name,ok,_ in results:
     by.setdefault(sc,[0,0]); by[sc][0]+=1; by[sc][1]+= (1 if ok else 0)
-T={69:"Sign-in survives a rate limit",68:"Stream cannot blind the app",67:"Restart keeps the position",66:"One-second prices",65:"Journal never loses a trade",64:"Pacing must not stall",63:"Tick velocity",62:"Underlying at fill",61:"Tiered ratchet + anti-clip",60:"SDK audit is honest",59:"Batched option quotes",58:"Option price grid",57:"Webull rate budget",56:"NinjaScript compiles",55:"One-click NT install",54:"Ratchet inside NinjaTrader",53:"Limits die with the app",52:"NinjaTrader delivery check",51:"Futures header + footer",50:"Futures on by default",49:"Toggles + short hints",48:"Futures config stripped",47:"Futures ratchet",46:"NinjaScript in step",45:"Breadth + VIX",44:"Entry telemetry",43:"Trend module",42:"Audio cues",41:"Volatility gauges",40:"Volume gauge",39:"Dwell time",38:"Velocity vs feed artifacts",37:"Desktop icon",36:"Trade log detail",35:"Time value warns not blocks",34:"LOCK/X gone, size warns",33:"Page actually runs",32:"No SAVE / live trade frozen",31:"One switch / still modal",30:"Directional entry levels",29:"Percent only, no cash",28:"Grid/ATM/quality/one-armed",27:"Config screen cleanup",26:"Ratchet stop",25:"Console auto-hide",24:"Options auto-reconcile",23:"Daily trade log",22:"Options phantom clear",21:"Auto-reconcile w/ broker",20:"MY CONFIG always on",19:"Phantom position",18:"Futures hours",17:"Closed market honest",16:"Restart leaves no spinner",15:"One tab only",14:"Git lock self-heal",13:"Broker tabs + tray",12:"Velocity honest when shut",11:"Multi-broker sessions",1:"Futures login survives restart",2:"remember_login default",3:"Options profiles to disk",
+T={70:"A rejected exit is not a storm",69:"Sign-in survives a rate limit",68:"Stream cannot blind the app",67:"Restart keeps the position",66:"One-second prices",65:"Journal never loses a trade",64:"Pacing must not stall",63:"Tick velocity",62:"Underlying at fill",61:"Tiered ratchet + anti-clip",60:"SDK audit is honest",59:"Batched option quotes",58:"Option price grid",57:"Webull rate budget",56:"NinjaScript compiles",55:"One-click NT install",54:"Ratchet inside NinjaTrader",53:"Limits die with the app",52:"NinjaTrader delivery check",51:"Futures header + footer",50:"Futures on by default",49:"Toggles + short hints",48:"Futures config stripped",47:"Futures ratchet",46:"NinjaScript in step",45:"Breadth + VIX",44:"Entry telemetry",43:"Trend module",42:"Audio cues",41:"Volatility gauges",40:"Volume gauge",39:"Dwell time",38:"Velocity vs feed artifacts",37:"Desktop icon",36:"Trade log detail",35:"Time value warns not blocks",34:"LOCK/X gone, size warns",33:"Page actually runs",32:"No SAVE / live trade frozen",31:"One switch / still modal",30:"Directional entry levels",29:"Percent only, no cash",28:"Grid/ATM/quality/one-armed",27:"Config screen cleanup",26:"Ratchet stop",25:"Console auto-hide",24:"Options auto-reconcile",23:"Daily trade log",22:"Options phantom clear",21:"Auto-reconcile w/ broker",20:"MY CONFIG always on",19:"Phantom position",18:"Futures hours",17:"Closed market honest",16:"Restart leaves no spinner",15:"One tab only",14:"Git lock self-heal",13:"Broker tabs + tray",12:"Velocity honest when shut",11:"Multi-broker sessions",1:"Futures login survives restart",2:"remember_login default",3:"Options profiles to disk",
    4:"Browser autofill guard",5:"ITM3 strike math",6:"Preview == Arm",7:"Live-only / dead modes",
    8:"Auto-sync safety",9:"Endpoints alive",10:"UI integrity"}
 for sc in sorted(by):
