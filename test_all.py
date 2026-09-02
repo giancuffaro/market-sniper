@@ -2705,8 +2705,9 @@ try:
     check(61, "tiers off restores the flat rungs",
           _r62.position["ratchet"]["stop_pct"] == 0.0,
           str(_r62.position["ratchet"]["stop_pct"]))
+    import config as _cfg61
     check(61, "the toggle exists and defaults on",
-          config.DEFAULT_SETTINGS.get("ratchet_tiers") is True)
+          _cfg61.DEFAULT_SETTINGS.get("ratchet_tiers") is True)
     check(61, "the module is imported defensively",
           "import ratchet_tiers as rt\nexcept Exception:" in
           io.open("webull_client.py", encoding="utf-8").read())
