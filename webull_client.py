@@ -381,6 +381,12 @@ MIN_CALL_INTERVAL = 0.20      # seconds between ANY two Webull calls
 BACKOFF_AFTER_429 = 20.0      # dead time once the broker says slow down
 
 
+# How often the app asks the broker "am I actually holding something?" while it
+# believes it is flat. One second would be 60 requests a minute out of a budget
+# of 300 shared with the bridge and the announcer, to answer a question that
+# changes only when a fill happens.
+ADOPT_EVERY = 5.0
+
 class _Budget:
     """Serialises and paces every Webull request this process makes.
 
@@ -1506,6 +1512,18 @@ class BaseSession:
             print("[journal] could not record the cleared trade: %s"
                   % str(e)[:120], flush=True)
 
+    def adopt_on_connect(self):
+        """Adopt straight away instead of waiting up to ADOPT_EVERY seconds.
+
+        Called the moment an account is selected. Reconnecting mid-trade is
+        exactly when the answer is needed on screen, not five seconds later.
+        """
+        self._adopt_tick = time.time()
+        try:
+            return self.adopt_broker_position()
+        except Exception:
+            return None
+
     def adopt_broker_position(self):
         """Take over a position the broker holds that this app does not know
         about. Sends NOTHING - it only reads.
@@ -2250,6 +2268,18 @@ class LiveSession(BaseSession):
             self._pending_close = None
         p = self.position
         if not p:
+            # FLAT ON OUR SIDE IS NOT FLAT AT THE BROKER. Restart the app while
+            # holding something and this is the only place that will ever find
+            # it. Throttled hard: one ask every ADOPT_EVERY seconds, because it
+            # runs on a 1-second poll and the request budget is shared.
+            now = time.time()
+            if now - getattr(self, "_adopt_tick", 0) >= ADOPT_EVERY:
+                self._adopt_tick = now
+                try:
+                    if self.adopt_broker_position():
+                        return self.position
+                except Exception:
+                    pass
             return None
         fc = p.get("fill_checked", 99)
         if fc < 8:
