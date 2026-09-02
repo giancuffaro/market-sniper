@@ -2611,6 +2611,39 @@ try:
     _w59 = io.open("webull_client.py", encoding="utf-8").read()
     check(59, "the batch goes through the rate budget", "paced(fn, *args, **kwargs)" in _w59)
 
+    # --- 60. The SDK audit only names methods that exist ------------------
+    # An audit that recommends a call which is not in the installed SDK is
+    # worse than no audit - it sends you building against nothing.
+    _audit_p = os.path.join(HERE, "WEBULL-SDK-AUDIT.md")
+    check(60, "the audit exists", os.path.exists(_audit_p))
+    if os.path.exists(_audit_p):
+        _audit = io.open(_audit_p, encoding="utf-8").read()
+        _sdk_root = os.path.join(HERE, ".venv", "Lib", "site-packages", "webull")
+        if os.path.isdir(_sdk_root):
+            _blob = []
+            for _dp, _dn, _fn in os.walk(_sdk_root):
+                for _f in _fn:
+                    if _f.endswith(".py"):
+                        _blob.append(io.open(os.path.join(_dp, _f), encoding="utf-8",
+                                             errors="replace").read())
+            _blob = "\n".join(_blob)
+            for _m in ("get_history_bar", "get_snapshot", "get_tick", "get_quotes",
+                       "get_footprint", "get_noii_snapshot", "get_batch_history_bar",
+                       "get_market_sectors", "get_gainers_losers", "get_most_active",
+                       "get_option_contracts", "get_trade_calendar",
+                       "preview_option", "replace_option"):
+                if _m in _audit:
+                    check(60, "%s is really in the SDK" % _m, ("def %s(" % _m) in _blob)
+        else:
+            check(60, "SDK present to check against", False, "no .venv here")
+        # The audit must repeat the two standing prohibitions, or someone
+        # follows it straight into the 9/2 dependency break.
+        check(60, "it warns against per-second polling", "300 requests / 60 s" in _audit)
+        check(60, "and against installing the streaming family",
+              "webull-python-sdk-*" in _audit)
+        check(60, "it does not claim push events are safe to install",
+              "untested" in _audit and "Do not install anything to find out" in _audit)
+
     import subprocess as _sp3
     _sm3 = _sp3.run(["node", "ui_smoke.js", "futures_index.html"], cwd=HERE,
                     capture_output=True, text=True, timeout=60)
@@ -2697,7 +2730,7 @@ print("\n"+"="*68)
 by={}
 for sc,name,ok,_ in results:
     by.setdefault(sc,[0,0]); by[sc][0]+=1; by[sc][1]+= (1 if ok else 0)
-T={59:"Batched option quotes",58:"Option price grid",57:"Webull rate budget",56:"NinjaScript compiles",55:"One-click NT install",54:"Ratchet inside NinjaTrader",53:"Limits die with the app",52:"NinjaTrader delivery check",51:"Futures header + footer",50:"Futures on by default",49:"Toggles + short hints",48:"Futures config stripped",47:"Futures ratchet",46:"NinjaScript in step",45:"Breadth + VIX",44:"Entry telemetry",43:"Trend module",42:"Audio cues",41:"Volatility gauges",40:"Volume gauge",39:"Dwell time",38:"Velocity vs feed artifacts",37:"Desktop icon",36:"Trade log detail",35:"Time value warns not blocks",34:"LOCK/X gone, size warns",33:"Page actually runs",32:"No SAVE / live trade frozen",31:"One switch / still modal",30:"Directional entry levels",29:"Percent only, no cash",28:"Grid/ATM/quality/one-armed",27:"Config screen cleanup",26:"Ratchet stop",25:"Console auto-hide",24:"Options auto-reconcile",23:"Daily trade log",22:"Options phantom clear",21:"Auto-reconcile w/ broker",20:"MY CONFIG always on",19:"Phantom position",18:"Futures hours",17:"Closed market honest",16:"Restart leaves no spinner",15:"One tab only",14:"Git lock self-heal",13:"Broker tabs + tray",12:"Velocity honest when shut",11:"Multi-broker sessions",1:"Futures login survives restart",2:"remember_login default",3:"Options profiles to disk",
+T={60:"SDK audit is honest",59:"Batched option quotes",58:"Option price grid",57:"Webull rate budget",56:"NinjaScript compiles",55:"One-click NT install",54:"Ratchet inside NinjaTrader",53:"Limits die with the app",52:"NinjaTrader delivery check",51:"Futures header + footer",50:"Futures on by default",49:"Toggles + short hints",48:"Futures config stripped",47:"Futures ratchet",46:"NinjaScript in step",45:"Breadth + VIX",44:"Entry telemetry",43:"Trend module",42:"Audio cues",41:"Volatility gauges",40:"Volume gauge",39:"Dwell time",38:"Velocity vs feed artifacts",37:"Desktop icon",36:"Trade log detail",35:"Time value warns not blocks",34:"LOCK/X gone, size warns",33:"Page actually runs",32:"No SAVE / live trade frozen",31:"One switch / still modal",30:"Directional entry levels",29:"Percent only, no cash",28:"Grid/ATM/quality/one-armed",27:"Config screen cleanup",26:"Ratchet stop",25:"Console auto-hide",24:"Options auto-reconcile",23:"Daily trade log",22:"Options phantom clear",21:"Auto-reconcile w/ broker",20:"MY CONFIG always on",19:"Phantom position",18:"Futures hours",17:"Closed market honest",16:"Restart leaves no spinner",15:"One tab only",14:"Git lock self-heal",13:"Broker tabs + tray",12:"Velocity honest when shut",11:"Multi-broker sessions",1:"Futures login survives restart",2:"remember_login default",3:"Options profiles to disk",
    4:"Browser autofill guard",5:"ITM3 strike math",6:"Preview == Arm",7:"Live-only / dead modes",
    8:"Auto-sync safety",9:"Endpoints alive",10:"UI integrity"}
 for sc in sorted(by):
