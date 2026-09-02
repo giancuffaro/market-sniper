@@ -612,10 +612,16 @@ def paced_retry(fn, *args, **kwargs):
     connect makes. One 429 there and the app was unusable - it gave up on a
     condition that clears itself in twenty seconds.
     """
+    # CRITICAL by default: signing in and reading what you hold are not
+    # optional, so they wait out a backoff instead of being dropped like a
+    # balance refresh.
+    kwargs.setdefault("priority", CRITICAL)
     last = None
     for attempt in range(CONNECT_RETRIES):
         try:
             return paced(fn, *args, **kwargs)
+        except BudgetSkipped as e:
+            last = e                        # backing off: wait and try again
         except Exception as e:                               # noqa: BLE001
             last = e
             if not any(w in str(e).upper() for w in _RATE_WORDS):
