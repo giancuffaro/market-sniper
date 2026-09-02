@@ -2644,6 +2644,73 @@ try:
         check(60, "it does not claim push events are safe to install",
               "untested" in _audit and "Do not install anything to find out" in _audit)
 
+    # --- 61. Tiered ratchet + anti-clip -----------------------------------
+    # A percentage is not the same noise at every premium: one tick on a $0.40
+    # contract is 2.5%, so "breakeven" there sits inside the spread.
+    import ratchet_tiers as _rt
+    _rt = importlib.reload(_rt)
+    for _fill, _want in ((0.50, (25.0, 10.0)), (1.50, (15.0, 0.0)), (5.00, (10.0, 5.0))):
+        _a, _f, _st = _rt.ratchet_plan(_fill)
+        check(61, "$%.2f arms +%g%% and first-locks %+g%%" % (_fill, _want[0], _want[1]),
+              _a == _want[0] and _f == _want[1], str((_a, _f, _st)))
+    # FLOOR 1: a rung must be worth 4+ ticks. 5% of $3.00 is $0.15 = 3 nickel
+    # ticks, too tight, so the step widens.
+    check(61, "the tick floor widens a too-tight rung",
+          _rt.ratchet_plan(3.00)[2] > 5.0, str(_rt.ratchet_plan(3.00)[2]))
+    check(61, "and leaves a wide-enough one alone", _rt.ratchet_plan(5.00)[2] == 5.0)
+    check(61, "tick size flips at $3", _rt.tick_size(2.99) == 0.01 and _rt.tick_size(3.00) == 0.05)
+
+    # Nothing locks before the arm level.
+    check(61, "below the arm, nothing is locked", _rt.ratchet_locked_pct(5, 3.00) is None)
+    check(61, "at the arm, the first lock applies", _rt.ratchet_locked_pct(10, 3.00) == 5.0)
+
+    # ANTI-CLIP: the stop may never sit closer than 40% of the gain made.
+    check(61, "anti-clip does nothing on a small gain",
+          _rt.anti_clip(5.0, 10.0) == 5.0)
+    check(61, "anti-clip caps a runner", _rt.anti_clip(71.7, 80.0) == 48.0,
+          str(_rt.anti_clip(71.7, 80.0)))
+    check(61, "the cap is (1-k) x gain", abs(_rt.anti_clip(999, 100.0) - 60.0) < 0.01)
+    check(61, "it passes None through", _rt.anti_clip(None, 50) is None)
+
+    # Wired into the live ratchet, and MONOTONIC. anti_clip is fed the PEAK,
+    # not the live gain - a falling gain would walk the stop back down, which
+    # is the one thing a ratchet must never do.
+    class _RT(wb.LiveSession):
+        def __init__(self, tiers=True):
+            import config as _c
+            self.settings = dict(_c.DEFAULT_SETTINGS)
+            self.settings["ratchet_tiers"] = tiers
+            self.strategies = []; self.position = None
+    _r61 = _RT(True)
+    _r61.position = {"entry": 3.00, "mark": 3.00, "qty": 1,
+                     "ratchet_on": True, "ratchet_step": 10.0}
+    _seen = []
+    for _m in (3.00, 3.15, 3.30, 3.60, 4.50, 5.40, 4.80, 4.50):
+        _r61.position["mark"] = _m
+        _r61._update_ratchet()
+        _seen.append(_r61.position["ratchet"]["stop_pct"])
+    check(61, "the opening stop is the flat step", _seen[0] == -10.0, str(_seen[0]))
+    check(61, "it arms at +10% on a $3 contract", _seen[2] == 5.0, str(_seen[2]))
+    check(61, "the stop NEVER loosens", all(b >= a - 1e-9 for a, b in zip(_seen, _seen[1:])),
+          str(_seen))
+    check(61, "a pullback holds the stop", _seen[-1] == _seen[-3], str(_seen[-3:]))
+    check(61, "anti-clip is fed the peak, not the live gain",
+          "PEAK, not the live gain" in io.open("webull_client.py", encoding="utf-8").read())
+
+    # The flat rungs G designed must still be reachable.
+    _r62 = _RT(False)
+    _r62.position = {"entry": 3.00, "mark": 3.30, "qty": 1,
+                     "ratchet_on": True, "ratchet_step": 10.0}
+    _r62._update_ratchet()
+    check(61, "tiers off restores the flat rungs",
+          _r62.position["ratchet"]["stop_pct"] == 0.0,
+          str(_r62.position["ratchet"]["stop_pct"]))
+    check(61, "the toggle exists and defaults on",
+          config.DEFAULT_SETTINGS.get("ratchet_tiers") is True)
+    check(61, "the module is imported defensively",
+          "import ratchet_tiers as rt\nexcept Exception:" in
+          io.open("webull_client.py", encoding="utf-8").read())
+
     import subprocess as _sp3
     _sm3 = _sp3.run(["node", "ui_smoke.js", "futures_index.html"], cwd=HERE,
                     capture_output=True, text=True, timeout=60)
@@ -2730,7 +2797,7 @@ print("\n"+"="*68)
 by={}
 for sc,name,ok,_ in results:
     by.setdefault(sc,[0,0]); by[sc][0]+=1; by[sc][1]+= (1 if ok else 0)
-T={60:"SDK audit is honest",59:"Batched option quotes",58:"Option price grid",57:"Webull rate budget",56:"NinjaScript compiles",55:"One-click NT install",54:"Ratchet inside NinjaTrader",53:"Limits die with the app",52:"NinjaTrader delivery check",51:"Futures header + footer",50:"Futures on by default",49:"Toggles + short hints",48:"Futures config stripped",47:"Futures ratchet",46:"NinjaScript in step",45:"Breadth + VIX",44:"Entry telemetry",43:"Trend module",42:"Audio cues",41:"Volatility gauges",40:"Volume gauge",39:"Dwell time",38:"Velocity vs feed artifacts",37:"Desktop icon",36:"Trade log detail",35:"Time value warns not blocks",34:"LOCK/X gone, size warns",33:"Page actually runs",32:"No SAVE / live trade frozen",31:"One switch / still modal",30:"Directional entry levels",29:"Percent only, no cash",28:"Grid/ATM/quality/one-armed",27:"Config screen cleanup",26:"Ratchet stop",25:"Console auto-hide",24:"Options auto-reconcile",23:"Daily trade log",22:"Options phantom clear",21:"Auto-reconcile w/ broker",20:"MY CONFIG always on",19:"Phantom position",18:"Futures hours",17:"Closed market honest",16:"Restart leaves no spinner",15:"One tab only",14:"Git lock self-heal",13:"Broker tabs + tray",12:"Velocity honest when shut",11:"Multi-broker sessions",1:"Futures login survives restart",2:"remember_login default",3:"Options profiles to disk",
+T={61:"Tiered ratchet + anti-clip",60:"SDK audit is honest",59:"Batched option quotes",58:"Option price grid",57:"Webull rate budget",56:"NinjaScript compiles",55:"One-click NT install",54:"Ratchet inside NinjaTrader",53:"Limits die with the app",52:"NinjaTrader delivery check",51:"Futures header + footer",50:"Futures on by default",49:"Toggles + short hints",48:"Futures config stripped",47:"Futures ratchet",46:"NinjaScript in step",45:"Breadth + VIX",44:"Entry telemetry",43:"Trend module",42:"Audio cues",41:"Volatility gauges",40:"Volume gauge",39:"Dwell time",38:"Velocity vs feed artifacts",37:"Desktop icon",36:"Trade log detail",35:"Time value warns not blocks",34:"LOCK/X gone, size warns",33:"Page actually runs",32:"No SAVE / live trade frozen",31:"One switch / still modal",30:"Directional entry levels",29:"Percent only, no cash",28:"Grid/ATM/quality/one-armed",27:"Config screen cleanup",26:"Ratchet stop",25:"Console auto-hide",24:"Options auto-reconcile",23:"Daily trade log",22:"Options phantom clear",21:"Auto-reconcile w/ broker",20:"MY CONFIG always on",19:"Phantom position",18:"Futures hours",17:"Closed market honest",16:"Restart leaves no spinner",15:"One tab only",14:"Git lock self-heal",13:"Broker tabs + tray",12:"Velocity honest when shut",11:"Multi-broker sessions",1:"Futures login survives restart",2:"remember_login default",3:"Options profiles to disk",
    4:"Browser autofill guard",5:"ITM3 strike math",6:"Preview == Arm",7:"Live-only / dead modes",
    8:"Auto-sync safety",9:"Endpoints alive",10:"UI integrity"}
 for sc in sorted(by):
