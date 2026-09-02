@@ -1702,40 +1702,73 @@ class BaseSession:
         """Rebuild an app position from a broker row, or None if the row does
         not carry enough to MANAGE the trade.
 
-        A position without an entry price cannot be ratcheted - every rung is
-        measured from it - so a row missing that is refused rather than adopted
-        into something that looks managed and is not.
+        THE SHAPE IS NOT AN OCC STRING. This first shipped parsing `symbol` as
+        an OCC contract (SPY260902P00764000) and could therefore never adopt
+        anything: Webull returns `symbol` as the plain underlying and puts the
+        contract in `legs[0]` as SEPARATE fields - option_exercise_price,
+        option_type, option_expire_date. That shape is not a guess; it is what
+        the discord-sniper bridge has read in production for months
+        (discord-sniper/webull_options.py, positions()).
+
+        Both forms are accepted anyway: legs/flat fields first, then an OCC
+        string if that is all there is. Costing nothing and covering a shape
+        change is worth more than being right about today's response.
+
+        A position with no entry price is REFUSED. Every ratchet rung is
+        measured from the entry, so adopting without one produces something
+        that looks managed and is not.
         """
         if not isinstance(row, dict):
             return None
+        legs = row.get("legs") if isinstance(row.get("legs"), list) else None
+        leg = legs[0] if legs and isinstance(legs[0], dict) else {}
 
-        def _n(*names):
-            v = _find_key(row, *names)
+        def _pick(*names):
+            for src in (leg, row):
+                v = _find_key(src, *names)
+                if v not in (None, ""):
+                    return v
+            return None
+
+        def _num(*names):
             try:
-                return float(v)
+                return float(_pick(*names))
             except (TypeError, ValueError):
                 return None
 
-        def _s(*names):
-            v = _find_key(row, *names)
-            return str(v) if v not in (None, "") else None
+        qty = _num("quantity", "qty", "position", "positionQty", "holdings")
+        entry = _num("cost_price", "costPrice", "cost", "avgCost", "average_cost",
+                     "avg_price", "averagePrice", "openPrice", "avg_fill_price")
+        under = _pick("symbol", "ticker", "underlying_symbol", "underlyingSymbol")
+        under = str(under).upper().strip() if under else None
 
-        qty = _n("quantity", "qty", "position", "positionQty", "holdings")
-        entry = _n("cost_price", "costPrice", "avgCost", "average_cost",
-                   "avg_price", "averagePrice", "openPrice")
+        strike = _num("option_exercise_price", "optionExercisePrice", "strike",
+                      "strike_price", "strikePrice")
+        otype = _pick("option_type", "optionType", "put_call", "putCall", "right")
+        otype = str(otype).upper().strip() if otype else None
+        expiry = _pick("option_expire_date", "optionExpireDate", "expire_date",
+                       "expireDate", "expiration", "expiry", "expiration_date")
+
+        # Fall back to an OCC string if the fields were not broken out.
+        if not (strike and otype) and under:
+            got = parse_occ(under)
+            if got:
+                under, expiry, otype, strike = got
+
         if not qty or qty <= 0 or not entry or entry <= 0:
             return None
-
-        occ = _s("symbol", "instrument_id", "instrumentId", "optionSymbol")
-        parsed = _parse_occ(occ) if occ else None
-        if not parsed:
+        if not under or strike is None or not otype:
             return None
-        under, expiry, kind, strike = parsed
+        kind = "CALL" if otype.startswith("C") else ("PUT" if otype.startswith("P")
+                                                     else None)
+        if kind is None:
+            return None                    # a stock row, not an option
         if under not in config.SYMBOLS:
             return None                    # not something this app trades
 
+        expiry = str(expiry)[:10] if expiry else _expiry_for(under)
         return {"symbol": under, "side": "CALLS" if kind == "CALL" else "PUTS",
-                "qty": int(qty), "strike": strike, "option_type": kind,
+                "qty": int(qty), "strike": float(strike), "option_type": kind,
                 "expiration": expiry, "entry": float(entry), "mark": float(entry),
                 "opened_at": _now_et().strftime("%H:%M"), "opened_ts": time.time(),
                 "fill_checked": 99,        # the broker already told us the fill
@@ -1750,8 +1783,7 @@ class BaseSession:
                 #
                 # So an adopted trade shows P&L, high-water mark and everything
                 # else immediately - that is what was actually missing - but it
-                # sends NOTHING until he presses MANAGE. One click, and only he
-                # knows whether the bot is in it too.
+                # sends NOTHING until he presses MANAGE.
                 "needs_manage_ok": True,
                 "ratchet_on": False,
                 "ratchet_step": float(self.settings.get("ratchet_step_pct") or 10.0)}
