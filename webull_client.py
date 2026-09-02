@@ -1,7 +1,7 @@
 """MARKET SNIPER — Webull session wrapper. v3.1
 (Symbols: SPY/QQQ daily-0DTE, TSLA weekly via nearest-Friday expiry.)"""
 
-import os, re, time, uuid, math, random, threading, functools, hashlib
+import os, re, time, uuid, math, random, threading, functools, hashlib, collections
 import datetime as dt
 try:
     from zoneinfo import ZoneInfo
@@ -377,7 +377,21 @@ def _is_futures_account(aid, raw_account):
 # So: every call through this gate, spaced, and a hard stop after a 429.
 # =========================================================================
 
-MIN_CALL_INTERVAL = 0.20      # seconds between ANY two Webull calls
+MIN_CALL_INTERVAL = 0.20
+
+# Webull allows 300 requests per ROLLING 60 seconds per app key, shared with
+# the discord bridge and the Fill Announcer. Taking half leaves room for both
+# and is still far more than this app needs when it is not being wasteful.
+WINDOW_SECONDS = 60.0
+OUR_SHARE_PER_MIN = 150
+
+# Cosmetic reads stop at this line so they can never crowd out a quote, a fill
+# or an exit. Trading always has the top third of the window to itself.
+LOW_WATERMARK = 100
+
+# Two threads must not fire in the same instant, but this is a floor, not a
+# tax: under the cap a call goes out essentially immediately.
+FLOOR_GAP = 0.03      # seconds between ANY two Webull calls
 BACKOFF_AFTER_429 = 20.0      # dead time once the broker says slow down
 
 
@@ -518,6 +532,7 @@ class _Budget:
     def __init__(self, min_interval=MIN_CALL_INTERVAL):
         self.min_interval = min_interval
         self._lock = threading.Lock()
+        self._stamps = collections.deque()   # when each call went out
         self._last = 0.0
         self._blocked_until = 0.0
         self.calls = 0
@@ -545,14 +560,50 @@ class _Budget:
                 if priority >= NORMAL and blocked_for > NORMAL_MAX_WAIT:
                     return None
                 wait = blocked_for
-            gap = self._last + self.min_interval - (now + wait)
-            if gap > 0:
-                wait += gap
+            # A ROLLING WINDOW, NOT A FIXED GAP.
+            #
+            # The limit is 300 requests per rolling 60 seconds, so a fixed
+            # 0.20s pause between calls was the wrong shape entirely: it made
+            # the app wait 200ms even after sitting idle for a minute, and a
+            # burst of five reads took a second for no reason at all. Measured
+            # on his machine: one quote he pressed took 4.4 seconds, and the
+            # app had spent 137 seconds of a session just waiting.
+            #
+            # Now a call goes out IMMEDIATELY while we are under our share of
+            # the window, and only slows down as we approach it. Idle app =
+            # instant. Busy app = paced. That is the whole change.
+            self._trim(now + wait)
+            cap = LOW_WATERMARK if priority >= LOW else OUR_SHARE_PER_MIN
+            if len(self._stamps) >= cap:
+                # At the cap: wait until the oldest call ages out of the window.
+                oldest = self._stamps[0]
+                need = (oldest + WINDOW_SECONDS) - (now + wait)
+                if need > 0:
+                    if priority >= LOW:
+                        return None            # cosmetic: just skip it
+                    if priority >= NORMAL and need > NORMAL_MAX_WAIT:
+                        return None
+                    wait += need
+            else:
+                # Under the cap: only a tiny floor gap, so two threads cannot
+                # fire the same millisecond, but no artificial 200ms tax.
+                gap = self._last + FLOOR_GAP - (now + wait)
+                if gap > 0:
+                    wait += gap
             self._last = now + wait          # reserve it before releasing
+            self._stamps.append(self._last)
             self.calls += 1
-            if priority >= LOW and wait > NORMAL_MAX_WAIT:
-                return None
             return wait
+
+    def _trim(self, now):
+        w = self._stamps
+        while w and w[0] <= now - WINDOW_SECONDS:
+            w.popleft()
+
+    def used_in_window(self):
+        with self._lock:
+            self._trim(time.time())
+            return len(self._stamps)
 
     def pace(self, priority=NORMAL):
         """Wait for this call's slot. Raises BudgetSkipped if it should not
@@ -575,6 +626,8 @@ class _Budget:
     def stats(self):
         return {"calls": self.calls, "rate_limits": self.rate_limits,
                 "skipped": self.skipped,
+                "in_last_minute": self.used_in_window(),
+                "our_share": OUR_SHARE_PER_MIN,
                 "paced_seconds": round(self.paced, 1),
                 "blocked_for": max(0.0, round(self._blocked_until - time.time(), 1))}
 
