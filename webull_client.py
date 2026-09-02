@@ -1475,6 +1475,85 @@ class BaseSession:
             print("[journal] could not record the cleared trade: %s"
                   % str(e)[:120], flush=True)
 
+    def adopt_broker_position(self):
+        """Take over a position the broker holds that this app does not know
+        about. Sends NOTHING - it only reads.
+
+        WHY: the app used to know only about trades IT opened. Restart it while
+        holding something and it showed FLAT - no P&L, no ratchet, nothing
+        managing the trade - until you closed by hand. That is the worst
+        possible time to be blind.
+
+        Only ever adopts when the app has NO position of its own, so a live
+        trade is never overwritten by a stale broker row.
+        """
+        if self.position is not None:
+            return None
+        rows = self.broker_positions()
+        if not rows:                       # None (ask failed) or [] (really flat)
+            return None
+        for row in rows:
+            got = self._position_from_row(row)
+            if got:
+                with self._order_lock:
+                    if self.position is not None:
+                        return None
+                    self.position = got
+                self.last_event = (
+                    "Adopted the %s %s%s you already held - %d contract(s) at %.2f. "
+                    "The ratchet is managing it from here."
+                    % (got["symbol"], int(got["strike"]) if float(got["strike"]).is_integer()
+                       else got["strike"], "C" if got["side"] == "CALLS" else "P",
+                       got["qty"], got["entry"]))
+                print("[ADOPT  ] %s" % self.last_event, flush=True)
+                return got
+        return None
+
+    def _position_from_row(self, row):
+        """Rebuild an app position from a broker row, or None if the row does
+        not carry enough to MANAGE the trade.
+
+        A position without an entry price cannot be ratcheted - every rung is
+        measured from it - so a row missing that is refused rather than adopted
+        into something that looks managed and is not.
+        """
+        if not isinstance(row, dict):
+            return None
+
+        def _n(*names):
+            v = _find_key(row, *names)
+            try:
+                return float(v)
+            except (TypeError, ValueError):
+                return None
+
+        def _s(*names):
+            v = _find_key(row, *names)
+            return str(v) if v not in (None, "") else None
+
+        qty = _n("quantity", "qty", "position", "positionQty", "holdings")
+        entry = _n("cost_price", "costPrice", "avgCost", "average_cost",
+                   "avg_price", "averagePrice", "openPrice")
+        if not qty or qty <= 0 or not entry or entry <= 0:
+            return None
+
+        occ = _s("symbol", "instrument_id", "instrumentId", "optionSymbol")
+        parsed = _parse_occ(occ) if occ else None
+        if not parsed:
+            return None
+        under, expiry, kind, strike = parsed
+        if under not in config.SYMBOLS:
+            return None                    # not something this app trades
+
+        return {"symbol": under, "side": "CALLS" if kind == "CALL" else "PUTS",
+                "qty": int(qty), "strike": strike, "option_type": kind,
+                "expiration": expiry, "entry": float(entry), "mark": float(entry),
+                "opened_at": _now_et().strftime("%H:%M"), "opened_ts": time.time(),
+                "fill_checked": 99,        # the broker already told us the fill
+                "adopted": True,
+                "ratchet_on": True,
+                "ratchet_step": float(self.settings.get("ratchet_step_pct") or 10.0)}
+
     def reconcile(self, force=False):
         """Clear our position if Webull says we hold nothing. Sends no orders."""
         now = time.time()
@@ -1482,6 +1561,9 @@ class BaseSession:
             return None
         self._last_reconcile = now
         if not self.position:
+            # Nothing here, but the BROKER may hold something - after a restart
+            # it always will. Adopt it so the trade is managed.
+            self.adopt_broker_position()
             return None
         rows = self.broker_positions()
         if rows is None:
