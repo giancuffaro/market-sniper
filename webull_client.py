@@ -393,6 +393,11 @@ ADOPT_EVERY = 5.0
 # dead key still answers while he is looking at the screen.
 CONNECT_RETRIES = 3
 
+# Picking an account calls connect() again. The list cannot have changed in the
+# seconds between, so the second call reads this instead of spending a request.
+ACCOUNTS_TTL = 90.0
+_ACCOUNTS_CACHE = {"rows": None, "at": 0.0}
+
 class _Budget:
     """Serialises and paces every Webull request this process makes.
 
@@ -1766,10 +1771,20 @@ class LiveSession(BaseSession):
         self._api_client = api_client
         self._od = OptionData(api_client)
         self.trade = TradeClient(api_client)
-        res = paced_retry(self.trade.account_v2.get_account_list)
-        if getattr(res, "status_code", None) != 200:
-            raise OrderRejected(f"account list failed: {getattr(res,'status_code','?')}")
-        data = res.json()
+        # Choosing an account calls connect() a SECOND time, with the id. The
+        # account list cannot change between the two clicks, so asking again is
+        # a wasted request against a budget that was the reason the first call
+        # failed. Cache it for the length of a sign-in.
+        cached = _ACCOUNTS_CACHE.get("rows")
+        if cached and time.time() - _ACCOUNTS_CACHE.get("at", 0) < ACCOUNTS_TTL:
+            data = cached
+        else:
+            res = paced_retry(self.trade.account_v2.get_account_list)
+            if getattr(res, "status_code", None) != 200:
+                raise OrderRejected(
+                    "account list failed: %s" % getattr(res, "status_code", "?"))
+            data = res.json()
+            _ACCOUNTS_CACHE.update({"rows": data, "at": time.time()})
         if isinstance(data, list):
             accounts = data
         elif isinstance(data, dict):
