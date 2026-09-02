@@ -2893,8 +2893,20 @@ try:
         wb.BUDGET = _saved64
 
     _w64 = io.open("webull_client.py", encoding="utf-8").read()
-    check(64, "the reason is recorded where the code is",
-          "made the data crawl while" in _w64)
+    # Was: assert my own comment text is present. That is not a test - it
+    # broke the moment I rewrote the comment, while the behaviour was fine.
+    # Assert the behaviour the comment DESCRIBES: the memory must survive
+    # across different contracts, and must not answer with the wrong one.
+    _od64b = _OD64()
+    _saved64b, wb.BUDGET = wb.BUDGET, wb._Budget(0.0)
+    try:
+        _od64b.snapshot_row("QQQ260902C00700000")
+        _od64b.n = 0
+        _od64b.snapshot_row("QQQ260902C00715000")
+        check(64, "the memory carries over to a DIFFERENT contract",
+              _od64b.n == 1, str(_od64b.n))
+    finally:
+        wb.BUDGET = _saved64b
     check(64, "no dir() hack survived", "'name' in dir()" not in _w64)
 
     # --- 65. A trade closed outside the app must still be journalled ------
@@ -4006,9 +4018,42 @@ finally:
     # wrong direction when the budget is already tight.
     _w73 = io.open("webull_client.py", encoding="utf-8").read()
     _sr = _w73.split("def snapshot_row", 1)[1].split("\n    def ", 1)[0]
-    check(73, "a skip does not clear the remembered shape",
-          "except BudgetSkipped:" in _sr
-          and _sr.index("except BudgetSkipped:") < _sr.index("self._shape_row = None"))
+    # Behaviour, not source ordering: a skipped call must leave the learned
+    # shape alone. Clearing it made the NEXT quote re-probe all eight shapes,
+    # so a skip made the following call eight times more expensive.
+    class _SkipOnce:
+        def __init__(self):
+            self.calls = 0
+        def __call__(self, *a, **kw):
+            self.calls += 1
+            if self.calls == 2:
+                raise wb.BudgetSkipped("backing off")
+            sym = a[0] if a else kw.get("symbols")
+            if isinstance(sym, (list, tuple)):
+                sym = sym[0]
+            return {"data": [{"symbol": sym, "price": 1.0}]}
+    _sk = _SkipOnce()
+    _odsk = wb.OptionData.__new__(wb.OptionData)
+    _odsk._fns = lambda: ([("f", _sk)], [])
+    _odsk._result = lambda r: r.get("data") if isinstance(r, dict) else r
+    _msk, wb.BUDGET.min_interval = wb.BUDGET.min_interval, 0.0
+    try:
+        _odsk.snapshot_row("QQQ260902C00710000")
+        _learned = getattr(_odsk, "_shape_row", None)
+        try:
+            _odsk.snapshot_row("QQQ260902C00710000")     # this one is skipped
+        except wb.BudgetSkipped:
+            pass
+        check(73, "a skip does not clear the remembered shape",
+              getattr(_odsk, "_shape_row", None) == _learned,
+              str(getattr(_odsk, "_shape_row", None)))
+        _sk.calls = 10
+        _before = _sk.calls
+        _odsk.snapshot_row("QQQ260902C00710000")
+        check(73, "so the next quote still costs one call",
+              _sk.calls - _before == 1, str(_sk.calls - _before))
+    finally:
+        wb.BUDGET.min_interval = _msk
     check(73, "and a skip aborts the probe instead of skipping 8 more times",
           _sr.count("except BudgetSkipped:") >= 2, str(_sr.count("except BudgetSkipped:")))
 
