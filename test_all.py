@@ -4071,8 +4071,14 @@ finally:
     _ix74 = io.open("index.html", encoding="utf-8").read()
     check(74, "the day is still shown as a percentage only",
           "dp.toFixed(1)+'%'" in _ix74)
-    check(74, "no cash on the screen", "day_realized" in _ix74
-          and "$" not in _ix74.split("const dn=Number(st.day_realized")[1][:200])
+    # The dollar value is read into `dn` and deliberately never rendered. The
+    # naive test here looked for "$" and tripped over $('dayNet') and template
+    # literals - assert what actually matters: the cash number never reaches
+    # the screen.
+    _daysec = _ix74.split("const dn=Number(st.day_realized")[1][:400]
+    check(74, "the day's cash value is never rendered",
+          "dn.toFixed" not in _daysec and "+dn" not in _daysec
+          and "${dn}" not in _daysec, _daysec[:120])
 
 
 print("\n"+"="*68)
