@@ -823,8 +823,15 @@ try:
     check(27,"tpUnitChanged fully removed", "tpUnitChanged" not in ix)
 
     wsrc2 = io.open(os.path.join(HERE,"webull_client.py"),encoding="utf-8").read()
-    check(27,"arming is entry-ONLY when the ratchet is on",
-          "if not s.get(\"my_enabled\"):" in wsrc2)
+    # This used to assert that a specific line of SOURCE existed - and that
+    # line was unreachable, so the test passed while the behaviour it named
+    # could never happen. Assert the behaviour instead.
+    _z27 = _w4.make_session("LIVE"); _z27._guard_open=lambda q: None
+    _z27.settings["my_enabled"]=False; _z27.settings["tp_enabled"]=False
+    _z27._underlying=lambda sym: 713.0
+    _z27.arm("QQQ","CALLS",1)
+    check(27,"arming is entry-ONLY: no take-profit is armed with it",
+          _z27.settings["tp_enabled"] is False and _z27.settings["my_enabled"] is True)
     check(27,"backend tp/sl fields still exist for STRATEGIES",
           '"tp_unit"' in wsrc2 and '"sl_unit"' in wsrc2)
 
