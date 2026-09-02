@@ -628,8 +628,22 @@ const EZ = (function(){
   let autolock={enabled:false,minutes:10}, lastActivity=Date.now();
   let prefs={}, prefsReady=false, prefsLoaded=null;
   const $=id=>document.getElementById(id);
-  const api=(p,b)=>fetch(p,{method:b?'POST':'GET',headers:{'Content-Type':'application/json'},
-                           body:b?JSON.stringify(b):undefined}).then(r=>r.json());
+  // A 500 returns PLAIN TEXT, not JSON, so r.json() threw and every server
+  // crash was reported as "could not reach the local app - is the black window
+  // still open?". 9/2: a NameError in connect() showed that message for half an
+  // hour while the server was up and answering. Read the text, then decide.
+  const api=async(p,b)=>{
+    const r=await fetch(p,{method:b?'POST':'GET',
+                           headers:{'Content-Type':'application/json'},
+                           body:b?JSON.stringify(b):undefined});
+    const txt=await r.text();
+    try{ return JSON.parse(txt); }
+    catch(e){
+      return {detail:'The app hit an internal error ('+r.status+'). It IS running — '
+                    +'this is a bug, not a connection problem. Tell Claude: '
+                    +(txt||'no detail').slice(0,120)};
+    }
+  };
   // money() removed - this screen shows percentages only, never cash.
 
   // Settings are NOT read from localStorage any more. my-settings.json on disk
