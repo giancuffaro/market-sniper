@@ -1779,10 +1779,29 @@ class LiveSession(BaseSession):
         if cached and time.time() - _ACCOUNTS_CACHE.get("at", 0) < ACCOUNTS_TTL:
             data = cached
         else:
-            res = paced_retry(self.trade.account_v2.get_account_list)
+            try:
+                res = paced_retry(self.trade.account_v2.get_account_list)
+            except Exception as e:                           # noqa: BLE001
+                # Say WHICH problem it is. "account list failed: 429" told him
+                # nothing and looked like a broken app; it is a shared budget
+                # being eaten by another process, and it clears on its own.
+                if any(w in str(e).upper() for w in _RATE_WORDS):
+                    raise OrderRejected(
+                        "Webull is rate limiting this API key, so it will not "
+                        "even list your accounts. Nothing is wrong with the "
+                        "app or the key. Three programs share 300 requests a "
+                        "minute — close the Fill Announcer and the Discord "
+                        "bridge, wait a minute, then press CONNECT again.")
+                raise
             if getattr(res, "status_code", None) != 200:
-                raise OrderRejected(
-                    "account list failed: %s" % getattr(res, "status_code", "?"))
+                code = getattr(res, "status_code", "?")
+                if code == 429:
+                    raise OrderRejected(
+                        "Webull is rate limiting this API key, so it will not "
+                        "even list your accounts. Close the Fill Announcer and "
+                        "the Discord bridge, wait a minute, then press CONNECT "
+                        "again.")
+                raise OrderRejected("account list failed: %s" % code)
             data = res.json()
             _ACCOUNTS_CACHE.update({"rows": data, "at": time.time()})
         if isinstance(data, list):
