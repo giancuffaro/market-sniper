@@ -1,7 +1,7 @@
 """MARKET SNIPER — Webull session wrapper. v3.1
 (Symbols: SPY/QQQ daily-0DTE, TSLA weekly via nearest-Friday expiry.)"""
 
-import os, time, uuid, math, random, threading, functools
+import os, re, time, uuid, math, random, threading, functools
 import datetime as dt
 try:
     from zoneinfo import ZoneInfo
@@ -104,7 +104,7 @@ def parse_occ(occ):
     under, ymd, cp, strike = m.groups()
     try:
         expiry = "20%s-%s-%s" % (ymd[0:2], ymd[2:4], ymd[4:6])
-        datetime.strptime(expiry, "%Y-%m-%d")          # refuse 20xx-13-45
+        dt.datetime.strptime(expiry, "%Y-%m-%d")          # refuse 20xx-13-45
     except ValueError:
         return None
     return (under, expiry, "CALL" if cp == "C" else "PUT", int(strike) / 1000.0)
