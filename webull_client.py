@@ -780,17 +780,31 @@ class OptionData:
                      {"symbols": occ, "category": "US_OPTION"},
                      {"symbols": [occ], "category": "US_OPTION"})
 
-        # REMEMBER THE WINNING SHAPE.
+        # REMEMBER THE WINNING SHAPE - THE SHAPE, NOT THE ARGUMENTS.
+        #
         # This loop probes up to 8 argument shapes per function until one is
-        # accepted. Before pacing, a rejected shape cost nothing. Now every
-        # attempt is a real 0.20s pause, so a winner sitting at position 5
-        # costs 0.8 SECONDS of dead time on every single quote - and the
-        # screen polls once a second. That is what made the data crawl while
-        # a position was open. The shape does not change between calls, so it
-        # is only ever discovered once.
+        # accepted, and each rejected attempt is a real paced call, so the
+        # winner has to be remembered or every quote pays for the search.
+        #
+        # It stored the ARGUMENT TUPLE, which contained the contract symbol.
+        # So every option quote after the first replayed the FIRST contract
+        # ever quoted. Found on 9/2 against his live account: Webull said his
+        # QQQ 710C was worth 0.26 and down 8.9%; the app showed 0.82 and
+        # +192.9%, because it was still asking about an earlier contract. A
+        # wrong price feeds P&L, the ratchet and every automatic exit, so this
+        # is the worst possible thing to get subtly wrong.
+        #
+        # Store the INDEX of the winning shape and rebuild it for the contract
+        # actually being asked about.
         won = getattr(self, "_shape_row", None)
         if won is not None:
-            wname, wkind, wshape = won
+            wname, wkind, widx = won
+            shapes = arg_shapes if wkind == "arg" else kw_shapes
+            if not isinstance(widx, int) or widx >= len(shapes):
+                self._shape_row = None          # old-format memory: discard
+                won = None
+        if won is not None:
+            wshape = shapes[widx]
             for name, fn in fns:
                 if name != wname:
                     continue
@@ -809,10 +823,10 @@ class OptionData:
                     self._shape_row = None      # it stopped working; re-probe
                     break
         for name, fn in fns:
-            for args in arg_shapes:
+            for _i, args in enumerate(arg_shapes):
                 try:
                     body = self._result(paced(fn, *args))
-                    self._shape_row = (name, "arg", args)
+                    self._shape_row = (name, "arg", _i)
                     return body[0] if isinstance(body, list) and body else body
                 except OrderRejected:
                     raise
