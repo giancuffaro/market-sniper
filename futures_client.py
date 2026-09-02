@@ -915,6 +915,12 @@ class BaseFuturesSession:
         self._exit_reason = hit or "CLOSE"
         if not hit:
             return
+        # A REJECTED EXIT IS NOT RETRIED EVERY TICK. Same fault as the options
+        # side on 9/2: the stop fires, the close is refused, the position stays,
+        # and one second later it fires again - forever. Keep retrying, because
+        # being stuck in a trade is worse than any request cost, but back off.
+        if time.time() < getattr(self, "_close_retry_at", 0.0):
+            return
         try:
             result = self.close()
             pnl = result.get("pnl", 0.0)   # NET of the round-turn commission
@@ -923,8 +929,17 @@ class BaseFuturesSession:
             label = {"TP": "TAKE PROFIT", "SL": "STOP LOSS", "TRAIL": "TRAILING STOP"}[hit]
             sign = "+" if pnl >= 0 else "−"
             self.last_event = f"{label} HIT — position closed {sign}${abs(pnl):.2f}"
+            self._close_fails = 0
+            self._close_retry_at = 0.0
         except OrderRejected as e:
-            self.last_event = f"{hit} hit but close blocked: {e}"
+            n = getattr(self, "_close_fails", 0) + 1
+            self._close_fails = n
+            wait = min(CLOSE_RETRY_MAX, 2.0 ** (n - 1))
+            self._close_retry_at = time.time() + wait
+            self.last_event = ("%s hit but close blocked: %s — retrying in %.0fs "
+                               "(attempt %d). Close it in your platform if this "
+                               "keeps up." % (hit, e, wait, n))
+            print("[EXIT   ] %s" % self.last_event, flush=True)
 
     def _guard_open(self, qty):
         if qty > MAX_CONTRACTS:
