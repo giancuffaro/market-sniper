@@ -1966,7 +1966,10 @@ class LiveSession(BaseSession):
 
     def _balance_for(self, aid):
         try:
-            res = paced(self.trade.account_v2.get_account_balance, aid)
+            # LOW: buying power is a nice-to-have. It used to be able to
+            # stall the whole app for the length of a backoff.
+            res = paced(self.trade.account_v2.get_account_balance, aid,
+                        priority=LOW)
             bal = res.json()
             bp = _find_key(bal, "buying_power", "buyingPower", "optionBuyingPower",
                            "option_buying_power", "day_buying_power", "cash_buying_power",
@@ -2532,7 +2535,9 @@ class LiveSession(BaseSession):
             client_order_id=uuid.uuid4().hex[:32], symbol=symbol, strike=q["strike"],
             expiration=_expiry_for(symbol), option_type=q["option_type"], side="BUY",
             quantity=qty, limit_price=limit)
-        res = paced(self.trade.order_v3.place_order, self.account_id, orders)
+        # CRITICAL: an order is never skipped to save request budget.
+        res = paced(self.trade.order_v3.place_order, self.account_id, orders,
+                    priority=CRITICAL)
         body = {}
         try:
             body = res.json()
@@ -2680,7 +2685,9 @@ class LiveSession(BaseSession):
             client_order_id=uuid.uuid4().hex[:32], symbol=p["symbol"], strike=p["strike"],
             expiration=p["expiration"], option_type=p["option_type"], side="SELL",
             quantity=p["qty"], limit_price=limit)
-        res = paced(self.trade.order_v3.place_order, self.account_id, orders)
+        # CRITICAL: an order is never skipped to save request budget.
+        res = paced(self.trade.order_v3.place_order, self.account_id, orders,
+                    priority=CRITICAL)
         body = {}
         try:
             body = res.json()
