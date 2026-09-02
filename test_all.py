@@ -3705,11 +3705,99 @@ finally:
         wb.BUDGET = _saved_bud
 
 
+    # --- 72. Clicking CONNECT again must not jam the app ------------------
+    # "i still cant click on any account and connect does nothing".
+    # fut.result(timeout=25) stops WAITING after 25s, but the task keeps
+    # running and keeps its worker. Sign-in took ~60s when the key was rate
+    # limited, so three clicks - the reasonable response to a dead button -
+    # occupied all three workers, and every click after that queued behind
+    # them and timed out without ever starting. Clicking again is what made
+    # it permanent.
+    _m72 = io.open("main.py", encoding="utf-8").read()
+    _cn72 = _m72.split("def connect(req: ConnectReq)", 1)[1].split("\n@app.", 1)[0]
+
+    check(72, "only one sign-in may be in flight", "_CONNECTING" in _cn72)
+    check(72, "a second press is refused, not queued",
+          "Still finishing the last sign-in" in _cn72)
+    check(72, "the reservation is released in a finally",
+          "finally:" in _cn72 and "_CONNECTING[\"until\"] = cooldown" in _cn72)
+    check(72, "a timeout leaves a cooldown, because the worker is still busy",
+          "cooldown = time.time() + CONNECT_COOLDOWN_S" in _cn72)
+    check(72, "and the message says not to keep clicking",
+          "slower, not faster" in _cn72)
+    check(72, "a skipped budget call is explained, not a 500",
+          "except wb.BudgetSkipped" in _cn72)
+
+    # Sign-in must finish well inside the request timeout, or the worker is
+    # abandoned every single time and the pool drains.
+    _mi72, _bo72 = wb.MIN_CALL_INTERVAL, wb.BACKOFF_AFTER_429
+    wb.BUDGET.min_interval = 0.0
+    try:
+        _n72 = {"c": 0}
+        def _always429():
+            _n72["c"] += 1
+            raise Exception("HTTP Status: 429, Code: TOO_MANY_REQUESTS")
+        _t72 = time.time()
+        try:
+            wb.paced_retry(_always429)
+        except Exception:
+            pass
+        _took = time.time() - _t72
+        check(72, "a hopeless sign-in gives up inside the timeout",
+              _took < main.CONNECT_TIMEOUT_S, "%.1fs vs %ss"
+              % (_took, main.CONNECT_TIMEOUT_S))
+        check(72, "and inside its own stated budget",
+              _took <= wb.CONNECT_BUDGET_SECONDS + 3.0, "%.1fs" % _took)
+        check(72, "having actually retried", _n72["c"] >= 2, str(_n72))
+    finally:
+        wb.BUDGET.min_interval = _mi72
+        wb.BACKOFF_AFTER_429 = _bo72
+
+    # Sign-in ignores the long global backoff. Webull's limit is per ROLLING
+    # minute, so sitting out 20 seconds is the wrong shape of pause - and it
+    # was what pushed sign-in past the timeout in the first place.
+    _B72 = wb._Budget(min_interval=0.0)
+    _B72.note_rate_limit()
+    check(72, "IMMEDIATE is not blocked by the backoff",
+          _B72.reserve(wb.IMMEDIATE) is not None)
+    check(72, "while everything else still is",
+          _B72.reserve(wb.LOW) is None)
+    check(72, "sign-in uses IMMEDIATE",
+          'kwargs.setdefault("priority", IMMEDIATE)' in
+          io.open("webull_client.py", encoding="utf-8").read())
+
+    # THE JAM ITSELF, simulated: six clicks must not submit six tasks.
+    from concurrent.futures import ThreadPoolExecutor as _TPE, TimeoutError as _FT
+    def _sim(guarded):
+        EX = _TPE(max_workers=3); C = {"until": 0.0}; started = []
+        def _slow():
+            started.append(1); time.sleep(0.06)
+        for _ in range(6):
+            _now = time.time()
+            if guarded and _now < C["until"]:
+                continue
+            _cd = 0.0
+            if guarded:
+                C["until"] = _now + 0.025
+            try:
+                EX.submit(_slow).result(timeout=0.025)
+            except _FT:
+                _cd = time.time() + 0.015
+            finally:
+                if guarded:
+                    C["until"] = _cd
+        EX.shutdown(wait=False)
+        return len(started)
+    check(72, "unguarded, six clicks submit six tasks", _sim(False) == 6,
+          str(_sim(False)))
+    check(72, "guarded, six clicks submit one", _sim(True) == 1, str(_sim(True)))
+
+
 print("\n"+"="*68)
 by={}
 for sc,name,ok,_ in results:
     by.setdefault(sc,[0,0]); by[sc][0]+=1; by[sc][1]+= (1 if ok else 0)
-T={71:"One 429 must not freeze the app",70:"A rejected exit is not a storm",69:"Sign-in survives a rate limit",68:"Stream cannot blind the app",67:"Restart keeps the position",66:"One-second prices",65:"Journal never loses a trade",64:"Pacing must not stall",63:"Tick velocity",62:"Underlying at fill",61:"Tiered ratchet + anti-clip",60:"SDK audit is honest",59:"Batched option quotes",58:"Option price grid",57:"Webull rate budget",56:"NinjaScript compiles",55:"One-click NT install",54:"Ratchet inside NinjaTrader",53:"Limits die with the app",52:"NinjaTrader delivery check",51:"Futures header + footer",50:"Futures on by default",49:"Toggles + short hints",48:"Futures config stripped",47:"Futures ratchet",46:"NinjaScript in step",45:"Breadth + VIX",44:"Entry telemetry",43:"Trend module",42:"Audio cues",41:"Volatility gauges",40:"Volume gauge",39:"Dwell time",38:"Velocity vs feed artifacts",37:"Desktop icon",36:"Trade log detail",35:"Time value warns not blocks",34:"LOCK/X gone, size warns",33:"Page actually runs",32:"No SAVE / live trade frozen",31:"One switch / still modal",30:"Directional entry levels",29:"Percent only, no cash",28:"Grid/ATM/quality/one-armed",27:"Config screen cleanup",26:"Ratchet stop",25:"Console auto-hide",24:"Options auto-reconcile",23:"Daily trade log",22:"Options phantom clear",21:"Auto-reconcile w/ broker",20:"MY CONFIG always on",19:"Phantom position",18:"Futures hours",17:"Closed market honest",16:"Restart leaves no spinner",15:"One tab only",14:"Git lock self-heal",13:"Broker tabs + tray",12:"Velocity honest when shut",11:"Multi-broker sessions",1:"Futures login survives restart",2:"remember_login default",3:"Options profiles to disk",
+T={72:"Clicking CONNECT twice cannot jam it",71:"One 429 must not freeze the app",70:"A rejected exit is not a storm",69:"Sign-in survives a rate limit",68:"Stream cannot blind the app",67:"Restart keeps the position",66:"One-second prices",65:"Journal never loses a trade",64:"Pacing must not stall",63:"Tick velocity",62:"Underlying at fill",61:"Tiered ratchet + anti-clip",60:"SDK audit is honest",59:"Batched option quotes",58:"Option price grid",57:"Webull rate budget",56:"NinjaScript compiles",55:"One-click NT install",54:"Ratchet inside NinjaTrader",53:"Limits die with the app",52:"NinjaTrader delivery check",51:"Futures header + footer",50:"Futures on by default",49:"Toggles + short hints",48:"Futures config stripped",47:"Futures ratchet",46:"NinjaScript in step",45:"Breadth + VIX",44:"Entry telemetry",43:"Trend module",42:"Audio cues",41:"Volatility gauges",40:"Volume gauge",39:"Dwell time",38:"Velocity vs feed artifacts",37:"Desktop icon",36:"Trade log detail",35:"Time value warns not blocks",34:"LOCK/X gone, size warns",33:"Page actually runs",32:"No SAVE / live trade frozen",31:"One switch / still modal",30:"Directional entry levels",29:"Percent only, no cash",28:"Grid/ATM/quality/one-armed",27:"Config screen cleanup",26:"Ratchet stop",25:"Console auto-hide",24:"Options auto-reconcile",23:"Daily trade log",22:"Options phantom clear",21:"Auto-reconcile w/ broker",20:"MY CONFIG always on",19:"Phantom position",18:"Futures hours",17:"Closed market honest",16:"Restart leaves no spinner",15:"One tab only",14:"Git lock self-heal",13:"Broker tabs + tray",12:"Velocity honest when shut",11:"Multi-broker sessions",1:"Futures login survives restart",2:"remember_login default",3:"Options profiles to disk",
    4:"Browser autofill guard",5:"ITM3 strike math",6:"Preview == Arm",7:"Live-only / dead modes",
    8:"Auto-sync safety",9:"Endpoints alive",10:"UI integrity"}
 for sc in sorted(by):
