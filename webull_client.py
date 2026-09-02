@@ -453,6 +453,23 @@ def _remembered_accounts(app_key):
     except Exception:
         return None
 
+# Call priorities. Lower number = more important. During a rate-limit backoff
+# the app keeps making CRITICAL calls and drops the rest, instead of freezing
+# everything for twenty seconds - which is what it used to do, because pace()
+# slept for the full backoff while holding the lock that every thread needs.
+CRITICAL = 0      # entering, exiting, and the mark of an OPEN position
+NORMAL   = 1      # positions, fills, quotes
+LOW      = 2      # balance, trend, breadth, anything cosmetic
+
+# The longest a NORMAL call will wait during a backoff before giving up. Past
+# this the screen is better served by keeping the last value than by stalling.
+NORMAL_MAX_WAIT = 3.0
+
+
+class BudgetSkipped(Exception):
+    """This call was deliberately not made, to protect the request budget."""
+
+
 class _Budget:
     """Serialises and paces every Webull request this process makes.
 
@@ -470,21 +487,47 @@ class _Budget:
         self.calls = 0
         self.paced = 0.0          # total seconds spent waiting
         self.rate_limits = 0
+        self.skipped = 0          # low-priority calls dropped during a backoff
 
-    def pace(self):
+    def reserve(self, priority=NORMAL):
+        """Claim a slot. Returns seconds to wait, or None meaning DON'T CALL.
+
+        Never sleeps, and never holds the lock across a sleep - that was the
+        whole fault. The slot is reserved by moving _last forward, so two
+        threads that reserve at the same moment still get separate slots.
+        """
         with self._lock:
             now = time.time()
             wait = 0.0
             if now < self._blocked_until:
-                wait = self._blocked_until - now
+                blocked_for = self._blocked_until - now
+                # DURING A BACKOFF, ONLY WHAT MATTERS GETS TO WAIT.
+                # A balance refresh has no business making you wait 20 seconds
+                # to find out what your position is worth.
+                if priority >= LOW:
+                    return None
+                if priority >= NORMAL and blocked_for > NORMAL_MAX_WAIT:
+                    return None
+                wait = blocked_for
             gap = self._last + self.min_interval - (now + wait)
             if gap > 0:
                 wait += gap
-            if wait > 0:
-                time.sleep(wait)
-                self.paced += wait
-            self._last = time.time()
+            self._last = now + wait          # reserve it before releasing
             self.calls += 1
+            if priority >= LOW and wait > NORMAL_MAX_WAIT:
+                return None
+            return wait
+
+    def pace(self, priority=NORMAL):
+        """Wait for this call's slot. Raises BudgetSkipped if it should not
+        be made at all right now."""
+        wait = self.reserve(priority)
+        if wait is None:
+            self.skipped += 1
+            raise BudgetSkipped("skipped: the API is backing off after a rate limit")
+        if wait > 0:
+            time.sleep(wait)              # OUTSIDE the lock
+            self.paced += wait
 
     def note_rate_limit(self):
         with self._lock:
@@ -495,6 +538,7 @@ class _Budget:
 
     def stats(self):
         return {"calls": self.calls, "rate_limits": self.rate_limits,
+                "skipped": self.skipped,
                 "paced_seconds": round(self.paced, 1),
                 "blocked_for": max(0.0, round(self._blocked_until - time.time(), 1))}
 
@@ -507,11 +551,15 @@ _RATE_WORDS = ("RATE_LIMIT", "TOO_MANY_REQUEST", "RATELIMIT", "429")
 def paced(fn, *args, **kwargs):
     """Run one Webull call through the budget.
 
+    priority=CRITICAL for anything that opens, closes or prices an open
+    position; LOW for anything cosmetic. A LOW call during a backoff is
+    dropped rather than queued.
+
     Any exception is re-raised untouched - the callers already turn these
     into plain English. The only thing added is noticing a 429 so the whole
     process backs off instead of hammering a door that is already shut.
     """
-    BUDGET.pace()
+    BUDGET.pace(kwargs.pop("priority", NORMAL))
     try:
         return fn(*args, **kwargs)
     except Exception as e:                                   # noqa: BLE001
