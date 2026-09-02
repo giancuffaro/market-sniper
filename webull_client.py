@@ -393,6 +393,11 @@ ADOPT_EVERY = 5.0
 # dead key still answers while he is looking at the screen.
 CONNECT_RETRIES = 3
 
+# The longest an auto-exit will ever wait before trying again. Being stuck in a
+# trade is worse than any request cost, so this stays short - but a rejected
+# sell retried once a second is what caused the 9/2 storm.
+CLOSE_RETRY_MAX = 15.0
+
 # Picking an account calls connect() again. The list cannot have changed in the
 # seconds between, so the second call reads this instead of spending a request.
 ACCOUNTS_TTL = 90.0
@@ -1002,6 +1007,21 @@ class BaseSession:
             hit = self._bracket_hit()
             if not hit:
                 return
+            # A REJECTED EXIT MUST NOT BE RETRIED EVERY TICK.
+            #
+            # 9/2: 313 order/place calls came back 429 in seventeen minutes.
+            # The stop was hit, close() was refused because the key was rate
+            # limited, the position stayed - and one second later the same
+            # bracket fired again. Once a second, forever. It ate the shared
+            # budget, so quotes 429'd too, so his P&L stopped updating and the
+            # screen "stopped polling". The retry storm caused the blindness.
+            #
+            # Still retry - this is an EXIT and being stuck in a trade is worse
+            # than any request cost - but slower each time, so a broker that is
+            # saying no gets asked at a sane rate instead of being hammered.
+            now = time.time()
+            if now < getattr(self, "_close_retry_at", 0.0):
+                return
             return self._do_auto_close(hit)
 
     def _do_auto_close(self, hit):
@@ -1026,8 +1046,24 @@ class BaseSession:
             sign = "+" if pnl >= 0 else "−"
             self.last_event = (f"{'TAKE PROFIT' if hit=='TP' else 'STOP LOSS'} HIT — "
                                f"position closed {sign}${abs(pnl):.2f}")
+            # It worked: forget any backoff so the next trade starts clean.
+            self._close_fails = 0
+            self._close_retry_at = 0.0
         except OrderRejected as e:
-            self.last_event = f"{hit} hit but close blocked: {e}"
+            n = getattr(self, "_close_fails", 0) + 1
+            self._close_fails = n
+            # 1s, 2s, 4s, 8s, then every 15s. Capped so an exit is always
+            # retried within a quarter of a minute, however long this goes on.
+            wait = min(CLOSE_RETRY_MAX, 2.0 ** (n - 1))
+            self._close_retry_at = time.time() + wait
+            rate = any(w in str(e).upper() for w in _RATE_WORDS)
+            self.last_event = (
+                ("%s hit but the broker is RATE LIMITING the sell — retrying in "
+                 "%.0fs (attempt %d). Close it in the Webull app if this keeps up."
+                 % (hit, wait, n)) if rate else
+                ("%s hit but close blocked: %s — retrying in %.0fs (attempt %d)"
+                 % (hit, e, wait, n)))
+            print("[EXIT   ] %s" % self.last_event, flush=True)
 
     # ---- ABSOLUTE ENTRY: round-number armed entry -------------------------------
     def _underlying(self, symbol):
