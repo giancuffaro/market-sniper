@@ -1568,9 +1568,10 @@ try:
     # The grid has .50 levels: "715" for a 715.50 trigger is the wrong price.
     check(42, "the armed line shows the level to 2dp",
           "Number(armed.target).toFixed(2)" in _ix)
-    check(42, "and names the breakout level too", "armed.breakout" in _ix)
+    # The breakout level is gone - one level per side, scenario 30.
+    check(42, "and names ONE level, not two", "armed.breakout" not in _ix)
     _wc5 = io.open("webull_client.py", encoding="utf-8").read()
-    check(42, "the server sends the breakout level", '"breakout": brk' in _wc5)
+    check(42, "the server sends the one level it waits for", '"target": target' in _wc5)
 
     import subprocess as _sp2
     _sm2 = _sp2.run(["node", "ui_smoke.js", "index.html"], cwd=HERE,
