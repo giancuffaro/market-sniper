@@ -1557,6 +1557,8 @@ class BaseSession:
                         found.append(("%s.%s" % (hname, m), fn))
         return found
 
+    _pos_must_answer = False        # set True only on the adopt-at-connect path
+
     def broker_positions(self):
         """Open positions ACCORDING TO WEBULL. None means 'could not ask'.
 
@@ -1570,7 +1572,8 @@ class BaseSession:
         for name, fn in self._position_fns():
             for args in ((self.account_id,), ()):
                 try:
-                    res = paced(fn, *args)
+                    res = paced_retry(fn, *args) if self._pos_must_answer \
+                        else paced(fn, *args)
                 except Exception:
                     continue
                 try:
@@ -1652,8 +1655,31 @@ class BaseSession:
         """
         if self.position is not None:
             return None
-        rows = self.broker_positions()
-        if not rows:                       # None (ask failed) or [] (really flat)
+        # On the connect path this READ has to succeed - it is the difference
+        # between seeing your position and the app claiming you are flat. A 429
+        # there is "ask again", not "you hold nothing".
+        self._pos_must_answer = True
+        try:
+            rows = self.broker_positions()
+        finally:
+            self._pos_must_answer = False
+
+        if rows is None:
+            # COULD NOT ASK. Never let this look like FLAT - that is exactly the
+            # 9/2 failure, where a rate-limited positions call left a live trade
+            # invisible and unmanaged.
+            n = getattr(self, "_adopt_ask_fails", 0) + 1
+            self._adopt_ask_fails = n
+            if n in (2, 10) or n % 30 == 0:
+                self.last_event = (
+                    "Cannot reach Webull to check what you are holding (rate "
+                    "limited, attempt %d). If you have a position open, the app "
+                    "is NOT managing it — close the Fill Announcer and the "
+                    "Discord bridge to free up the API budget." % n)
+                print("[ADOPT  ] %s" % self.last_event, flush=True)
+            return None
+        self._adopt_ask_fails = 0
+        if not rows:                       # the broker really says flat
             return None
         for row in rows:
             got = self._position_from_row(row)
