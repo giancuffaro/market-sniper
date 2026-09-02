@@ -3173,11 +3173,103 @@ finally:
           "pos.needs_manage_ok ? null : pos.ratchet" in _ix67)
 
 
+    # --- 68. The stream is an accelerator, never a dependency --------------
+    # This one has never run against a live feed, so every test here is about
+    # the ONE thing that matters if it misbehaves: it must not be able to
+    # blank the chips, freeze a price, or stop the app starting.
+    import stream as _st
+    _s68 = io.open("stream.py", encoding="utf-8").read()
+
+    _ps = _st.PriceStream("k", "s")
+    # Nothing received yet: the answer is None, meaning POLL - not zero, not
+    # a guess, not the last thing it saw.
+    check(68, "an empty stream returns None", _ps.price("SPY") is None)
+    check(68, "and None for a symbol it never saw", _ps.price("NVDA") is None)
+    check(68, "and for no symbol at all", _ps.price("") is None
+          and _ps.price(None) is None)
+
+    _ps._on_message(None, "t", [{"symbol": "SPY", "price": 764.49,
+                                 "preClose": 761.78}])
+    _r = _ps.price("SPY")
+    check(68, "a pushed quote reads back", _r and _r["price"] == 764.49, str(_r))
+    check(68, "with change from the previous close",
+          _r and abs(_r["change"] - 2.71) < 0.011
+          and abs(_r["change_pct"] - 0.36) < 0.011, str(_r))
+    check(68, "and is labelled as streamed",
+          _r and _r["source"] == "stream" and _r["live"] is True, str(_r))
+    check(68, "lower case symbols still match", _ps.price("spy") is not None)
+
+    # THE IMPORTANT ONE. A feed that goes quiet must stop answering. A frozen
+    # price is worse than a slow one because nothing on screen looks wrong.
+    with _ps._lock:
+        _ps._rows["SPY"]["t"] = time.time() - (_st.STALE_SECONDS + 1)
+    check(68, "a stale price is withheld", _ps.price("SPY") is None)
+    check(68, "stale is shorter than a breath", _st.STALE_SECONDS <= 10.0,
+          str(_st.STALE_SECONDS))
+
+    # A malformed push must not kill the reader thread - it is the only thread
+    # feeding every price on the screen.
+    for _bad in (None, "text", 5, [{"no_symbol": 1}], [{"symbol": "X"}],
+                 {"symbol": "SPY"}, [None, "x"]):
+        try:
+            _ps._on_message(None, "t", _bad); _ok = True
+        except Exception as _e:
+            _ok = False
+        check(68, "survives a bad message %r" % (type(_bad).__name__,), _ok)
+    check(68, "and a junk message stores nothing",
+          _ps.price("X") is None)
+
+    # Partial rows: a bid-only push must not invent a price.
+    _p2 = _st.PriceStream("k", "s")
+    _p2._on_message(None, "t", [{"symbol": "QQQ", "bid": 1.0, "ask": 1.1}])
+    check(68, "bid/ask without a trade is not a price", _p2.price("QQQ") is None)
+
+    # Starting must never raise, whatever is or is not installed.
+    _p3 = _st.PriceStream("bad", "bad")
+    try:
+        _r3 = _p3.start(["SPY"]); _ok3 = True
+    except Exception:
+        _ok3 = False
+    check(68, "start() never raises", _ok3)
+    check(68, "and says so rather than pretending", _r3 in (True, False))
+    try:
+        _p3.stop(); _ok4 = True
+    except Exception:
+        _ok4 = False
+    check(68, "stop() never raises", _ok4)
+    check(68, "status() always answers",
+          isinstance(_st.PriceStream("k","s").status(), dict))
+
+    # The chain in main.py: the stream is only trusted when it has EVERY
+    # symbol fresh. A partial stream falling through is the difference between
+    # one chip lagging and one chip lying.
+    _m68 = io.open("main.py", encoding="utf-8").read()
+    _pr = _m68.split("def prices()", 1)[1].split("@app.get", 1)[0]
+    check(68, "prices tries the stream first",
+          _pr.index("STREAM.get") < _pr.index("stock_snapshot"))
+    check(68, "and only if every symbol is fresh",
+          "len(streamed) == len(syms)" in _pr)
+    check(68, "then the broker", "stock_snapshot" in _pr)
+    check(68, "then Yahoo", "quotes.get_all()" in _pr)
+    check(68, "and never blanks the chips on an error",
+          "fall through to Yahoo rather than blank" in _pr)
+    check(68, "the stream is closed with the session",
+          "STREAM" in _m68.split("def disconnect", 1)[1][:400])
+
+    # The dependency rule from the handoff, in a test so it cannot be forgotten.
+    check(68, "it uses the SDK already installed",
+          "from webull.data.data_streaming_client import" in _s68)
+    check(68, "and says not to install the forbidden family",
+          "Do not install it." in _s68 and "webull-python-sdk-" in _s68)
+    check(68, "a missing client degrades instead of crashing",
+          "STREAM_AVAILABLE = False" in _s68 and "except Exception:" in _s68)
+
+
 print("\n"+"="*68)
 by={}
 for sc,name,ok,_ in results:
     by.setdefault(sc,[0,0]); by[sc][0]+=1; by[sc][1]+= (1 if ok else 0)
-T={67:"Restart keeps the position",66:"One-second prices",65:"Journal never loses a trade",64:"Pacing must not stall",63:"Tick velocity",62:"Underlying at fill",61:"Tiered ratchet + anti-clip",60:"SDK audit is honest",59:"Batched option quotes",58:"Option price grid",57:"Webull rate budget",56:"NinjaScript compiles",55:"One-click NT install",54:"Ratchet inside NinjaTrader",53:"Limits die with the app",52:"NinjaTrader delivery check",51:"Futures header + footer",50:"Futures on by default",49:"Toggles + short hints",48:"Futures config stripped",47:"Futures ratchet",46:"NinjaScript in step",45:"Breadth + VIX",44:"Entry telemetry",43:"Trend module",42:"Audio cues",41:"Volatility gauges",40:"Volume gauge",39:"Dwell time",38:"Velocity vs feed artifacts",37:"Desktop icon",36:"Trade log detail",35:"Time value warns not blocks",34:"LOCK/X gone, size warns",33:"Page actually runs",32:"No SAVE / live trade frozen",31:"One switch / still modal",30:"Directional entry levels",29:"Percent only, no cash",28:"Grid/ATM/quality/one-armed",27:"Config screen cleanup",26:"Ratchet stop",25:"Console auto-hide",24:"Options auto-reconcile",23:"Daily trade log",22:"Options phantom clear",21:"Auto-reconcile w/ broker",20:"MY CONFIG always on",19:"Phantom position",18:"Futures hours",17:"Closed market honest",16:"Restart leaves no spinner",15:"One tab only",14:"Git lock self-heal",13:"Broker tabs + tray",12:"Velocity honest when shut",11:"Multi-broker sessions",1:"Futures login survives restart",2:"remember_login default",3:"Options profiles to disk",
+T={68:"Stream cannot blind the app",67:"Restart keeps the position",66:"One-second prices",65:"Journal never loses a trade",64:"Pacing must not stall",63:"Tick velocity",62:"Underlying at fill",61:"Tiered ratchet + anti-clip",60:"SDK audit is honest",59:"Batched option quotes",58:"Option price grid",57:"Webull rate budget",56:"NinjaScript compiles",55:"One-click NT install",54:"Ratchet inside NinjaTrader",53:"Limits die with the app",52:"NinjaTrader delivery check",51:"Futures header + footer",50:"Futures on by default",49:"Toggles + short hints",48:"Futures config stripped",47:"Futures ratchet",46:"NinjaScript in step",45:"Breadth + VIX",44:"Entry telemetry",43:"Trend module",42:"Audio cues",41:"Volatility gauges",40:"Volume gauge",39:"Dwell time",38:"Velocity vs feed artifacts",37:"Desktop icon",36:"Trade log detail",35:"Time value warns not blocks",34:"LOCK/X gone, size warns",33:"Page actually runs",32:"No SAVE / live trade frozen",31:"One switch / still modal",30:"Directional entry levels",29:"Percent only, no cash",28:"Grid/ATM/quality/one-armed",27:"Config screen cleanup",26:"Ratchet stop",25:"Console auto-hide",24:"Options auto-reconcile",23:"Daily trade log",22:"Options phantom clear",21:"Auto-reconcile w/ broker",20:"MY CONFIG always on",19:"Phantom position",18:"Futures hours",17:"Closed market honest",16:"Restart leaves no spinner",15:"One tab only",14:"Git lock self-heal",13:"Broker tabs + tray",12:"Velocity honest when shut",11:"Multi-broker sessions",1:"Futures login survives restart",2:"remember_login default",3:"Options profiles to disk",
    4:"Browser autofill guard",5:"ITM3 strike math",6:"Preview == Arm",7:"Live-only / dead modes",
    8:"Auto-sync safety",9:"Endpoints alive",10:"UI integrity"}
 for sc in sorted(by):
