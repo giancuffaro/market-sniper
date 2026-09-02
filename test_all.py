@@ -3713,6 +3713,49 @@ finally:
     check(71, "and a skip during sign-in is retried, not fatal",
           "except BudgetSkipped" in _w71)
 
+    # WHAT HE PRESSED MUST NOT BE DROPPED.
+    # 9/2, straight after the priority change: "BUY CALLS - Couldn't load the
+    # option quote from Webull right now ... skipped: the API is backing off
+    # after a rate limit". He pressed a button and the app silently binned the
+    # one read he was waiting on, then blamed the market. Only the OPEN
+    # position's mark had been marked important; a NEW trade had not.
+    _w71b = io.open("webull_client.py", encoding="utf-8").read()
+
+    def _prio_in(fn_name):
+        body = _w71b.split("    def %s(" % fn_name, 1)[1].split("\n    def ", 1)[0]
+        import re as _re
+        m = _re.search(r"call_priority\((\w+)\)", body)
+        return m.group(1) if m else None
+
+    check(71, "the BUY quote is never skipped", _prio_in("quote") == "IMMEDIATE",
+          str(_prio_in("quote")))
+    check(71, "the EXIT quote is never skipped", _prio_in("close") == "IMMEDIATE",
+          str(_prio_in("close")))
+    check(71, "the open position's mark is protected",
+          _prio_in("refresh_mark") == "CRITICAL", str(_prio_in("refresh_mark")))
+    check(71, "but the volatility gauge is droppable",
+          _prio_in("atm_option_for_vol") == "LOW",
+          str(_prio_in("atm_option_for_vol")))
+
+    # Prove it end to end: during a backoff, the thing he clicked still goes.
+    _B71 = wb._Budget(min_interval=0.0)
+    _B71.note_rate_limit()
+    _saved71 = wb.BUDGET
+    try:
+        wb.BUDGET = _B71
+        with wb.call_priority(wb.IMMEDIATE):
+            _ok71 = wb.paced(lambda: "quote came back")
+        check(71, "a button press survives a backoff", _ok71 == "quote came back")
+        _dropped = False
+        try:
+            with wb.call_priority(wb.LOW):
+                wb.paced(lambda: "should not run")
+        except wb.BudgetSkipped:
+            _dropped = True
+        check(71, "while cosmetic reads are still dropped", _dropped)
+    finally:
+        wb.BUDGET = _saved71
+
     # A dropped LOW call must degrade, never crash the caller.
     _z71 = wb.LiveSession.__new__(wb.LiveSession)
     class _NeverCalled:
