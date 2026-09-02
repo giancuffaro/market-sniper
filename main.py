@@ -700,6 +700,31 @@ def disconnect():
             pass
     return {"ok": True}
 
+@app.get("/api/debug/positions")
+def debug_positions():
+    """The RAW rows Webull returns, plus what the app made of them. Read-only.
+
+    Exists because a wrong entry price silently inflates the percentage on the
+    hero line, and that percentage is what he decides on. When the screen and
+    the broker disagree, this is the only way to see WHICH field was misread
+    instead of guessing at it.
+    """
+    e = SESSION.get("s")
+    if e is None:
+        raise HTTPException(400, "not connected")
+    try:
+        rows = e.broker_positions()
+    except Exception as ex:                                  # noqa: BLE001
+        raise HTTPException(400, "positions read failed: %s" % str(ex)[:160])
+    parsed = []
+    for r in (rows or []):
+        try:
+            parsed.append(e._position_from_row(r))
+        except Exception as ex:                              # noqa: BLE001
+            parsed.append({"parse_error": str(ex)[:120]})
+    return {"raw": rows, "parsed": parsed, "adopted": e.position}
+
+
 @app.post("/api/shutdown")
 def shutdown():
     ps = STREAM.get("s")
