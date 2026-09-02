@@ -387,6 +387,12 @@ BACKOFF_AFTER_429 = 20.0      # dead time once the broker says slow down
 # changes only when a fill happens.
 ADOPT_EVERY = 5.0
 
+# How many times signing in will wait out a rate limit before giving up. Each
+# wait is the full 20s backoff, so this is about a minute - long enough to
+# outlast a burst from the bridge or the announcer, short enough that a truly
+# dead key still answers while he is looking at the screen.
+CONNECT_RETRIES = 3
+
 class _Budget:
     """Serialises and paces every Webull request this process makes.
 
@@ -453,6 +459,34 @@ def paced(fn, *args, **kwargs):
             BUDGET.note_rate_limit()
         raise
 
+
+
+def paced_retry(fn, *args, **kwargs):
+    """paced(), but for a READ that has to succeed: signing in.
+
+    Only ever wrap calls that change nothing. Retrying a place_order after a
+    429 could double a position - the request may well have landed before the
+    limiter answered. Reads have no such risk.
+
+    Why this exists: 9/2, he could not get past the account picker. The key was
+    rate limited (14 429s on list-open, 2 on balance, from three processes
+    sharing 300 requests a minute) and the account list is the FIRST call
+    connect makes. One 429 there and the app was unusable - it gave up on a
+    condition that clears itself in twenty seconds.
+    """
+    last = None
+    for attempt in range(CONNECT_RETRIES):
+        try:
+            return paced(fn, *args, **kwargs)
+        except Exception as e:                               # noqa: BLE001
+            last = e
+            if not any(w in str(e).upper() for w in _RATE_WORDS):
+                raise                       # a real error: fail now, honestly
+            if attempt < CONNECT_RETRIES - 1:
+                print("[BUDGET ] rate limited during sign-in - waiting out the "
+                      "backoff, try %d of %d" % (attempt + 2, CONNECT_RETRIES),
+                      flush=True)
+    raise last
 
 
 class OptionData:
@@ -1732,7 +1766,7 @@ class LiveSession(BaseSession):
         self._api_client = api_client
         self._od = OptionData(api_client)
         self.trade = TradeClient(api_client)
-        res = paced(self.trade.account_v2.get_account_list)
+        res = paced_retry(self.trade.account_v2.get_account_list)
         if getattr(res, "status_code", None) != 200:
             raise OrderRejected(f"account list failed: {getattr(res,'status_code','?')}")
         data = res.json()
