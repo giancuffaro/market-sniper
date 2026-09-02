@@ -2803,6 +2803,60 @@ try:
     check(63, "unavailable returns None, not an empty list",
           "None, not [] - the caller must be able to tell" in _w63)
 
+    # --- 64. Pacing must not stall the screen -----------------------------
+    # REGRESSION, found live with a position open: snapshot_row probes up to 8
+    # argument shapes until one is accepted. Before pacing a rejected shape
+    # cost nothing; after it, each is a real 0.20s pause. A winner at position
+    # 5 was 0.8 SECONDS of dead time on EVERY quote, against a 1-second screen
+    # poll. The shape never changes between calls, so it is learned once.
+    import threading as _th64
+
+    class _OD64(object):
+        def __init__(self, win_at=5):
+            self.n = 0; self.win_at = win_at
+            self._snap_cache = {}; self._snap_lock = _th64.Lock()
+        def _fns(self):
+            def fn(*a, **kw):
+                self.n += 1
+                if self.n % 1000 == self.win_at % 1000 or getattr(self, "_ok", False):
+                    pass
+                # accept exactly one shape: keyword "symbols" as a bare string
+                if kw.get("symbols") and isinstance(kw["symbols"], str) and "category" not in kw:
+                    return {"symbol": "X", "askPrice": 1.0}
+                raise Exception("wrong shape")
+            return [("f.fn", fn)], []
+        def _result(self, r):
+            return r
+    for _m in ("snapshot_row", "snapshot_cached", "forget_snapshot", "_SNAP_TTL"):
+        setattr(_OD64, _m, getattr(wb.OptionData, _m))
+
+    _saved64, wb.BUDGET = wb.BUDGET, wb._Budget(0.05)
+    try:
+        _od64 = _OD64()
+        _t = time.time(); _od64.snapshot_row("QQQ260902C00700000"); _first = time.time() - _t
+        _n1 = _od64.n
+        _od64.n = 0
+        _t = time.time(); _od64.snapshot_row("QQQ260902C00700000"); _later = time.time() - _t
+        check(64, "the first quote hunts for a shape", _n1 > 1, str(_n1))
+        check(64, "every quote after costs ONE attempt", _od64.n == 1, str(_od64.n))
+        check(64, "and is measurably faster", _later < _first, "%.2f vs %.2f" % (_later, _first))
+        check(64, "the shape is remembered", getattr(_od64, "_shape_row", None) is not None)
+
+        # If the remembered shape ever stops working, it must re-probe rather
+        # than fail forever.
+        _od64._shape_row = ("f.fn", "arg", ("nonsense",))
+        _od64.n = 0
+        _r = _od64.snapshot_row("QQQ260902C00700000")
+        check(64, "a stale shape is discarded and re-learned",
+              _r is not None and _od64._shape_row[1] == "kw", str(_od64._shape_row))
+    finally:
+        wb.BUDGET = _saved64
+
+    _w64 = io.open("webull_client.py", encoding="utf-8").read()
+    check(64, "the reason is recorded where the code is",
+          "made the data crawl while" in _w64)
+    check(64, "no dir() hack survived", "'name' in dir()" not in _w64)
+
     import subprocess as _sp3
     _sm3 = _sp3.run(["node", "ui_smoke.js", "futures_index.html"], cwd=HERE,
                     capture_output=True, text=True, timeout=60)
@@ -2889,7 +2943,7 @@ print("\n"+"="*68)
 by={}
 for sc,name,ok,_ in results:
     by.setdefault(sc,[0,0]); by[sc][0]+=1; by[sc][1]+= (1 if ok else 0)
-T={63:"Tick velocity",62:"Underlying at fill",61:"Tiered ratchet + anti-clip",60:"SDK audit is honest",59:"Batched option quotes",58:"Option price grid",57:"Webull rate budget",56:"NinjaScript compiles",55:"One-click NT install",54:"Ratchet inside NinjaTrader",53:"Limits die with the app",52:"NinjaTrader delivery check",51:"Futures header + footer",50:"Futures on by default",49:"Toggles + short hints",48:"Futures config stripped",47:"Futures ratchet",46:"NinjaScript in step",45:"Breadth + VIX",44:"Entry telemetry",43:"Trend module",42:"Audio cues",41:"Volatility gauges",40:"Volume gauge",39:"Dwell time",38:"Velocity vs feed artifacts",37:"Desktop icon",36:"Trade log detail",35:"Time value warns not blocks",34:"LOCK/X gone, size warns",33:"Page actually runs",32:"No SAVE / live trade frozen",31:"One switch / still modal",30:"Directional entry levels",29:"Percent only, no cash",28:"Grid/ATM/quality/one-armed",27:"Config screen cleanup",26:"Ratchet stop",25:"Console auto-hide",24:"Options auto-reconcile",23:"Daily trade log",22:"Options phantom clear",21:"Auto-reconcile w/ broker",20:"MY CONFIG always on",19:"Phantom position",18:"Futures hours",17:"Closed market honest",16:"Restart leaves no spinner",15:"One tab only",14:"Git lock self-heal",13:"Broker tabs + tray",12:"Velocity honest when shut",11:"Multi-broker sessions",1:"Futures login survives restart",2:"remember_login default",3:"Options profiles to disk",
+T={64:"Pacing must not stall",63:"Tick velocity",62:"Underlying at fill",61:"Tiered ratchet + anti-clip",60:"SDK audit is honest",59:"Batched option quotes",58:"Option price grid",57:"Webull rate budget",56:"NinjaScript compiles",55:"One-click NT install",54:"Ratchet inside NinjaTrader",53:"Limits die with the app",52:"NinjaTrader delivery check",51:"Futures header + footer",50:"Futures on by default",49:"Toggles + short hints",48:"Futures config stripped",47:"Futures ratchet",46:"NinjaScript in step",45:"Breadth + VIX",44:"Entry telemetry",43:"Trend module",42:"Audio cues",41:"Volatility gauges",40:"Volume gauge",39:"Dwell time",38:"Velocity vs feed artifacts",37:"Desktop icon",36:"Trade log detail",35:"Time value warns not blocks",34:"LOCK/X gone, size warns",33:"Page actually runs",32:"No SAVE / live trade frozen",31:"One switch / still modal",30:"Directional entry levels",29:"Percent only, no cash",28:"Grid/ATM/quality/one-armed",27:"Config screen cleanup",26:"Ratchet stop",25:"Console auto-hide",24:"Options auto-reconcile",23:"Daily trade log",22:"Options phantom clear",21:"Auto-reconcile w/ broker",20:"MY CONFIG always on",19:"Phantom position",18:"Futures hours",17:"Closed market honest",16:"Restart leaves no spinner",15:"One tab only",14:"Git lock self-heal",13:"Broker tabs + tray",12:"Velocity honest when shut",11:"Multi-broker sessions",1:"Futures login survives restart",2:"remember_login default",3:"Options profiles to disk",
    4:"Browser autofill guard",5:"ITM3 strike math",6:"Preview == Arm",7:"Live-only / dead modes",
    8:"Auto-sync safety",9:"Endpoints alive",10:"UI integrity"}
 for sc in sorted(by):
