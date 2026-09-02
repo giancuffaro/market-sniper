@@ -1413,7 +1413,6 @@ class BaseSession:
             for args in ((self.account_id,), ()):
                 try:
                     res = paced(fn, *args)
-                    self._shape_pos = (name, args) if 'name' in dir() else None
                 except Exception:
                     continue
                 try:
@@ -1653,7 +1652,6 @@ class LiveSession(BaseSession):
                 try:
                     res = (paced(fn, **call) if isinstance(call, dict)
                            else paced(fn, *call))
-                    self._shape_fill = call
                     if getattr(res, "status_code", 200) != 200:
                         continue
                     body = res.json() if hasattr(res, "json") else res
