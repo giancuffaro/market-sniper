@@ -3433,6 +3433,46 @@ finally:
     check(70, "futures: capped too", fc.CLOSE_RETRY_MAX <= 15.0,
           str(fc.CLOSE_RETRY_MAX))
 
+    # THE ACTUAL 9/2 STORM. It was never a 429 storm - it was a PHANTOM storm.
+    # 1,938 sells in 100 seconds, ~19 a second, on a QQQ 708 he had already
+    # closed. Webull rejected every one with 417
+    # OPENAPI_OPTION_CAVERED_CALL_STOCK_NO_ENOUGH - "you do not hold that" -
+    # and the app kept the position and kept selling. THAT flood rate-limited
+    # the key, which is why quotes 429'd and his P&L stopped updating.
+    _ph = _stuck(wb)
+    _ph.position = {"symbol": "QQQ", "side": "CALLS", "qty": 2, "strike": 708.0,
+                    "option_type": "CALL", "expiration": "2026-09-02",
+                    "entry": 1.20, "mark": 1.10}
+    _vanished = []
+    _ph._record_vanished = lambda p_, why: _vanished.append((p_["symbol"], why))
+    def _real417():
+        _ph._n["n"] += 1
+        raise wb.OrderRejected("order rejected (HTTP 417): "
+              "{'error_code': 'OPENAPI_OPTION_CAVERED_CALL_STOCK_NO_ENOUGH'}")
+    _ph.close = _real417
+    for _ in range(2000):
+        _ph._maybe_auto_close()
+    check(70, "a phantom is sold ONCE, not 1,938 times", _ph._n["n"] == 1,
+          str(_ph._n))
+    check(70, "and the screen is cleared", _ph.position is None)
+    check(70, "and the trade is journalled, not lost",
+          _vanished == [("QQQ", "CLOSED-ELSEWHERE")], str(_vanished))
+    check(70, "and it says the broker does not have it",
+          "do not hold that" in _ph.last_event, _ph.last_event[:70])
+
+    # The distinction that matters: "you do not hold that" is an ANSWER and
+    # must clear; "too many requests" is "ask later" and must NOT clear, or a
+    # rate limit would wipe a real position off the screen mid-trade.
+    _rl = _stuck(wb)
+    _rl._record_vanished = lambda p_, why: None
+    _rl._maybe_auto_close()
+    check(70, "a rate limit NEVER clears a real position",
+          _rl.position is not None, str(_rl.position))
+
+    for _w in ("STOCK_NO_ENOUGH", "NO_ENOUGH_POSITION", "INSUFFICIENT_POSITION"):
+        check(70, "recognises %s" % _w,
+              any(_w in x for x in wb._NO_POSITION_WORDS))
+
     # The ENTRY side was already safe and must stay that way: it clears `armed`
     # BEFORE placing, so a rejected buy cannot re-fire on the next tick.
     _ent = _w69.split("def _maybe_trigger_entry", 1)[1].split("\n    def ", 1)[0]
