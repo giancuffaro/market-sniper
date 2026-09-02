@@ -3730,6 +3730,7 @@ finally:
 
     # Sign-in must finish well inside the request timeout, or the worker is
     # abandoned every single time and the pool drains.
+    _TMO72 = int(re.search(r'CONNECT_TIMEOUT_S = (\\d+)', _m72).group(1))
     _mi72, _bo72 = wb.MIN_CALL_INTERVAL, wb.BACKOFF_AFTER_429
     wb.BUDGET.min_interval = 0.0
     try:
@@ -3744,8 +3745,7 @@ finally:
             pass
         _took = time.time() - _t72
         check(72, "a hopeless sign-in gives up inside the timeout",
-              _took < main.CONNECT_TIMEOUT_S, "%.1fs vs %ss"
-              % (_took, main.CONNECT_TIMEOUT_S))
+              _took < _TMO72, "%.1fs vs %ss" % (_took, _TMO72))
         check(72, "and inside its own stated budget",
               _took <= wb.CONNECT_BUDGET_SECONDS + 3.0, "%.1fs" % _took)
         check(72, "having actually retried", _n72["c"] >= 2, str(_n72))
