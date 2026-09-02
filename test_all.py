@@ -2857,6 +2857,66 @@ try:
           "made the data crawl while" in _w64)
     check(64, "no dir() hack survived", "'name' in dir()" not in _w64)
 
+    # --- 65. A trade closed outside the app must still be journalled ------
+    # Found live 2026-09-02: G closed at the broker and NOTHING was logged.
+    # reconcile() and forget_position() cleared the screen and the trade was
+    # simply gone - so the journal was silently losing whole trades and the
+    # day's numbers were wrong by however many.
+    import tempfile as _tf65, trade_log as _tl65
+    _tl65 = importlib.reload(_tl65)
+    _d65 = _tf65.mkdtemp()
+    _tl65.LOG_DIR = _d65
+    _tl65.CSV_PATH = os.path.join(_d65, "t.csv")
+    _tl65.XLSX_PATH = os.path.join(_d65, "t.xlsx")
+
+    class _S65(wb.LiveSession):
+        def __init__(self, rows):
+            import config as _c
+            self.settings = dict(_c.DEFAULT_SETTINGS); self.strategies = []
+            self.blotter = []; self.day_realized = 0.0; self._day = None
+            self.account_id = "ACC"; self._rows = rows
+            self._order_lock = _th64.Lock(); self._last_reconcile = 0
+        def _save_day(self): pass
+        def broker_positions(self): return self._rows
+        def _underlying(self, sym): return 715.0
+
+    _pos65 = {"symbol": "QQQ", "side": "CALLS", "strike": 700.0, "qty": 1,
+              "entry": 2.00, "mark": 2.35, "bid": 2.30, "expiration": "2026-09-02",
+              "opened_at": "13:00", "ratchet_step": 10.0}
+
+    _a65 = _S65([]); _a65.position = dict(_pos65); _a65.reconcile(force=True)
+    _rows65 = _tl65._rows()
+    check(65, "a broker-side close is recorded", len(_rows65) == 1, str(len(_rows65)))
+    check(65, "named so you can find it later",
+          _rows65[0]["exit_reason"] == "CLOSED-ELSEWHERE", str(_rows65[0]["exit_reason"]))
+    # The BID is what a sale would really have got - use it over the mark.
+    check(65, "the exit uses the last bid, not the mark", _rows65[0]["exit"] == "2.3",
+          str(_rows65[0]["exit"]))
+    # A guess that looks like a fact is worse than no row.
+    check(65, "and it is flagged as estimated", "estimated" in _rows65[0]["note"])
+
+    _b65 = _S65([]); _b65.position = dict(_pos65); _b65.forget_position()
+    check(65, "the CLEAR IT button records too", len(_tl65._rows()) == 2)
+    check(65, "with its own reason", _tl65._rows()[-1]["exit_reason"] == "CLEARED-BY-HAND")
+
+    # With no last price there is nothing honest to write.
+    _c65 = _S65([])
+    _c65.position = {"symbol": "QQQ", "side": "CALLS", "strike": 700.0, "qty": 1,
+                     "entry": 2.0, "expiration": "x", "opened_at": "13:00"}
+    _c65.forget_position()
+    check(65, "no last price means no invented row", len(_tl65._rows()) == 2)
+
+    # A FAILED broker call is not "you are flat" - the position must stay.
+    _d65s = _S65(None); _d65s.position = dict(_pos65); _d65s.reconcile(force=True)
+    check(65, "a failed positions call changes nothing",
+          _d65s.position is not None and len(_tl65._rows()) == 2)
+
+    _w65 = io.open("webull_client.py", encoding="utf-8").read()
+    check(65, "the reason is recorded where the code is",
+          "the journal was quietly losing whole trades" in _w65)
+    check(65, "journalling can never break the clear",
+          "could not record the cleared trade" in _w65)
+
     import subprocess as _sp3
     _sm3 = _sp3.run(["node", "ui_smoke.js", "futures_index.html"], cwd=HERE,
                     capture_output=True, text=True, timeout=60)
@@ -2943,7 +3003,7 @@ print("\n"+"="*68)
 by={}
 for sc,name,ok,_ in results:
     by.setdefault(sc,[0,0]); by[sc][0]+=1; by[sc][1]+= (1 if ok else 0)
-T={64:"Pacing must not stall",63:"Tick velocity",62:"Underlying at fill",61:"Tiered ratchet + anti-clip",60:"SDK audit is honest",59:"Batched option quotes",58:"Option price grid",57:"Webull rate budget",56:"NinjaScript compiles",55:"One-click NT install",54:"Ratchet inside NinjaTrader",53:"Limits die with the app",52:"NinjaTrader delivery check",51:"Futures header + footer",50:"Futures on by default",49:"Toggles + short hints",48:"Futures config stripped",47:"Futures ratchet",46:"NinjaScript in step",45:"Breadth + VIX",44:"Entry telemetry",43:"Trend module",42:"Audio cues",41:"Volatility gauges",40:"Volume gauge",39:"Dwell time",38:"Velocity vs feed artifacts",37:"Desktop icon",36:"Trade log detail",35:"Time value warns not blocks",34:"LOCK/X gone, size warns",33:"Page actually runs",32:"No SAVE / live trade frozen",31:"One switch / still modal",30:"Directional entry levels",29:"Percent only, no cash",28:"Grid/ATM/quality/one-armed",27:"Config screen cleanup",26:"Ratchet stop",25:"Console auto-hide",24:"Options auto-reconcile",23:"Daily trade log",22:"Options phantom clear",21:"Auto-reconcile w/ broker",20:"MY CONFIG always on",19:"Phantom position",18:"Futures hours",17:"Closed market honest",16:"Restart leaves no spinner",15:"One tab only",14:"Git lock self-heal",13:"Broker tabs + tray",12:"Velocity honest when shut",11:"Multi-broker sessions",1:"Futures login survives restart",2:"remember_login default",3:"Options profiles to disk",
+T={65:"Journal never loses a trade",64:"Pacing must not stall",63:"Tick velocity",62:"Underlying at fill",61:"Tiered ratchet + anti-clip",60:"SDK audit is honest",59:"Batched option quotes",58:"Option price grid",57:"Webull rate budget",56:"NinjaScript compiles",55:"One-click NT install",54:"Ratchet inside NinjaTrader",53:"Limits die with the app",52:"NinjaTrader delivery check",51:"Futures header + footer",50:"Futures on by default",49:"Toggles + short hints",48:"Futures config stripped",47:"Futures ratchet",46:"NinjaScript in step",45:"Breadth + VIX",44:"Entry telemetry",43:"Trend module",42:"Audio cues",41:"Volatility gauges",40:"Volume gauge",39:"Dwell time",38:"Velocity vs feed artifacts",37:"Desktop icon",36:"Trade log detail",35:"Time value warns not blocks",34:"LOCK/X gone, size warns",33:"Page actually runs",32:"No SAVE / live trade frozen",31:"One switch / still modal",30:"Directional entry levels",29:"Percent only, no cash",28:"Grid/ATM/quality/one-armed",27:"Config screen cleanup",26:"Ratchet stop",25:"Console auto-hide",24:"Options auto-reconcile",23:"Daily trade log",22:"Options phantom clear",21:"Auto-reconcile w/ broker",20:"MY CONFIG always on",19:"Phantom position",18:"Futures hours",17:"Closed market honest",16:"Restart leaves no spinner",15:"One tab only",14:"Git lock self-heal",13:"Broker tabs + tray",12:"Velocity honest when shut",11:"Multi-broker sessions",1:"Futures login survives restart",2:"remember_login default",3:"Options profiles to disk",
    4:"Browser autofill guard",5:"ITM3 strike math",6:"Preview == Arm",7:"Live-only / dead modes",
    8:"Auto-sync safety",9:"Endpoints alive",10:"UI integrity"}
 for sc in sorted(by):
