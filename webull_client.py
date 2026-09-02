@@ -1070,8 +1070,8 @@ class BaseSession:
         spot = self._underlying(symbol)
         if spot is None:
             raise OrderRejected("no underlying price available to arm the entry")
-        pull, brk = self.entry_window(spot, side)
-        target = pull                            # the level price is walking toward
+        pull, _brk = self.entry_window(spot, side)
+        target = pull                            # the ONE level this waits for
         s = self.settings
         s["my_enabled"] = True
         # The RATCHET owns the exit when it is on, so do not also arm a
@@ -1081,8 +1081,7 @@ class BaseSession:
             s["tp_enabled"] = True; s["tp_unit"] = "whole"
             s["sl_enabled"] = True; s["sl_unit"] = "pct"; s["sl_value"] = config.MY_CONFIG_SL_PCT
         self.armed = {"symbol": symbol, "side": side, "qty": qty,
-                      "target": target, "breakout": brk,
-                      "spot_at_arm": round(spot, 2)}
+                      "target": target, "spot_at_arm": round(spot, 2)}
         return dict(self.armed)
 
     def disarm(self):
@@ -1098,17 +1097,25 @@ class BaseSession:
             return
         # Either side fills it. The pullback level is behind price, the
         # breakout level in front, and whichever price reaches first wins.
-        brk = a.get("breakout")
+        # ONE LEVEL. The breakout side was added on 2026-09-02 because
+        # pullback-only would not fill in a trend - and taken out the same day,
+        # live, because it does something G does not want: a PUT firing on a
+        # DROP through the level below is joining momentum, when the trade he
+        # is describing is fading the push INTO resistance. Two triggers on one
+        # arm also meant the screen showed two numbers and neither was "the"
+        # level.
+        #
+        # So: CALLS wait for the level at or BELOW price, PUTS for the level at
+        # or ABOVE. If it never comes back, it never fills - that is the cost,
+        # and it is the one he chose.
         if a["side"] == "CALLS":
             pulled = spot <= a["target"]
-            broke = brk is not None and spot >= brk
         else:
             pulled = spot >= a["target"]
-            broke = brk is not None and spot <= brk
-        if not (pulled or broke):
+        if not pulled:
             return
-        hit_level = a["target"] if pulled else brk
-        how = "pullback" if pulled else "breakout"
+        hit_level = a["target"]
+        how = "pullback"
         self.armed = None                   # clear first so we never double-fire
         try:
             self.place(a["symbol"], a["side"], a["qty"])

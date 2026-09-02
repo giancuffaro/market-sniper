@@ -1241,8 +1241,7 @@ const EZ = (function(){
       sfx('armed');
       // 2dp: the grid has .50 levels, and "715" for a 715.50 trigger is a
       // different price from the one that will actually fire.
-      const _lv = Number(r.target).toFixed(2)
-        + (r.breakout!=null ? ' or ' + Number(r.breakout).toFixed(2) : '');
+      const _lv = Number(r.target).toFixed(2);
       showEvent('ARMED · ABSOLUTE ENTRY — waiting for '+sym+' to reach '+_lv+', then buys the ask');
       await tick(); return;
     }
@@ -1450,7 +1449,6 @@ const EZ = (function(){
       $('armBand').classList.remove('hidden');
       $('armTitle').textContent='ARMED · ABSOLUTE ENTRY';
       $('armSub').textContent='waiting for '+armed.symbol+' → '+Number(armed.target).toFixed(2)
-        + (armed.breakout!=null ? ' or ' + Number(armed.breakout).toFixed(2) : '')
         + ' · then '+armed.side+' at ask';
     }else{
       $('armBand').classList.add('hidden');
