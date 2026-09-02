@@ -4022,11 +4022,64 @@ finally:
         check(73, "budget reports %s" % _k, _k in _st73, str(sorted(_st73)))
 
 
+    # --- 74. The DAY figure must be a return, not a sum of percentages ----
+    # "app shows calls at 200% which is totally false". It was: day_pct added
+    # every trade's percentage together. Two +100% trades read "+200%", which
+    # is not a return on anything - you cannot add percentages taken on
+    # different position sizes. Worse, it could show a PROFIT on a losing day.
+    _d74 = wb.LiveSession.__new__(wb.LiveSession)
+    def _day(rows):
+        _d74.blotter = rows
+        return _d74._day_pct()
+
+    check(74, "two +100% trades is +100%, not +200%",
+          _day([{"pct": 100, "pnl": 100, "cost": 100},
+                {"pct": 100, "pnl": 100, "cost": 100}]) == 100.0,
+          str(_day([{"pct": 100, "pnl": 100, "cost": 100},
+                    {"pct": 100, "pnl": 100, "cost": 100}])))
+
+    # THE ONE THAT MATTERS: small winner, big loser. The old sum said +40%.
+    _mixed = _day([{"pct": 50, "pnl": 50, "cost": 100},
+                   {"pct": -10, "pnl": -100, "cost": 1000}])
+    check(74, "a losing day cannot read as a winning one", _mixed < 0,
+          "%.1f%%" % _mixed)
+    check(74, "and it is the real weighted return", abs(_mixed - (-4.5)) < 0.05,
+          "%.1f%%" % _mixed)
+
+    check(74, "one trade reads as that trade",
+          abs(_day([{"pct": -6.87, "pnl": -9.0, "cost": 131.0}]) - (-6.9)) < 0.05)
+    check(74, "no trades is zero, not an error", _day([]) == 0.0)
+    check(74, "a zero-cost row cannot divide by zero",
+          _day([{"pct": 0, "pnl": 0, "cost": 0}]) == 0.0)
+
+    # Rows written before this fix have no cost. Averaging them is imperfect
+    # but it is bounded; adding them is not.
+    _legacy = _day([{"pct": 100}, {"pct": 50}])
+    check(74, "legacy rows average instead of summing", _legacy == 75.0,
+          str(_legacy))
+    check(74, "so an old day can never show 150%", _legacy < 150.0)
+
+    # The cost basis must actually be recorded going forward, or every day
+    # falls back to the average branch for ever.
+    _w74 = io.open("webull_client.py", encoding="utf-8").read()
+    _bl = _w74.split("self.blotter.append(", 1)[1].split("self._save_day()", 1)[0]
+    check(74, "each closed trade records its cost basis", '"cost"' in _bl)
+    check(74, "computed from entry, size and contract multiplier",
+          "100.0" in _bl and "qty" in _bl and "entry" in _bl)
+
+    # And it still must never put a dollar figure on the screen.
+    _ix74 = io.open("index.html", encoding="utf-8").read()
+    check(74, "the day is still shown as a percentage only",
+          "dp.toFixed(1)+'%'" in _ix74)
+    check(74, "no cash on the screen", "day_realized" in _ix74
+          and "$" not in _ix74.split("const dn=Number(st.day_realized")[1][:200])
+
+
 print("\n"+"="*68)
 by={}
 for sc,name,ok,_ in results:
     by.setdefault(sc,[0,0]); by[sc][0]+=1; by[sc][1]+= (1 if ok else 0)
-T={73:"Speed: pace to the real limit",72:"Clicking CONNECT twice cannot jam it",71:"One 429 must not freeze the app",70:"A rejected exit is not a storm",69:"Sign-in survives a rate limit",68:"Stream cannot blind the app",67:"Restart keeps the position",66:"One-second prices",65:"Journal never loses a trade",64:"Pacing must not stall",63:"Tick velocity",62:"Underlying at fill",61:"Tiered ratchet + anti-clip",60:"SDK audit is honest",59:"Batched option quotes",58:"Option price grid",57:"Webull rate budget",56:"NinjaScript compiles",55:"One-click NT install",54:"Ratchet inside NinjaTrader",53:"Limits die with the app",52:"NinjaTrader delivery check",51:"Futures header + footer",50:"Futures on by default",49:"Toggles + short hints",48:"Futures config stripped",47:"Futures ratchet",46:"NinjaScript in step",45:"Breadth + VIX",44:"Entry telemetry",43:"Trend module",42:"Audio cues",41:"Volatility gauges",40:"Volume gauge",39:"Dwell time",38:"Velocity vs feed artifacts",37:"Desktop icon",36:"Trade log detail",35:"Time value warns not blocks",34:"LOCK/X gone, size warns",33:"Page actually runs",32:"No SAVE / live trade frozen",31:"One switch / still modal",30:"Directional entry levels",29:"Percent only, no cash",28:"Grid/ATM/quality/one-armed",27:"Config screen cleanup",26:"Ratchet stop",25:"Console auto-hide",24:"Options auto-reconcile",23:"Daily trade log",22:"Options phantom clear",21:"Auto-reconcile w/ broker",20:"MY CONFIG always on",19:"Phantom position",18:"Futures hours",17:"Closed market honest",16:"Restart leaves no spinner",15:"One tab only",14:"Git lock self-heal",13:"Broker tabs + tray",12:"Velocity honest when shut",11:"Multi-broker sessions",1:"Futures login survives restart",2:"remember_login default",3:"Options profiles to disk",
+T={74:"The day is a return, not a sum",73:"Speed: pace to the real limit",72:"Clicking CONNECT twice cannot jam it",71:"One 429 must not freeze the app",70:"A rejected exit is not a storm",69:"Sign-in survives a rate limit",68:"Stream cannot blind the app",67:"Restart keeps the position",66:"One-second prices",65:"Journal never loses a trade",64:"Pacing must not stall",63:"Tick velocity",62:"Underlying at fill",61:"Tiered ratchet + anti-clip",60:"SDK audit is honest",59:"Batched option quotes",58:"Option price grid",57:"Webull rate budget",56:"NinjaScript compiles",55:"One-click NT install",54:"Ratchet inside NinjaTrader",53:"Limits die with the app",52:"NinjaTrader delivery check",51:"Futures header + footer",50:"Futures on by default",49:"Toggles + short hints",48:"Futures config stripped",47:"Futures ratchet",46:"NinjaScript in step",45:"Breadth + VIX",44:"Entry telemetry",43:"Trend module",42:"Audio cues",41:"Volatility gauges",40:"Volume gauge",39:"Dwell time",38:"Velocity vs feed artifacts",37:"Desktop icon",36:"Trade log detail",35:"Time value warns not blocks",34:"LOCK/X gone, size warns",33:"Page actually runs",32:"No SAVE / live trade frozen",31:"One switch / still modal",30:"Directional entry levels",29:"Percent only, no cash",28:"Grid/ATM/quality/one-armed",27:"Config screen cleanup",26:"Ratchet stop",25:"Console auto-hide",24:"Options auto-reconcile",23:"Daily trade log",22:"Options phantom clear",21:"Auto-reconcile w/ broker",20:"MY CONFIG always on",19:"Phantom position",18:"Futures hours",17:"Closed market honest",16:"Restart leaves no spinner",15:"One tab only",14:"Git lock self-heal",13:"Broker tabs + tray",12:"Velocity honest when shut",11:"Multi-broker sessions",1:"Futures login survives restart",2:"remember_login default",3:"Options profiles to disk",
    4:"Browser autofill guard",5:"ITM3 strike math",6:"Preview == Arm",7:"Live-only / dead modes",
    8:"Auto-sync safety",9:"Endpoints alive",10:"UI integrity"}
 for sc in sorted(by):
