@@ -2440,7 +2440,14 @@ try:
     import threading as _th
     check(57, "there is a budget", hasattr(wb, "BUDGET") and hasattr(wb, "paced"))
     check(57, "the floor is at least 0.20s", wb.MIN_CALL_INTERVAL >= 0.20)
-    check(57, "a 429 backs off for 20s", wb.BACKOFF_AFTER_429 >= 20.0)
+    # The backoff used to be 20s, from when this app could saturate the key by
+    # itself. The rolling window means it no longer can, and every second of
+    # blackout is a second his P&L is frozen - so it is short now, but never
+    # zero, or a 429 storm would just repeat.
+    check(57, "a 429 still backs off", wb.BACKOFF_AFTER_429 >= 2.0,
+          str(wb.BACKOFF_AFTER_429))
+    check(57, "but not for a blackout", wb.BACKOFF_AFTER_429 <= 8.0,
+          str(wb.BACKOFF_AFTER_429))
 
     _b = wb._Budget(0.05)
     _saved_budget, wb.BUDGET = wb.BUDGET, _b
@@ -2450,8 +2457,12 @@ try:
         for _ in range(6):
             wb.paced(lambda: None)
         _el = time.time() - _t0
-        check(57, "calls are spaced, not burst", _el >= 0.24, "%.2fs for 6" % _el)
+        # NOT "calls are spaced" any more - under our share they are meant to
+        # burst, and that is the speed fix. What must hold is that we never
+        # exceed our share of the rolling window.
+        check(57, "an idle app answers fast", _el < 0.60, "%.2fs for 6" % _el)
         check(57, "and counted", _b.stats()["calls"] == 6)
+        check(57, "and tracked inside the window", _b.used_in_window() == 6)
 
         # A 429 must stop EVERYTHING, not just the call that saw it.
         try:
@@ -2480,8 +2491,13 @@ try:
         _t2 = time.time()
         _ts = [_th.Thread(target=_hammer) for _ in range(4)]
         [t.start() for t in _ts]; [t.join() for t in _ts]
-        check(57, "threads cannot slip past each other",
-              time.time() - _t2 >= 0.70, "%.2fs for 16" % (time.time() - _t2))
+        # THE REAL INVARIANT: 16 calls from 4 threads must all be accounted
+        # for, with none slipping past the window counter. Two threads reading
+        # the same timestamp would both go and the budget would be fiction.
+        check(57, "no thread slips past the counter",
+              _b2.used_in_window() == 16, str(_b2.used_in_window()))
+        check(57, "and none exceeded our share",
+              _b2.used_in_window() <= wb.OUR_SHARE_PER_MIN)
     finally:
         wb.BUDGET, wb.BACKOFF_AFTER_429 = _saved_budget, _saved_backoff
 
@@ -3664,7 +3680,9 @@ finally:
           _B.reserve(wb.NORMAL) is None)
     _c = _B.reserve(wb.CRITICAL)
     check(71, "but CRITICAL still gets its slot", _c is not None)
-    check(71, "and it waits out the backoff", _c > 10.0, str(_c))
+    check(71, "and it waits out the backoff",
+          _c > wb.BACKOFF_AFTER_429 * 0.5, "%.1f vs backoff %.1f"
+          % (_c, wb.BACKOFF_AFTER_429))
 
     # THE LOCK. Reserving must never sleep, or one thread's wait becomes
     # everyone's wait.
