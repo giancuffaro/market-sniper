@@ -741,6 +741,11 @@ class OptionData:
                     return body[0] if isinstance(body, list) and body else body
                 except OrderRejected:
                     raise
+                except BudgetSkipped:
+                    # NOT the shape's fault. Clearing it here meant one skipped
+                    # call forced the next quote to re-probe all eight shapes -
+                    # a skip made the NEXT call eight times more expensive.
+                    raise
                 except Exception:
                     self._shape_row = None      # it stopped working; re-probe
                     break
@@ -752,6 +757,8 @@ class OptionData:
                     return body[0] if isinstance(body, list) and body else body
                 except OrderRejected:
                     raise
+                except BudgetSkipped:
+                    raise          # every other shape would be skipped too
                 except TypeError:
                     continue
                 except Exception as e:
