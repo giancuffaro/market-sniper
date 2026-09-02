@@ -1788,6 +1788,14 @@ class LiveSession(BaseSession):
 
         self.account_id, self.account_type = chosen[0], chosen[1]
         self._load_balance()
+        # Before returning "connected", find out whether the account is already
+        # holding something. Reconnecting mid-trade is the case this exists for:
+        # the app used to come up FLAT and manage nothing until it was closed by
+        # hand. Never fatal - a connection that works is worth more than this.
+        try:
+            self.adopt_on_connect()
+        except Exception:
+            pass
         return self.state()
 
     def _load_balance(self):
