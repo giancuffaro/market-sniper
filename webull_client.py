@@ -470,6 +470,36 @@ class BudgetSkipped(Exception):
     """This call was deliberately not made, to protect the request budget."""
 
 
+_PRIO = threading.local()
+
+
+class call_priority:
+    """Set the priority for every Webull call made inside this block.
+
+    The option-quote path probes up to eight call shapes through three helper
+    layers. Passing a priority down through all of them would be threaded by
+    hand and wrong the first time someone adds a ninth shape, so the priority
+    rides on the thread instead.
+    """
+
+    def __init__(self, level):
+        self.level = level
+
+    def __enter__(self):
+        self.prev = getattr(_PRIO, "level", None)
+        _PRIO.level = self.level
+        return self
+
+    def __exit__(self, *exc):
+        _PRIO.level = self.prev
+        return False
+
+
+def current_priority(default=NORMAL):
+    got = getattr(_PRIO, "level", None)
+    return default if got is None else got
+
+
 class _Budget:
     """Serialises and paces every Webull request this process makes.
 
@@ -559,7 +589,7 @@ def paced(fn, *args, **kwargs):
     into plain English. The only thing added is noticing a 429 so the whole
     process backs off instead of hammering a door that is already shut.
     """
-    BUDGET.pace(kwargs.pop("priority", NORMAL))
+    BUDGET.pace(kwargs.pop("priority", current_priority()))
     try:
         return fn(*args, **kwargs)
     except Exception as e:                                   # noqa: BLE001
