@@ -628,10 +628,24 @@ def forget_position():
 def disconnect():
     SESSION["s"] = None
     MIRROR["s"], MIRROR["name"] = None, None
+    # Close the stream with the session. A live MQTT connection left behind
+    # keeps a thread and a socket open for an account that is no longer here.
+    ps, STREAM["s"] = STREAM.get("s"), None
+    if ps is not None:
+        try:
+            ps.stop()
+        except Exception:                                    # noqa: BLE001
+            pass
     return {"ok": True}
 
 @app.post("/api/shutdown")
 def shutdown():
+    ps = STREAM.get("s")
+    if ps is not None:
+        try:
+            ps.stop()
+        except Exception:                                    # noqa: BLE001
+            pass
     import threading, time
     def _die():
         time.sleep(0.4)
