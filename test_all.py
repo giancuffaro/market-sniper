@@ -3792,6 +3792,61 @@ finally:
           'kwargs.setdefault("priority", IMMEDIATE)' in
           io.open("webull_client.py", encoding="utf-8").read())
 
+    # THE ONE THAT ACTUALLY BIT HIM. Every check above reads main.py as TEXT,
+    # so all of them passed while /api/connect returned 500 on every press:
+    # main.py never imported `time`, and the guard I added called time.time().
+    # A test that only greps source cannot catch a NameError. RUN the thing.
+    import importlib.util as _ilu
+    _spec = _ilu.spec_from_file_location("_main_probe", os.path.join(HERE, "main.py"))
+    _mainmod = _ilu.module_from_spec(_spec)
+    try:
+        _spec.loader.exec_module(_mainmod)
+        _imported = True
+        _why = ""
+    except Exception as _e:
+        _imported, _why = False, "%s: %s" % (type(_e).__name__, _e)
+    check(72, "main.py imports cleanly", _imported, _why)
+
+    if _imported:
+        from fastapi import HTTPException as _HE
+        _err = None
+        try:
+            _mainmod.connect(_mainmod.ConnectReq(app_key="", app_secret=""))
+        except _HE as _e:
+            _err = ("HTTPException", _e.status_code)
+        except Exception as _e:                              # noqa: BLE001
+            _err = (type(_e).__name__, str(_e)[:90])
+        # Empty keys can't sign in to anything, so this must come back as a
+        # reportable 400 - never a NameError, never an unhandled crash.
+        check(72, "connect() runs instead of crashing",
+              _err is not None and _err[0] == "HTTPException", str(_err))
+        check(72, "and every name it uses exists",
+              _err is None or _err[0] != "NameError", str(_err))
+        # The guard reads the clock; if `time` is missing this is where it dies.
+        check(72, "main.py has the clock it needs",
+              hasattr(_mainmod, "time") and hasattr(_mainmod.time, "time"))
+        # A second press while one is in flight must be refused, not queued.
+        _mainmod._CONNECTING["until"] = time.time() + 5
+        _busy = None
+        try:
+            _mainmod.connect(_mainmod.ConnectReq(app_key="x", app_secret="y"))
+        except _HE as _e:
+            _busy = str(_e.detail)
+        finally:
+            _mainmod._CONNECTING["until"] = 0.0
+        check(72, "a second press is refused with a plain message",
+              _busy and "Still finishing the last sign-in" in _busy, str(_busy)[:90])
+
+    # A server ERROR must never be reported to him as "the app isn't running".
+    _ix72 = io.open("index.html", encoding="utf-8").read()
+    check(72, "the UI reads the body before parsing it",
+          "const txt=await r.text();" in _ix72)
+    check(72, "and says an internal error is a bug, not a dead app",
+          "It IS running" in _ix72)
+    check(72, "the old blanket message no longer hides crashes",
+          _ix72.count("could not reach the local app") <= 1, 
+          str(_ix72.count("could not reach the local app")))
+
     # THE JAM ITSELF, simulated: six clicks must not submit six tasks.
     from concurrent.futures import ThreadPoolExecutor as _TPE, TimeoutError as _FT
     def _sim(guarded):
