@@ -45,6 +45,16 @@ except Exception:
 _EXEC = ThreadPoolExecutor(max_workers=3)
 CONNECT_TIMEOUT_S = 25
 
+# ONE SIGN-IN AT A TIME.
+#
+# 9/2, and it looked like a dead app: fut.result(timeout=25) stops WAITING
+# after 25 seconds, but the task keeps running and keeps holding its worker.
+# Sign-in could take ~60s when the key was rate limited, so three clicks - the
+# reasonable response to a button that did nothing - occupied all three
+# workers, and every click after that queued behind them and timed out without
+# ever starting. Clicking again was what made it permanent.
+_CONNECTING = {"until": 0.0}
+
 app = FastAPI(title="MARKET SNIPER")
 SESSION = {"s": None}
 MIRROR = {"s": None, "name": None}
@@ -370,18 +380,35 @@ def preview(symbol: str = "QQQ", side: str = "CALLS"):
 @app.post("/api/connect")
 def connect(req: ConnectReq):
     # LIVE only since v3.6 — every order this app sends is real money.
+    now = time.time()
+    if now < _CONNECTING["until"]:
+        raise HTTPException(400,
+            "Still finishing the last sign-in — give it %d more second(s). "
+            "Pressing CONNECT again queues another attempt behind this one, "
+            "which is what makes it look stuck."
+            % max(1, int(_CONNECTING["until"] - now)))
+    # Reserve a worker for at most this long, whatever happens below.
+    _CONNECTING["until"] = now + CONNECT_TIMEOUT_S
+
     s = wb.make_session("LIVE")
     try:
         fut = _EXEC.submit(s.connect, req.app_key.strip(), req.app_secret.strip(),
                            req.account_id)
         state = fut.result(timeout=CONNECT_TIMEOUT_S)
     except FutTimeout:
-        raise HTTPException(400, f"Webull didn't respond within {CONNECT_TIMEOUT_S}s — retry.")
+        raise HTTPException(400,
+            f"Webull didn't answer within {CONNECT_TIMEOUT_S}s. Wait a few "
+            "seconds and press CONNECT once — pressing it repeatedly queues "
+            "attempts and makes it slower, not faster.")
     except wb.ChooseAccounts as e:
         return {"choose_accounts": [
             {"id": str(a), "type": t, "bp": bp} for a, t, bp in e.accounts]}
     except wb.OrderRejected as e:
         raise HTTPException(400, str(e))
+    except wb.BudgetSkipped:
+        _CONNECTING["until"] = 0.0
+        raise HTTPException(400, "The API is backing off after a rate limit. "
+                                 "Wait ten seconds and press CONNECT once.")
     except Exception as e:
         msg = str(e)
         low = msg.lower()
