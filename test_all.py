@@ -3447,7 +3447,15 @@ finally:
     # accounts, and he could not sign in to his own app at all. His account
     # list does not change because another program is noisy, so a launch that
     # is rate limited falls back to the list remembered from last time.
+    # Redirect persistence into memory. A test that writes to his real
+    # my-settings.json has, more than once, left his live trading config
+    # holding something a test invented.
     import user_config as uc
+    _fakedisk = {}
+    _uc_save, _uc_load = uc.save, uc.load
+    uc.save = lambda sec, val: _fakedisk.__setitem__(sec, val)
+    uc.load = lambda sec, default=None: _fakedisk.get(
+        sec, ({} if default is None else default))
     _KEY69 = "test-app-key-abc"
     check(69, "nothing is remembered before a first sign-in",
           wb._remembered_accounts(_KEY69) is None)
@@ -3477,6 +3485,9 @@ finally:
           _cn69.index("_ACCOUNTS_CACHE.get") < _cn69.index("_remembered_accounts"))
     check(69, "a successful list is written down for next time",
           "_remember_accounts(app_key, data)" in _cn69)
+    uc.save, uc.load = _uc_save, _uc_load
+    check(69, "and the test wrote nothing to his real settings",
+          "known_accounts" not in (io.open("my-settings.json", encoding="utf-8").read()))
 
     # The message has to name the cause. "account list failed: 429" reads like
     # a broken app; it is a shared budget, and it clears on its own.
