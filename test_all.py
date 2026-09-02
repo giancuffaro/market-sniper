@@ -3921,11 +3921,94 @@ finally:
     check(72, "guarded, six clicks submit one", _sim(True) == 1, str(_sim(True)))
 
 
+    # --- 73. Speed: pace against the real limit, not a fixed gap ----------
+    # "what can we do to improve speed of everything?" - measured on his
+    # machine first: one quote he PRESSED took 4.4 seconds, the session had
+    # made 65 calls and skipped 203, and had spent 137 seconds just waiting.
+    # The cause was a fixed 0.20s gap between every call. Webull's limit is
+    # 300 per ROLLING 60s, so a fixed gap makes the app wait 200ms even after
+    # sitting idle for a minute, and a burst of five reads costs a second for
+    # nothing.
+    _B73 = wb._Budget()
+    _t73 = time.time()
+    for _ in range(20):
+        _B73.pace(wb.NORMAL)
+    _idle20 = time.time() - _t73
+    check(73, "20 reads on an idle app take under a second",
+          _idle20 < 1.0, "%.2fs" % _idle20)
+    check(73, "which beats the old fixed-gap cost of 4s",
+          _idle20 < 20 * 0.20, "%.2fs vs 4.00s" % _idle20)
+
+    _B73b = wb._Budget()
+    _t73b = time.time()
+    _B73b.pace(wb.IMMEDIATE)
+    check(73, "a single button press is not taxed at all",
+          time.time() - _t73b < 0.05, "%.3fs" % (time.time() - _t73b))
+
+    # It must still respect the share - fast is not the same as unlimited.
+    _B73c = wb._Budget()
+    for _ in range(wb.OUR_SHARE_PER_MIN):
+        _B73c.pace(wb.CRITICAL)
+    check(73, "it throttles once our share is used",
+          _B73c.reserve(wb.CRITICAL) > 1.0, str(_B73c.reserve(wb.CRITICAL)))
+    check(73, "our share leaves room for the other two programs",
+          wb.OUR_SHARE_PER_MIN <= 200, str(wb.OUR_SHARE_PER_MIN))
+    check(73, "and the window really is a minute", wb.WINDOW_SECONDS == 60.0)
+
+    # Cosmetic reads stop EARLIER than trading reads, so a chart can never
+    # crowd out a quote or an exit.
+    check(73, "cosmetic reads stop before trading reads",
+          wb.LOW_WATERMARK < wb.OUR_SHARE_PER_MIN,
+          "%d < %d" % (wb.LOW_WATERMARK, wb.OUR_SHARE_PER_MIN))
+    _B73d = wb._Budget()
+    for _ in range(wb.LOW_WATERMARK):
+        _B73d.pace(wb.NORMAL)
+    _lowdropped = False
+    try:
+        _B73d.pace(wb.LOW)
+    except wb.BudgetSkipped:
+        _lowdropped = True
+    check(73, "at the watermark a chart read is dropped", _lowdropped)
+    _press_ok = True
+    try:
+        _B73d.pace(wb.IMMEDIATE)
+    except wb.BudgetSkipped:
+        _press_ok = False
+    check(73, "but a button press still goes through", _press_ok)
+
+    # The window has to actually roll, or the app locks up after a minute.
+    _B73e = wb._Budget()
+    _B73e._stamps.extend([time.time() - 61.0] * wb.OUR_SHARE_PER_MIN)
+    check(73, "calls older than the window are forgotten",
+          _B73e.used_in_window() == 0, str(_B73e.used_in_window()))
+
+    # A SKIP MUST NOT POISON THE LEARNED SDK SHAPE. One skipped call used to
+    # clear it, so the next quote re-probed all eight argument shapes - a skip
+    # made the following call eight times more expensive, which is exactly the
+    # wrong direction when the budget is already tight.
+    _w73 = io.open("webull_client.py", encoding="utf-8").read()
+    _sr = _w73.split("def snapshot_row", 1)[1].split("\n    def ", 1)[0]
+    check(73, "a skip does not clear the remembered shape",
+          "except BudgetSkipped:" in _sr
+          and _sr.index("except BudgetSkipped:") < _sr.index("self._shape_row = None"))
+    check(73, "and a skip aborts the probe instead of skipping 8 more times",
+          _sr.count("except BudgetSkipped:") >= 2, str(_sr.count("except BudgetSkipped:")))
+
+    # The backoff is no longer a 20-second blackout.
+    check(73, "the 429 backoff is short", wb.BACKOFF_AFTER_429 <= 8.0,
+          str(wb.BACKOFF_AFTER_429))
+
+    # And the screen can show him where the budget actually went.
+    _st73 = wb._Budget().stats()
+    for _k in ("in_last_minute", "our_share", "skipped"):
+        check(73, "budget reports %s" % _k, _k in _st73, str(sorted(_st73)))
+
+
 print("\n"+"="*68)
 by={}
 for sc,name,ok,_ in results:
     by.setdefault(sc,[0,0]); by[sc][0]+=1; by[sc][1]+= (1 if ok else 0)
-T={72:"Clicking CONNECT twice cannot jam it",71:"One 429 must not freeze the app",70:"A rejected exit is not a storm",69:"Sign-in survives a rate limit",68:"Stream cannot blind the app",67:"Restart keeps the position",66:"One-second prices",65:"Journal never loses a trade",64:"Pacing must not stall",63:"Tick velocity",62:"Underlying at fill",61:"Tiered ratchet + anti-clip",60:"SDK audit is honest",59:"Batched option quotes",58:"Option price grid",57:"Webull rate budget",56:"NinjaScript compiles",55:"One-click NT install",54:"Ratchet inside NinjaTrader",53:"Limits die with the app",52:"NinjaTrader delivery check",51:"Futures header + footer",50:"Futures on by default",49:"Toggles + short hints",48:"Futures config stripped",47:"Futures ratchet",46:"NinjaScript in step",45:"Breadth + VIX",44:"Entry telemetry",43:"Trend module",42:"Audio cues",41:"Volatility gauges",40:"Volume gauge",39:"Dwell time",38:"Velocity vs feed artifacts",37:"Desktop icon",36:"Trade log detail",35:"Time value warns not blocks",34:"LOCK/X gone, size warns",33:"Page actually runs",32:"No SAVE / live trade frozen",31:"One switch / still modal",30:"Directional entry levels",29:"Percent only, no cash",28:"Grid/ATM/quality/one-armed",27:"Config screen cleanup",26:"Ratchet stop",25:"Console auto-hide",24:"Options auto-reconcile",23:"Daily trade log",22:"Options phantom clear",21:"Auto-reconcile w/ broker",20:"MY CONFIG always on",19:"Phantom position",18:"Futures hours",17:"Closed market honest",16:"Restart leaves no spinner",15:"One tab only",14:"Git lock self-heal",13:"Broker tabs + tray",12:"Velocity honest when shut",11:"Multi-broker sessions",1:"Futures login survives restart",2:"remember_login default",3:"Options profiles to disk",
+T={73:"Speed: pace to the real limit",72:"Clicking CONNECT twice cannot jam it",71:"One 429 must not freeze the app",70:"A rejected exit is not a storm",69:"Sign-in survives a rate limit",68:"Stream cannot blind the app",67:"Restart keeps the position",66:"One-second prices",65:"Journal never loses a trade",64:"Pacing must not stall",63:"Tick velocity",62:"Underlying at fill",61:"Tiered ratchet + anti-clip",60:"SDK audit is honest",59:"Batched option quotes",58:"Option price grid",57:"Webull rate budget",56:"NinjaScript compiles",55:"One-click NT install",54:"Ratchet inside NinjaTrader",53:"Limits die with the app",52:"NinjaTrader delivery check",51:"Futures header + footer",50:"Futures on by default",49:"Toggles + short hints",48:"Futures config stripped",47:"Futures ratchet",46:"NinjaScript in step",45:"Breadth + VIX",44:"Entry telemetry",43:"Trend module",42:"Audio cues",41:"Volatility gauges",40:"Volume gauge",39:"Dwell time",38:"Velocity vs feed artifacts",37:"Desktop icon",36:"Trade log detail",35:"Time value warns not blocks",34:"LOCK/X gone, size warns",33:"Page actually runs",32:"No SAVE / live trade frozen",31:"One switch / still modal",30:"Directional entry levels",29:"Percent only, no cash",28:"Grid/ATM/quality/one-armed",27:"Config screen cleanup",26:"Ratchet stop",25:"Console auto-hide",24:"Options auto-reconcile",23:"Daily trade log",22:"Options phantom clear",21:"Auto-reconcile w/ broker",20:"MY CONFIG always on",19:"Phantom position",18:"Futures hours",17:"Closed market honest",16:"Restart leaves no spinner",15:"One tab only",14:"Git lock self-heal",13:"Broker tabs + tray",12:"Velocity honest when shut",11:"Multi-broker sessions",1:"Futures login survives restart",2:"remember_login default",3:"Options profiles to disk",
    4:"Browser autofill guard",5:"ITM3 strike math",6:"Preview == Arm",7:"Live-only / dead modes",
    8:"Auto-sync safety",9:"Endpoints alive",10:"UI integrity"}
 for sc in sorted(by):

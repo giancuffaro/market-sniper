@@ -392,7 +392,13 @@ LOW_WATERMARK = 100
 # Two threads must not fire in the same instant, but this is a floor, not a
 # tax: under the cap a call goes out essentially immediately.
 FLOOR_GAP = 0.03      # seconds between ANY two Webull calls
-BACKOFF_AFTER_429 = 20.0      # dead time once the broker says slow down
+# Was 20 seconds. That was a guess made when this app could saturate the key
+# by itself; with the rolling window above it can no longer be the cause, and a
+# 429 is usually another process on the same key. Webull's window is rolling,
+# so a slot frees up within seconds - and every second of this backoff is a
+# second his P&L is not updating. Short, and only the droppable calls honour it
+# for long (see reserve()).
+BACKOFF_AFTER_429 = 5.0      # dead time once the broker says slow down
 
 
 # How often the app asks the broker "am I actually holding something?" while it
