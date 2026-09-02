@@ -1,5 +1,5 @@
 """Market Sniper v3.7 — 10-scenario regression suite."""
-import io, json, os, re, shutil, subprocess, sys, tempfile, time, urllib.request, urllib.error
+import io, json, os, re, shutil, subprocess, sys, tempfile, threading, time, urllib.request, urllib.error
 
 HERE = "/sessions/stoic-brave-ritchie/mnt/Market Sniper"
 sys.path.insert(0, HERE); os.chdir(HERE)
@@ -3070,11 +3070,114 @@ finally:
     else:
         print("  real trade log untouched.")
 
+    # --- 67. A restart must not lose the position -------------------------
+    # 9/2, live: he was holding a put, restarted, and the app said FLAT. It
+    # only ever knew trades IT opened - reconcile() could clear a position but
+    # nothing could ever ADD one. He watched a real trade with no P&L, no
+    # high-water mark and no ratchet until he closed it by hand.
+    _w67 = io.open("webull_client.py", encoding="utf-8").read()
+
+    # The parser must be the exact inverse of the builder, both ways. If they
+    # ever drift, adoption puts the wrong strike on screen and manages it.
+    for _sym, _exp, _typ, _k in [("SPY","2026-09-02","PUT",764.0),
+                                 ("QQQ","2026-09-02","CALL",715.5),
+                                 ("TSLA","2026-12-19","CALL",332.5),
+                                 ("SPY","2026-09-02","PUT",9.5)]:
+        _occ = wb.occ_symbol(_sym, _exp, _typ, _k)
+        check(67, "round trip %s %g%s" % (_sym, _k, _typ[0]),
+              wb.parse_occ(_occ) == (_sym, _exp, _typ, _k), _occ)
+    for _bad in ("", "GARBAGE", "SPY260945P00764000", "SPY_260902P00764000",
+                 None, "AAPL260902X00100000", "SPY260902P0076400"):
+        check(67, "refuses %r" % (_bad,), wb.parse_occ(_bad) is None)
+
+    def _s67(rows):
+        z = wb.LiveSession.__new__(wb.LiveSession)
+        z.position = None; z.trade = 1; z.account_id = "A"
+        z.settings = {"ratchet_step_pct": 10.0}
+        z._order_lock = threading.RLock(); z.last_event = ""
+        z.broker_positions = lambda: rows
+        return z
+
+    _good = [{"symbol": "SPY260902P00764000", "quantity": "2", "costPrice": "1.35"}]
+    _g = _s67(_good).adopt_broker_position()
+    check(67, "a held position IS adopted", _g is not None)
+    check(67, "with the right contract", _g and _g["symbol"] == "SPY"
+          and _g["strike"] == 764.0 and _g["side"] == "PUTS", str(_g))
+    check(67, "the right size and entry", _g and _g["qty"] == 2
+          and abs(_g["entry"] - 1.35) < 1e-9, str(_g))
+    check(67, "alternate field names work",
+          (_s67([{"symbol": "QQQ260902C00715500", "qty": 1, "avgCost": 0.88}])
+           .adopt_broker_position() or {}).get("strike") == 715.5)
+    check(67, "junk rows do not stop a good one",
+          (_s67(["x", None, {"symbol": "SPY260902P00764000", "quantity": 1,
+                             "costPrice": 1.1}]).adopt_broker_position() or {})
+          .get("entry") == 1.1)
+
+    # A FAILED ask is not an empty account, and an empty account is not a trade.
+    check(67, "a failed ask adopts nothing", _s67(None).adopt_broker_position() is None)
+    check(67, "a flat account adopts nothing", _s67([]).adopt_broker_position() is None)
+    # No entry price means the ratchet has nothing to measure from - refuse it
+    # rather than show something that looks managed and is not.
+    check(67, "no entry price -> refused",
+          _s67([{"symbol": "SPY260902P00764000", "quantity": "2"}])
+          .adopt_broker_position() is None)
+    check(67, "zero quantity -> refused",
+          _s67([{"symbol": "SPY260902P00764000", "quantity": 0,
+                 "costPrice": 1.2}]).adopt_broker_position() is None)
+    check(67, "a symbol this app does not trade -> refused",
+          _s67([{"symbol": "NVDA260902C00100000", "quantity": 1,
+                 "costPrice": 1.0}]).adopt_broker_position() is None)
+
+    # Never overwrite a live trade with a stale broker row.
+    _live = _s67(_good); _live.position = {"symbol": "IWM", "mine": True}
+    _live.adopt_broker_position()
+    check(67, "an open trade is never overwritten",
+          _live.position.get("mine") is True, str(_live.position))
+
+    # THE SAFETY RULE. This app cannot tell whether the discord-sniper bot
+    # opened the position it just found. Two tools resting a sell on one
+    # contract is the 8/18 double-flatten - the second sell goes short. So an
+    # adopted trade is VISIBLE immediately and SOLD by nothing until he says.
+    check(67, "adopted arrives unmanaged", _g.get("needs_manage_ok") is True, str(_g))
+    check(67, "with the ratchet off", _g.get("ratchet_on") is False, str(_g))
+    _ac = _w67.split("def _maybe_auto_close", 1)[1].split("def _do_auto_close", 1)[0]
+    check(67, "brackets cannot fire on an unmanaged position",
+          'needs_manage_ok' in _ac and _ac.index('needs_manage_ok')
+          < _ac.index('_bracket_hit'), _ac[:200])
+
+    # It has to actually RUN. Adoption that is never called is not a fix.
+    _rm67 = _w67.split("def refresh_mark", 1)[1].split("\n    def ", 1)[0]
+    check(67, "the poll adopts while flat", "adopt_broker_position()" in _rm67)
+    check(67, "before it gives up on being flat",
+          _rm67.index("adopt_broker_position()") < _rm67.index('fc = p.get'))
+    check(67, "connect adopts without waiting", "self.adopt_on_connect()" in _w67)
+    # ...but not once a second. 60 requests a minute out of 300 shared three
+    # ways, to answer a question that only changes on a fill.
+    check(67, "and it is throttled", "ADOPT_EVERY" in _rm67 and wb.ADOPT_EVERY >= 3.0,
+          str(getattr(wb, "ADOPT_EVERY", None)))
+
+    # One click hands it over, and the click is his.
+    _m67 = io.open("main.py", encoding="utf-8").read()
+    check(67, "there is a MANAGE endpoint", '"/api/position/manage"' in _m67)
+    _mg = _m67.split('def manage_position', 1)[1].split('@app.post', 1)[0]
+    check(67, "which clears the flag", 'needs_manage_ok' in _mg)
+    check(67, "and arms the ratchet", '"ratchet_on"] = True' in _mg)
+    check(67, "and sends no order", "place" not in _mg.lower().replace("replace", ""))
+    _ix67 = io.open("index.html", encoding="utf-8").read()
+    check(67, "the screen says it is unmanaged", 'id="adoptBand"' in _ix67
+          and "NOT BEING MANAGED" in _ix67)
+    check(67, "there is a button", 'EZ.managePosition()' in _ix67)
+    check(67, "it warns about the bot before arming",
+          "second sell goes SHORT" in _ix67)
+    check(67, "and no ratchet readout is shown while unmanaged",
+          "pos.needs_manage_ok ? null : pos.ratchet" in _ix67)
+
+
 print("\n"+"="*68)
 by={}
 for sc,name,ok,_ in results:
     by.setdefault(sc,[0,0]); by[sc][0]+=1; by[sc][1]+= (1 if ok else 0)
-T={66:"One-second prices",65:"Journal never loses a trade",64:"Pacing must not stall",63:"Tick velocity",62:"Underlying at fill",61:"Tiered ratchet + anti-clip",60:"SDK audit is honest",59:"Batched option quotes",58:"Option price grid",57:"Webull rate budget",56:"NinjaScript compiles",55:"One-click NT install",54:"Ratchet inside NinjaTrader",53:"Limits die with the app",52:"NinjaTrader delivery check",51:"Futures header + footer",50:"Futures on by default",49:"Toggles + short hints",48:"Futures config stripped",47:"Futures ratchet",46:"NinjaScript in step",45:"Breadth + VIX",44:"Entry telemetry",43:"Trend module",42:"Audio cues",41:"Volatility gauges",40:"Volume gauge",39:"Dwell time",38:"Velocity vs feed artifacts",37:"Desktop icon",36:"Trade log detail",35:"Time value warns not blocks",34:"LOCK/X gone, size warns",33:"Page actually runs",32:"No SAVE / live trade frozen",31:"One switch / still modal",30:"Directional entry levels",29:"Percent only, no cash",28:"Grid/ATM/quality/one-armed",27:"Config screen cleanup",26:"Ratchet stop",25:"Console auto-hide",24:"Options auto-reconcile",23:"Daily trade log",22:"Options phantom clear",21:"Auto-reconcile w/ broker",20:"MY CONFIG always on",19:"Phantom position",18:"Futures hours",17:"Closed market honest",16:"Restart leaves no spinner",15:"One tab only",14:"Git lock self-heal",13:"Broker tabs + tray",12:"Velocity honest when shut",11:"Multi-broker sessions",1:"Futures login survives restart",2:"remember_login default",3:"Options profiles to disk",
+T={67:"Restart keeps the position",66:"One-second prices",65:"Journal never loses a trade",64:"Pacing must not stall",63:"Tick velocity",62:"Underlying at fill",61:"Tiered ratchet + anti-clip",60:"SDK audit is honest",59:"Batched option quotes",58:"Option price grid",57:"Webull rate budget",56:"NinjaScript compiles",55:"One-click NT install",54:"Ratchet inside NinjaTrader",53:"Limits die with the app",52:"NinjaTrader delivery check",51:"Futures header + footer",50:"Futures on by default",49:"Toggles + short hints",48:"Futures config stripped",47:"Futures ratchet",46:"NinjaScript in step",45:"Breadth + VIX",44:"Entry telemetry",43:"Trend module",42:"Audio cues",41:"Volatility gauges",40:"Volume gauge",39:"Dwell time",38:"Velocity vs feed artifacts",37:"Desktop icon",36:"Trade log detail",35:"Time value warns not blocks",34:"LOCK/X gone, size warns",33:"Page actually runs",32:"No SAVE / live trade frozen",31:"One switch / still modal",30:"Directional entry levels",29:"Percent only, no cash",28:"Grid/ATM/quality/one-armed",27:"Config screen cleanup",26:"Ratchet stop",25:"Console auto-hide",24:"Options auto-reconcile",23:"Daily trade log",22:"Options phantom clear",21:"Auto-reconcile w/ broker",20:"MY CONFIG always on",19:"Phantom position",18:"Futures hours",17:"Closed market honest",16:"Restart leaves no spinner",15:"One tab only",14:"Git lock self-heal",13:"Broker tabs + tray",12:"Velocity honest when shut",11:"Multi-broker sessions",1:"Futures login survives restart",2:"remember_login default",3:"Options profiles to disk",
    4:"Browser autofill guard",5:"ITM3 strike math",6:"Preview == Arm",7:"Live-only / dead modes",
    8:"Auto-sync safety",9:"Endpoints alive",10:"UI integrity"}
 for sc in sorted(by):
