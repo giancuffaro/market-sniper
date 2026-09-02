@@ -2747,6 +2747,62 @@ try:
     check(62, "a dead price feed does not stop the trade being recorded",
           len(_u.blotter) == 1)
 
+    # --- 63. Real time-and-sales velocity (SDK WIN #2) --------------------
+    # tape.py measured speed from 1-MINUTE BARS and admitted it in its own
+    # docstring. For "silent tape means do not enter", the difference between
+    # "the last bar was quiet" and "two prints in thirty seconds" IS the signal.
+    import tape as _tp63
+    _tp63 = importlib.reload(_tp63)
+    _now63 = time.time()
+
+    def _mk63(n, span, start, side=None, size=100):
+        return [{"tradeTime": start + i * (span / max(1, n)), "price": 700 + i * 0.001,
+                 "volume": size, "side": side} for i in range(n)]
+
+    _quiet = _mk63(120, 540, _now63 - 600) + _mk63(10, 60, _now63 - 60)
+    _busy = _mk63(120, 540, _now63 - 600) + _mk63(200, 60, _now63 - 60, side="B")
+    _rq = _tp63.compute_ticks(_tp63.parse_ticks(_quiet), _now63)
+    _rb = _tp63.compute_ticks(_tp63.parse_ticks(_busy), _now63)
+    check(63, "a quiet minute does not read fast", _rq["state"] in ("calm", "normal"),
+          str(_rq.get("state")))
+    check(63, "a busy minute does", _rb["state"] in ("fast", "violent"), str(_rb.get("state")))
+    check(63, "prints per second are reported", _rb["prints_per_sec"] > _rq["prints_per_sec"])
+    check(63, "and the reading says it came from ticks", _rb["source"] == "ticks")
+
+    # Direction from WHERE the prints went off - the thing bars cannot tell
+    # you. Heavy volume hitting the bid is a different tape from the same
+    # volume lifting the offer.
+    check(63, "all-buy prints read up", _rb["direction"] == "up" and _rb["buy_share"] == 100.0)
+    _sells = _mk63(120, 540, _now63 - 600) + _mk63(200, 60, _now63 - 60, side="S")
+    check(63, "all-sell prints read down",
+          _tp63.compute_ticks(_tp63.parse_ticks(_sells), _now63)["direction"] == "down")
+
+    # Timestamps arrive in seconds on some endpoints and milliseconds on
+    # others. Guessing wrong puts every print 50,000 years away.
+    _ms = [{"timestamp": int((_now63 - 30 + i) * 1000), "price": 700, "volume": 50}
+           for i in range(20)]
+    check(63, "millisecond timestamps are detected",
+          abs(_tp63.parse_ticks(_ms)[0]["t"] - (_now63 - 30)) < 2,
+          str(_tp63.parse_ticks(_ms)[0]["t"]))
+    check(63, "junk rows are dropped, not guessed",
+          _tp63.parse_ticks([{"nope": 1}, "x", {"price": 1}]) == [])
+    check(63, "no prints is a reason, not a crash",
+          _tp63.compute_ticks([])["ok"] is False)
+    check(63, "too few prints is honest too",
+          _tp63.compute_ticks(_tp63.parse_ticks(_mk63(3, 10, _now63 - 10)), _now63)["ok"] is False)
+
+    # The bar path MUST remain - it is broker-free, so the login screen and a
+    # dropped connection still show a reading.
+    _m63 = io.open("main.py", encoding="utf-8").read()
+    check(63, "ticks are preferred when connected", "e.recent_ticks(symbol)" in _m63)
+    check(63, "bars remain the fallback", 'tape.velocity(ysym), "source": "bars"' in _m63)
+    check(63, "a tick hiccup cannot blank the meter",
+          "must never blank the meter" in _m63)
+    _w63 = io.open("webull_client.py", encoding="utf-8").read()
+    check(63, "the tick fetch is paced", "paced(fn, *args, **kw)" in _w63)
+    check(63, "unavailable returns None, not an empty list",
+          "None, not [] - the caller must be able to tell" in _w63)
+
     import subprocess as _sp3
     _sm3 = _sp3.run(["node", "ui_smoke.js", "futures_index.html"], cwd=HERE,
                     capture_output=True, text=True, timeout=60)
@@ -2833,7 +2889,7 @@ print("\n"+"="*68)
 by={}
 for sc,name,ok,_ in results:
     by.setdefault(sc,[0,0]); by[sc][0]+=1; by[sc][1]+= (1 if ok else 0)
-T={62:"Underlying at fill",61:"Tiered ratchet + anti-clip",60:"SDK audit is honest",59:"Batched option quotes",58:"Option price grid",57:"Webull rate budget",56:"NinjaScript compiles",55:"One-click NT install",54:"Ratchet inside NinjaTrader",53:"Limits die with the app",52:"NinjaTrader delivery check",51:"Futures header + footer",50:"Futures on by default",49:"Toggles + short hints",48:"Futures config stripped",47:"Futures ratchet",46:"NinjaScript in step",45:"Breadth + VIX",44:"Entry telemetry",43:"Trend module",42:"Audio cues",41:"Volatility gauges",40:"Volume gauge",39:"Dwell time",38:"Velocity vs feed artifacts",37:"Desktop icon",36:"Trade log detail",35:"Time value warns not blocks",34:"LOCK/X gone, size warns",33:"Page actually runs",32:"No SAVE / live trade frozen",31:"One switch / still modal",30:"Directional entry levels",29:"Percent only, no cash",28:"Grid/ATM/quality/one-armed",27:"Config screen cleanup",26:"Ratchet stop",25:"Console auto-hide",24:"Options auto-reconcile",23:"Daily trade log",22:"Options phantom clear",21:"Auto-reconcile w/ broker",20:"MY CONFIG always on",19:"Phantom position",18:"Futures hours",17:"Closed market honest",16:"Restart leaves no spinner",15:"One tab only",14:"Git lock self-heal",13:"Broker tabs + tray",12:"Velocity honest when shut",11:"Multi-broker sessions",1:"Futures login survives restart",2:"remember_login default",3:"Options profiles to disk",
+T={63:"Tick velocity",62:"Underlying at fill",61:"Tiered ratchet + anti-clip",60:"SDK audit is honest",59:"Batched option quotes",58:"Option price grid",57:"Webull rate budget",56:"NinjaScript compiles",55:"One-click NT install",54:"Ratchet inside NinjaTrader",53:"Limits die with the app",52:"NinjaTrader delivery check",51:"Futures header + footer",50:"Futures on by default",49:"Toggles + short hints",48:"Futures config stripped",47:"Futures ratchet",46:"NinjaScript in step",45:"Breadth + VIX",44:"Entry telemetry",43:"Trend module",42:"Audio cues",41:"Volatility gauges",40:"Volume gauge",39:"Dwell time",38:"Velocity vs feed artifacts",37:"Desktop icon",36:"Trade log detail",35:"Time value warns not blocks",34:"LOCK/X gone, size warns",33:"Page actually runs",32:"No SAVE / live trade frozen",31:"One switch / still modal",30:"Directional entry levels",29:"Percent only, no cash",28:"Grid/ATM/quality/one-armed",27:"Config screen cleanup",26:"Ratchet stop",25:"Console auto-hide",24:"Options auto-reconcile",23:"Daily trade log",22:"Options phantom clear",21:"Auto-reconcile w/ broker",20:"MY CONFIG always on",19:"Phantom position",18:"Futures hours",17:"Closed market honest",16:"Restart leaves no spinner",15:"One tab only",14:"Git lock self-heal",13:"Broker tabs + tray",12:"Velocity honest when shut",11:"Multi-broker sessions",1:"Futures login survives restart",2:"remember_login default",3:"Options profiles to disk",
    4:"Browser autofill guard",5:"ITM3 strike math",6:"Preview == Arm",7:"Live-only / dead modes",
    8:"Auto-sync safety",9:"Endpoints alive",10:"UI integrity"}
 for sc in sorted(by):
