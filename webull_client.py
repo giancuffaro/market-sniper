@@ -1624,6 +1624,30 @@ class BaseSession:
             self.day_realized, self.blotter = 0.0, []
         self._day = today
 
+    def _day_pct(self):
+        """The day as ONE percentage, weighted by what each trade actually
+        risked.
+
+        It used to be sum(pct) - the percentages of every trade ADDED TOGETHER.
+        Two +100% trades read "+200%", which is not a return on anything; you
+        cannot add percentages taken on different position sizes. He spotted it
+        himself: "app shows calls at 200% which is totally false".
+
+        The honest number is total profit over total cost. A $100 trade at +50%
+        and a $1,000 trade at -10% is a LOSS of 5%, not the +40% the old sum
+        would have shown. Still no cash on screen - the dollars are only ever
+        the arithmetic behind the percent.
+        """
+        cost = sum(float(b.get("cost") or 0) for b in self.blotter)
+        pnl = sum(float(b.get("pnl") or 0) for b in self.blotter)
+        if cost > 0:
+            return round(pnl / cost * 100.0, 1)
+        # Older rows predate the cost field. Averaging their percentages is a
+        # worse answer than the weighted one but a far better answer than
+        # adding them up.
+        pcts = [float(b.get("pct") or 0) for b in self.blotter]
+        return round(sum(pcts) / len(pcts), 1) if pcts else 0.0
+
     def _save_day(self):
         uc.save("options_day", {"date": self._day,
                                 "net": round(self.day_realized, 2),
@@ -1657,6 +1681,10 @@ class BaseSession:
                     + ("  ~est" if estimated else ""),
             "move": f"{p['entry']:.2f} -> {float(exit_price):.2f}",
             "pnl": pnl,
+            # COST BASIS, so the day figure can be a real weighted return.
+            # It is never displayed - it exists so the percentage on screen is
+            # arithmetic instead of a sum of unrelated percentages.
+            "cost": round(float(p.get("entry") or 0) * 100.0 * int(p.get("qty") or 0), 2),
             # The screen shows PERCENT only - no dollar figures anywhere. The
             # dollar value is still recorded here and in the trade log, it is
             # simply never displayed.
@@ -2061,7 +2089,7 @@ class BaseSession:
                 # Percent view of the day: every trade's return added up. With a
                 # constant position size this is the number that matters, and it
                 # is the only one the screen is allowed to show.
-                "day_pct": round(sum(float(b.get("pct") or 0) for b in self.blotter), 1),
+                "day_pct": self._day_pct(),
                 "day_wins": sum(1 for b in self.blotter if float(b.get("pct") or 0) > 0),
                 "day_losses": sum(1 for b in self.blotter if float(b.get("pct") or 0) < 0),
                 "blotter": self.blotter[-20:], "settings": self.settings,
