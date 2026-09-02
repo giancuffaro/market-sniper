@@ -60,6 +60,10 @@ FIELDS = [
     "in_dwell_above", "in_dwell_below", "in_pinned",
     "in_vol_pctl", "in_rv_pct", "in_iv_pct",
     "in_counter_trend", "in_round_level", "in_round_clock", "in_parked_rule",
+    # The STOCK price when the contract filled, and when it closed. G asked
+    # for it: an option P&L on its own does not tell you whether the underlying
+    # actually went your way, and that is the question a review starts with.
+    "underlying_in", "underlying_out", "underlying_move",
     "exit_reason", "note",
 ]
 
@@ -68,7 +72,8 @@ _NUM = {"strike", "qty", "entry", "exit", "pnl", "pnl_pct", "held_secs",
         "best_pct", "worst_pct", "best_price", "worst_price", "gave_back_pct",
         "ratchet_stop_pct", "ratchet_step",
         "in_trend_agree", "in_breadth", "in_vel_score", "in_dwell_above",
-        "in_dwell_below", "in_vol_pctl", "in_rv_pct", "in_iv_pct"}
+        "in_dwell_below", "in_vol_pctl", "in_rv_pct", "in_iv_pct",
+        "underlying_in", "underlying_out", "underlying_move"}
 
 
 def _rows():

@@ -1252,6 +1252,13 @@ class BaseSession:
             self._save_day()
 
     def _record_close(self, p, exit_price, estimated=False):
+        # The stock price as the trade ends, so the journal can show whether
+        # the underlying went your way even when the option did not.
+        if not p.get("underlying_out"):
+            try:
+                p["underlying_out"] = p.get("spot") or self._underlying(p.get("symbol"))
+            except Exception:                            # noqa: BLE001
+                pass
         """The one place a finished trade gets written down. Nothing else
         touches DAY NET, so the number on screen and the list under it can
         never disagree."""
@@ -1311,6 +1318,10 @@ class BaseSession:
                 "strike_mode": self.settings.get("strike_mode", ""),
                 "held_secs": (int(time.time() - p["opened_ts"])
                               if p.get("opened_ts") else ""),
+                "underlying_in": p.get("underlying_in", ""),
+                "underlying_out": p.get("underlying_out", ""),
+                "underlying_move": (round(float(p["underlying_out"]) - float(p["underlying_in"]), 2)
+                                    if p.get("underlying_in") and p.get("underlying_out") else ""),
                 **(p.get("entry_ctx") or {}),
                 "note": "price estimated until Webull confirms the fill" if estimated else "",
             })
@@ -1894,6 +1905,9 @@ class LiveSession(BaseSession):
                          # trade with nothing managing the exit.
                          "ratchet_on": True,
                          "ratchet_step": float(self.settings.get("ratchet_step_pct") or 10.0),
+                         # The STOCK price at the fill. Read here, not at the
+                         # close - by then the move that made the trade is over.
+                         "underlying_in": q.get("spot"),
                          # Captured HERE, at the fill, not at close: by the time
                          # a trade ends the market that produced it is gone.
                          "entry_ctx": self.entry_conditions(symbol, side, spot=q.get("spot"))}
