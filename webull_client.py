@@ -420,7 +420,7 @@ class OptionData:
         for name, fn in fns:
             for args in arg_shapes:
                 try:
-                    body = self._result(fn(*args))
+                    body = self._result(paced(fn, *args))
                     return body[0] if isinstance(body, list) and body else body
                 except OrderRejected:
                     raise
@@ -430,7 +430,7 @@ class OptionData:
                     errors.append(f"{name}: {str(e)[:150]}")
             for kw in kw_shapes:
                 try:
-                    body = self._result(fn(**kw))
+                    body = self._result(paced(fn, **kw))
                     return body[0] if isinstance(body, list) and body else body
                 except OrderRejected:
                     raise
@@ -1114,7 +1114,7 @@ class BaseSession:
         for name, fn in self._position_fns():
             for args in ((self.account_id,), ()):
                 try:
-                    res = fn(*args)
+                    res = paced(fn, *args)
                 except Exception:
                     continue
                 try:
@@ -1223,7 +1223,7 @@ class LiveSession(BaseSession):
 
     def _balance_for(self, aid):
         try:
-            res = self.trade.account_v2.get_account_balance(aid)
+            res = paced(self.trade.account_v2.get_account_balance, aid)
             bal = res.json()
             bp = _find_key(bal, "buying_power", "buyingPower", "optionBuyingPower",
                            "option_buying_power", "day_buying_power", "cash_buying_power",
@@ -1242,7 +1242,7 @@ class LiveSession(BaseSession):
         self._api_client = api_client
         self._od = OptionData(api_client)
         self.trade = TradeClient(api_client)
-        res = self.trade.account_v2.get_account_list()
+        res = paced(self.trade.account_v2.get_account_list)
         if getattr(res, "status_code", None) != 200:
             raise OrderRejected(f"account list failed: {getattr(res,'status_code','?')}")
         data = res.json()
@@ -1352,7 +1352,8 @@ class LiveSession(BaseSession):
                          {"account_id": self.account_id, "client_order_id": coid},
                          {"account_id": self.account_id}):
                 try:
-                    res = fn(**call) if isinstance(call, dict) else fn(*call)
+                    res = (paced(fn, **call) if isinstance(call, dict)
+                           else paced(fn, *call))
                     if getattr(res, "status_code", 200) != 200:
                         continue
                     body = res.json() if hasattr(res, "json") else res
@@ -1604,7 +1605,7 @@ class LiveSession(BaseSession):
             client_order_id=uuid.uuid4().hex[:32], symbol=symbol, strike=q["strike"],
             expiration=_expiry_for(symbol), option_type=q["option_type"], side="BUY",
             quantity=qty, limit_price=limit)
-        res = self.trade.order_v3.place_order(self.account_id, orders)
+        res = paced(self.trade.order_v3.place_order, self.account_id, orders)
         body = {}
         try:
             body = res.json()
@@ -1737,7 +1738,7 @@ class LiveSession(BaseSession):
             client_order_id=uuid.uuid4().hex[:32], symbol=p["symbol"], strike=p["strike"],
             expiration=p["expiration"], option_type=p["option_type"], side="SELL",
             quantity=p["qty"], limit_price=limit)
-        res = self.trade.order_v3.place_order(self.account_id, orders)
+        res = paced(self.trade.order_v3.place_order, self.account_id, orders)
         body = {}
         try:
             body = res.json()
@@ -1800,7 +1801,8 @@ class LiveSession(BaseSession):
                          {"account_id": self.account_id, "client_order_id": coid},
                          {"account_id": self.account_id}):
                 try:
-                    res = fn(**call) if isinstance(call, dict) else fn(*call)
+                    res = (paced(fn, **call) if isinstance(call, dict)
+                           else paced(fn, *call))
                     if getattr(res, "status_code", 200) != 200:
                         continue
                     body = res.json() if hasattr(res, "json") else res
