@@ -2405,6 +2405,80 @@ try:
     check(56, "and explains what the Control Center actually is",
           "just NinjaTrader's main window" in _rm)
 
+    # --- 57. The shared Webull rate budget --------------------------------
+    # One app key = 300 requests / 60 s, shared with the discord-sniper bridge
+    # and the Fill Announcer. On 2026-09-02 one process produced 76,991
+    # rate-limit errors in a night and every other process 429'd with it -
+    # including the bot's stops. Market Sniper had NO pacing at all.
+    import threading as _th
+    check(57, "there is a budget", hasattr(wb, "BUDGET") and hasattr(wb, "paced"))
+    check(57, "the floor is at least 0.20s", wb.MIN_CALL_INTERVAL >= 0.20)
+    check(57, "a 429 backs off for 20s", wb.BACKOFF_AFTER_429 >= 20.0)
+
+    _b = wb._Budget(0.05)
+    _saved_budget, wb.BUDGET = wb.BUDGET, _b
+    _saved_backoff, wb.BACKOFF_AFTER_429 = wb.BACKOFF_AFTER_429, 1.0
+    try:
+        _t0 = time.time()
+        for _ in range(6):
+            wb.paced(lambda: None)
+        _el = time.time() - _t0
+        check(57, "calls are spaced, not burst", _el >= 0.24, "%.2fs for 6" % _el)
+        check(57, "and counted", _b.stats()["calls"] == 6)
+
+        # A 429 must stop EVERYTHING, not just the call that saw it.
+        try:
+            wb.paced(lambda: (_ for _ in ()).throw(Exception("TOO_MANY_REQUESTS")))
+        except Exception:
+            pass
+        check(57, "a 429 is noticed", _b.stats()["rate_limits"] == 1)
+        _t1 = time.time(); wb.paced(lambda: None); _held = time.time() - _t1
+        check(57, "and holds every later call", _held >= 0.9, "%.2fs" % _held)
+
+        # The error must still reach the caller - swallowing it would hide a
+        # failed order behind a "rate limit handled" message.
+        _raised = False
+        try:
+            wb.paced(lambda: (_ for _ in ()).throw(ValueError("boom")))
+        except ValueError:
+            _raised = True
+        check(57, "other errors are re-raised untouched", _raised)
+
+        # Threads: /api/state, the mirror session and the strategy engine all
+        # call in. Two reading the same timestamp would both go.
+        _b2 = wb._Budget(0.05); wb.BUDGET = _b2
+        def _hammer():
+            for _ in range(4):
+                wb.paced(lambda: None)
+        _t2 = time.time()
+        _ts = [_th.Thread(target=_hammer) for _ in range(4)]
+        [t.start() for t in _ts]; [t.join() for t in _ts]
+        check(57, "threads cannot slip past each other",
+              time.time() - _t2 >= 0.70, "%.2fs for 16" % (time.time() - _t2))
+    finally:
+        wb.BUDGET, wb.BACKOFF_AFTER_429 = _saved_budget, _saved_backoff
+
+    # EVERY SDK call must go through it - one bypass and the budget is fiction.
+    _w57 = io.open("webull_client.py", encoding="utf-8").read()
+    import re as _re57
+    _direct = [l.strip() for l in _w57.splitlines()
+               if _re57.search(r"self\.trade\.[a-z_0-9]+\.[a-z_]+\(", l)
+               and "paced(" not in l]
+    check(57, "no SDK call bypasses the budget", not _direct, str(_direct)[:160])
+    check(57, "the option snapshot is paced", "paced(fn, *args)" in _w57)
+    check(57, "order placement is paced too",
+          "paced(self.trade.order_v3.place_order" in _w57)
+
+    # The mirror account doubled every quote. A cache the display shares, that
+    # an ORDER never uses.
+    check(57, "quotes are cached briefly", "def snapshot_cached" in _w57
+          and "_SNAP_TTL = 0.8" in _w57)
+    check(57, "and an order always re-quotes",
+          "self._od.forget_snapshot()" in _w57.split("def place(self, symbol, side, qty):", 1)[1][:400])
+    check(57, "the cache cannot grow without bound", "len(self._snap_cache) > 64" in _w57)
+    check(57, "usage is visible", '@app.get("/api/budget")' in
+          io.open("main.py", encoding="utf-8").read())
+
     import subprocess as _sp3
     _sm3 = _sp3.run(["node", "ui_smoke.js", "futures_index.html"], cwd=HERE,
                     capture_output=True, text=True, timeout=60)
@@ -2491,7 +2565,7 @@ print("\n"+"="*68)
 by={}
 for sc,name,ok,_ in results:
     by.setdefault(sc,[0,0]); by[sc][0]+=1; by[sc][1]+= (1 if ok else 0)
-T={56:"NinjaScript compiles",55:"One-click NT install",54:"Ratchet inside NinjaTrader",53:"Limits die with the app",52:"NinjaTrader delivery check",51:"Futures header + footer",50:"Futures on by default",49:"Toggles + short hints",48:"Futures config stripped",47:"Futures ratchet",46:"NinjaScript in step",45:"Breadth + VIX",44:"Entry telemetry",43:"Trend module",42:"Audio cues",41:"Volatility gauges",40:"Volume gauge",39:"Dwell time",38:"Velocity vs feed artifacts",37:"Desktop icon",36:"Trade log detail",35:"Time value warns not blocks",34:"LOCK/X gone, size warns",33:"Page actually runs",32:"No SAVE / live trade frozen",31:"One switch / still modal",30:"Directional entry levels",29:"Percent only, no cash",28:"Grid/ATM/quality/one-armed",27:"Config screen cleanup",26:"Ratchet stop",25:"Console auto-hide",24:"Options auto-reconcile",23:"Daily trade log",22:"Options phantom clear",21:"Auto-reconcile w/ broker",20:"MY CONFIG always on",19:"Phantom position",18:"Futures hours",17:"Closed market honest",16:"Restart leaves no spinner",15:"One tab only",14:"Git lock self-heal",13:"Broker tabs + tray",12:"Velocity honest when shut",11:"Multi-broker sessions",1:"Futures login survives restart",2:"remember_login default",3:"Options profiles to disk",
+T={57:"Webull rate budget",56:"NinjaScript compiles",55:"One-click NT install",54:"Ratchet inside NinjaTrader",53:"Limits die with the app",52:"NinjaTrader delivery check",51:"Futures header + footer",50:"Futures on by default",49:"Toggles + short hints",48:"Futures config stripped",47:"Futures ratchet",46:"NinjaScript in step",45:"Breadth + VIX",44:"Entry telemetry",43:"Trend module",42:"Audio cues",41:"Volatility gauges",40:"Volume gauge",39:"Dwell time",38:"Velocity vs feed artifacts",37:"Desktop icon",36:"Trade log detail",35:"Time value warns not blocks",34:"LOCK/X gone, size warns",33:"Page actually runs",32:"No SAVE / live trade frozen",31:"One switch / still modal",30:"Directional entry levels",29:"Percent only, no cash",28:"Grid/ATM/quality/one-armed",27:"Config screen cleanup",26:"Ratchet stop",25:"Console auto-hide",24:"Options auto-reconcile",23:"Daily trade log",22:"Options phantom clear",21:"Auto-reconcile w/ broker",20:"MY CONFIG always on",19:"Phantom position",18:"Futures hours",17:"Closed market honest",16:"Restart leaves no spinner",15:"One tab only",14:"Git lock self-heal",13:"Broker tabs + tray",12:"Velocity honest when shut",11:"Multi-broker sessions",1:"Futures login survives restart",2:"remember_login default",3:"Options profiles to disk",
    4:"Browser autofill guard",5:"ITM3 strike math",6:"Preview == Arm",7:"Live-only / dead modes",
    8:"Auto-sync safety",9:"Endpoints alive",10:"UI integrity"}
 for sc in sorted(by):
