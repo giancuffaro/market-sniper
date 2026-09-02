@@ -956,6 +956,8 @@ class BaseSession:
         with self._order_lock:
             if not self.position:
                 return
+            if self.position.get("needs_manage_ok"):
+                return          # adopted, not yet handed over: never auto-sell
             hit = self._bracket_hit()
             if not hit:
                 return
@@ -1600,7 +1602,20 @@ class BaseSession:
                 "opened_at": _now_et().strftime("%H:%M"), "opened_ts": time.time(),
                 "fill_checked": 99,        # the broker already told us the fill
                 "adopted": True,
-                "ratchet_on": True,
+                # SEEN, NOT SOLD - until he says otherwise.
+                #
+                # This app cannot tell WHO opened a position it finds. If the
+                # discord-sniper bot opened it, the bot already has a stop
+                # resting on that contract, and a second tool selling the same
+                # contract is the 8/18 "two resting sells" failure written into
+                # the handoff: flattened twice, the second sell going short.
+                #
+                # So an adopted trade shows P&L, high-water mark and everything
+                # else immediately - that is what was actually missing - but it
+                # sends NOTHING until he presses MANAGE. One click, and only he
+                # knows whether the bot is in it too.
+                "needs_manage_ok": True,
+                "ratchet_on": False,
                 "ratchet_step": float(self.settings.get("ratchet_step_pct") or 10.0)}
 
     def reconcile(self, force=False):
