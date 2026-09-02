@@ -232,6 +232,14 @@
   .footer a{color:var(--dim);cursor:pointer;text-decoration:underline}
   /* fixed, not absolute: the dark area must cover the WHOLE window, otherwise
      clicking the page background beside the app column wouldn't close the popup */
+  .adopt{border:1px solid var(--amber);background:rgba(255,176,32,.09);
+         border-radius:10px;padding:11px 13px;margin-top:11px}
+  .adopt .t{color:var(--amber);font-weight:700;font-size:11px;letter-spacing:.6px}
+  .adopt .s{color:var(--dim);font-size:11px;margin:4px 0 9px;line-height:1.45}
+  .mbtn{width:100%;padding:10px;border-radius:8px;border:1px solid var(--amber);
+        background:var(--amber);color:#000;font-weight:800;font-size:12px;
+        letter-spacing:.6px;cursor:pointer}
+  .mbtn:active{transform:translateY(1px)}
   .scrim{position:fixed;inset:0;background:rgba(0,0,0,.6);display:none;align-items:center;justify-content:center;padding:22px;z-index:5}
   .scrim.show{display:flex}
   /* Fixed height, not content height. The modal is vertically centred, so a
@@ -426,6 +434,11 @@
       <div><span id="pnlPct" class="n">+0.0%</span></div>
       <div class="spot" id="pnlSpot"></div>
       <div class="spot" id="bracketLine"></div>
+      <div id="adoptBand" class="adopt hidden">
+        <div class="t">FOUND AT THE BROKER — NOT BEING MANAGED</div>
+        <div class="s" id="adoptSub"></div>
+        <button id="manageBtn" class="mbtn">MANAGE IT — ARM THE RATCHET</button>
+      </div>
     </div>
 
     <div id="eventBanner" class="event"><div class="x" onclick="EZ.hideEvent()">✕</div>
@@ -1486,7 +1499,17 @@ const EZ = (function(){
       }
       // RATCHET readout wins the line when it is running - it IS the exit,
       // so showing the old TP/SL next to it would just be noise.
-      const rt = pos.ratchet;
+      if(pos.needs_manage_ok){
+        $('adoptBand').classList.remove('hidden');
+        $('adoptSub').textContent =
+          'You already held this when the app started, so it opened FLAT and '
+        + 'managed nothing. It is shown now. Nothing will be sold until you '
+        + 'press this — if the Discord bot is also in this contract, two stops '
+        + 'on one contract sells you twice.';
+      }else{
+        $('adoptBand').classList.add('hidden');
+      }
+      const rt = pos.needs_manage_ok ? null : pos.ratchet;
       if(rt){
         const be = Math.abs(rt.stop_pct) < 0.001;
         $('bracketLine').innerHTML =
@@ -1533,6 +1556,15 @@ const EZ = (function(){
   function hideReject(){ $('reject').classList.remove('show'); $('rejectFix').classList.remove('show'); }
 
   // Only offered when Webull says it can't see the contracts we think you own.
+  async function managePosition(){
+    if(!confirm('Arm the ratchet on this position?\n\nOnly do this if the '
+              + 'Discord bot is NOT also holding this contract. Two tools '
+              + 'resting a sell on one contract closes it twice — and the '
+              + 'second sell goes SHORT.')) return;
+    try{ await api('/api/position/manage',{}); sfx('armed'); }
+    catch(e){ showReject(String((e&&e.message)||e)); }
+  }
+
   async function forgetPosition(){
     if(!confirm("Only do this if you've checked the Webull app and you are NOT holding "
                +"these contracts.\n\nThis sends NO order. It just clears the position off "
