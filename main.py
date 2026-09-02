@@ -135,7 +135,22 @@ def tape_speed(symbol: str = "QQQ"):
     if symbol not in config.SYMBOLS:
         raise HTTPException(400, f"{symbol} isn't one of the tradable symbols.")
     ysym = quotes.YSYM.get(symbol, symbol) if quotes else symbol
-    return {"symbol": symbol, **tape.velocity(ysym)}
+
+    # PREFER REAL PRINTS. The bar path measures speed from 1-minute bars and
+    # says so in its own docstring; get_tick returns the actual trades. Bars
+    # remain the fallback because they need no broker - the login screen and a
+    # dropped connection both still show a reading.
+    e = SESSION.get("s")
+    if e is not None and hasattr(e, "recent_ticks"):
+        try:
+            body = e.recent_ticks(symbol)
+            if body is not None:
+                r = tape.compute_ticks(tape.parse_ticks(body))
+                if r.get("ok"):
+                    return {"symbol": symbol, **r}
+        except Exception:
+            pass          # a tick hiccup must never blank the meter
+    return {"symbol": symbol, **tape.velocity(ysym), "source": "bars"}
 
 
 @app.get("/api/dwell")

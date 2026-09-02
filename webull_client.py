@@ -1798,6 +1798,41 @@ class LiveSession(BaseSession):
             pass
         return out
 
+    def recent_ticks(self, symbol, count=400):
+        """Raw time-and-sales for the UNDERLYING, or None if unavailable.
+
+        None, not [] - the caller must be able to tell "the feed said nothing
+        happened" from "we could not ask", because the first is a reading and
+        the second is a fallback.
+        """
+        try:
+            dc = self._od._client()
+        except Exception:                                    # noqa: BLE001
+            return None
+        holders = [dc]
+        for attr in dir(dc):
+            if attr.startswith("_"):
+                continue
+            low = attr.lower()
+            if "market" in low or "quote" in low or "data" in low:
+                try:
+                    holders.append(getattr(dc, attr))
+                except Exception:                            # noqa: BLE001
+                    pass
+        for h in holders:
+            fn = getattr(h, "get_tick", None)
+            if not callable(fn):
+                continue
+            for args, kw in (((symbol, "US_STOCK"), {"count": str(count)}),
+                             ((symbol, "US_STOCK", str(count)), {}),
+                             ((), {"symbol": symbol, "category": "US_STOCK",
+                                   "count": str(count)})):
+                try:
+                    return self._od._result(paced(fn, *args, **kw))
+                except Exception:                            # noqa: BLE001
+                    continue
+        return None
+
     def atm_option_for_vol(self, symbol):
         """An at-the-money quote for the volatility gauge, from the LIVE chain.
 
