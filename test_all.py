@@ -3617,11 +3617,99 @@ finally:
           _ent.index("self.armed = None") < _ent.index("self.place("))
 
 
+    # --- 71. One 429 must not freeze the whole app ------------------------
+    # THE fault behind "trades not polling fast" and "PNL not even showing".
+    # pace() slept for the entire 20-second backoff WHILE HOLDING THE LOCK
+    # every other thread needs. So a single 429 - from a balance refresh, a
+    # trend chart, anything - froze the position price, the ratchet and the
+    # exit check for twenty seconds at a time. The rate limit was never the
+    # problem; the response to it was.
+    _w71 = io.open("webull_client.py", encoding="utf-8").read()
+    _B = wb._Budget(min_interval=0.0)
+
+    # Nothing wrong: everything goes through.
+    for _p, _n in ((wb.CRITICAL, "critical"), (wb.NORMAL, "normal"), (wb.LOW, "low")):
+        check(71, "a healthy budget lets %s through" % _n,
+              _B.reserve(_p) is not None)
+
+    _B.note_rate_limit()
+    check(71, "during a backoff, LOW is dropped", _B.reserve(wb.LOW) is None)
+    check(71, "and NORMAL is dropped rather than stalled",
+          _B.reserve(wb.NORMAL) is None)
+    _c = _B.reserve(wb.CRITICAL)
+    check(71, "but CRITICAL still gets its slot", _c is not None)
+    check(71, "and it waits out the backoff", _c > 10.0, str(_c))
+
+    # THE LOCK. Reserving must never sleep, or one thread's wait becomes
+    # everyone's wait.
+    _res = _w71.split("def reserve(", 1)[1].split("def pace(", 1)[0]
+    check(71, "reserve() never sleeps", "time.sleep" not in _res)
+    _pc = _w71.split("    def pace(self, priority", 1)[1].split("\n    def ", 1)[0]
+    check(71, "pace() sleeps OUTSIDE the lock",
+          "with self._lock" not in _pc and "time.sleep" in _pc)
+
+    # Measured, not asserted from the source: a low-priority call during a
+    # backoff must return in milliseconds, not seconds.
+    _B2 = wb._Budget(min_interval=0.0)
+    _B2.note_rate_limit()
+    _t0 = time.time()
+    try:
+        _B2.pace(wb.LOW); _skipped = False
+    except wb.BudgetSkipped:
+        _skipped = True
+    _el = time.time() - _t0
+    check(71, "a LOW call returns instantly during a backoff",
+          _skipped and _el < 0.5, "%.2fs" % _el)
+    check(71, "and it is counted as skipped, not as a call",
+          _B2.stats()["skipped"] >= 1, str(_B2.stats()))
+
+    # Two threads reserving at once must not be handed the same slot.
+    _B3 = wb._Budget(min_interval=0.20)
+    _slots = [_B3.reserve(wb.NORMAL) for _ in range(4)]
+    check(71, "concurrent slots do not collide",
+          all(_slots[i + 1] > _slots[i] for i in range(len(_slots) - 1)),
+          str(_slots))
+
+    # CLASSIFICATION. Orders are never dropped; the open position's price is
+    # never dropped; buying power always can be.
+    check(71, "orders are CRITICAL",
+          _w71.count("place_order, self.account_id, orders,\n                    "
+                     "priority=CRITICAL") == 2
+          or _w71.count("priority=CRITICAL") >= 2)
+    _rm71 = _w71.split("def refresh_mark", 1)[1].split("\n    def ", 1)[0]
+    check(71, "the open position's mark is CRITICAL",
+          "call_priority(CRITICAL)" in _rm71)
+    check(71, "buying power is LOW",
+          "get_account_balance, aid,\n                        priority=LOW" in _w71
+          or "priority=LOW" in _w71)
+    check(71, "signing in waits rather than being skipped",
+          'kwargs.setdefault("priority", CRITICAL)' in _w71)
+    check(71, "and a skip during sign-in is retried, not fatal",
+          "except BudgetSkipped" in _w71)
+
+    # A dropped LOW call must degrade, never crash the caller.
+    _z71 = wb.LiveSession.__new__(wb.LiveSession)
+    class _NeverCalled:
+        class account_v2:
+            @staticmethod
+            def get_account_balance(aid):
+                raise AssertionError("a LOW call was made during a backoff")
+    _z71.trade = _NeverCalled(); _z71.account_id = "A"
+    _saved_bud = wb.BUDGET
+    try:
+        wb.BUDGET = wb._Budget(min_interval=0.0)
+        wb.BUDGET.note_rate_limit()
+        check(71, "a skipped balance degrades to None, no crash",
+              _z71._balance_for("A") is None)
+    finally:
+        wb.BUDGET = _saved_bud
+
+
 print("\n"+"="*68)
 by={}
 for sc,name,ok,_ in results:
     by.setdefault(sc,[0,0]); by[sc][0]+=1; by[sc][1]+= (1 if ok else 0)
-T={70:"A rejected exit is not a storm",69:"Sign-in survives a rate limit",68:"Stream cannot blind the app",67:"Restart keeps the position",66:"One-second prices",65:"Journal never loses a trade",64:"Pacing must not stall",63:"Tick velocity",62:"Underlying at fill",61:"Tiered ratchet + anti-clip",60:"SDK audit is honest",59:"Batched option quotes",58:"Option price grid",57:"Webull rate budget",56:"NinjaScript compiles",55:"One-click NT install",54:"Ratchet inside NinjaTrader",53:"Limits die with the app",52:"NinjaTrader delivery check",51:"Futures header + footer",50:"Futures on by default",49:"Toggles + short hints",48:"Futures config stripped",47:"Futures ratchet",46:"NinjaScript in step",45:"Breadth + VIX",44:"Entry telemetry",43:"Trend module",42:"Audio cues",41:"Volatility gauges",40:"Volume gauge",39:"Dwell time",38:"Velocity vs feed artifacts",37:"Desktop icon",36:"Trade log detail",35:"Time value warns not blocks",34:"LOCK/X gone, size warns",33:"Page actually runs",32:"No SAVE / live trade frozen",31:"One switch / still modal",30:"Directional entry levels",29:"Percent only, no cash",28:"Grid/ATM/quality/one-armed",27:"Config screen cleanup",26:"Ratchet stop",25:"Console auto-hide",24:"Options auto-reconcile",23:"Daily trade log",22:"Options phantom clear",21:"Auto-reconcile w/ broker",20:"MY CONFIG always on",19:"Phantom position",18:"Futures hours",17:"Closed market honest",16:"Restart leaves no spinner",15:"One tab only",14:"Git lock self-heal",13:"Broker tabs + tray",12:"Velocity honest when shut",11:"Multi-broker sessions",1:"Futures login survives restart",2:"remember_login default",3:"Options profiles to disk",
+T={71:"One 429 must not freeze the app",70:"A rejected exit is not a storm",69:"Sign-in survives a rate limit",68:"Stream cannot blind the app",67:"Restart keeps the position",66:"One-second prices",65:"Journal never loses a trade",64:"Pacing must not stall",63:"Tick velocity",62:"Underlying at fill",61:"Tiered ratchet + anti-clip",60:"SDK audit is honest",59:"Batched option quotes",58:"Option price grid",57:"Webull rate budget",56:"NinjaScript compiles",55:"One-click NT install",54:"Ratchet inside NinjaTrader",53:"Limits die with the app",52:"NinjaTrader delivery check",51:"Futures header + footer",50:"Futures on by default",49:"Toggles + short hints",48:"Futures config stripped",47:"Futures ratchet",46:"NinjaScript in step",45:"Breadth + VIX",44:"Entry telemetry",43:"Trend module",42:"Audio cues",41:"Volatility gauges",40:"Volume gauge",39:"Dwell time",38:"Velocity vs feed artifacts",37:"Desktop icon",36:"Trade log detail",35:"Time value warns not blocks",34:"LOCK/X gone, size warns",33:"Page actually runs",32:"No SAVE / live trade frozen",31:"One switch / still modal",30:"Directional entry levels",29:"Percent only, no cash",28:"Grid/ATM/quality/one-armed",27:"Config screen cleanup",26:"Ratchet stop",25:"Console auto-hide",24:"Options auto-reconcile",23:"Daily trade log",22:"Options phantom clear",21:"Auto-reconcile w/ broker",20:"MY CONFIG always on",19:"Phantom position",18:"Futures hours",17:"Closed market honest",16:"Restart leaves no spinner",15:"One tab only",14:"Git lock self-heal",13:"Broker tabs + tray",12:"Velocity honest when shut",11:"Multi-broker sessions",1:"Futures login survives restart",2:"remember_login default",3:"Options profiles to disk",
    4:"Browser autofill guard",5:"ITM3 strike math",6:"Preview == Arm",7:"Live-only / dead modes",
    8:"Auto-sync safety",9:"Endpoints alive",10:"UI integrity"}
 for sc in sorted(by):
