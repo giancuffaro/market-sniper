@@ -2917,6 +2917,77 @@ try:
     check(65, "journalling can never break the clear",
           "could not record the cleared trade" in _w65)
 
+    # --- 66. One-second prices, one call ----------------------------------
+    # The chips read Yahoo, which caches 5s - so polling the screen faster
+    # re-read the same number. The browser was never the limit, the source was.
+    # Webull's snapshot takes every symbol in ONE call, so 1/sec costs 60
+    # requests a minute out of a 300 budget shared three ways, no matter how
+    # many symbols are on screen.
+    import quotes as _q66
+    check(66, "Yahoo really does cache", _q66._TTL >= 5.0, str(_q66._TTL))
+
+    class _SS66(wb.LiveSession):
+        def __init__(self, mode="joined"):
+            import config as _c
+            self.settings = dict(_c.DEFAULT_SETTINGS); self.strategies = []
+            self.calls = 0; self.mode = mode
+            self._stock_cache = {"t": 0.0, "rows": {}}
+            class _OD:
+                def __init__(self, outer): self.o = outer
+                def _client(self):
+                    o = self.o
+                    class C:
+                        def get_snapshot(_s, *a, **kw):
+                            o.calls += 1
+                            syms = None
+                            if a and isinstance(a[0], str): syms = a[0].split(",")
+                            elif a and isinstance(a[0], list): syms = a[0]
+                            elif kw.get("symbols"): syms = (kw["symbols"].split(",")
+                                if isinstance(kw["symbols"], str) else kw["symbols"])
+                            if not syms: raise Exception("no symbols")
+                            return {"data": [{"symbol": x, "close": 100.0 + i,
+                                              "preClose": 99.0 + i}
+                                             for i, x in enumerate(syms)]}
+                    return C()
+                def _result(_s, r): return r
+            self._od = _OD(self)
+
+    _ss = _SS66()
+    _rows = _ss.stock_snapshot(["SPY", "QQQ", "TSLA"])
+    check(66, "three symbols cost ONE call", _ss.calls == 1, str(_ss.calls))
+    check(66, "and all three come back", len(_rows) == 3, str(len(_rows)))
+    check(66, "with price and change", _rows["SPY"]["price"] == 100.0
+          and abs(_rows["SPY"]["change"] - 1.0) < 0.01, str(_rows["SPY"]))
+    check(66, "and are marked as coming from the broker",
+          _rows["SPY"]["source"] == "webull" and _rows["SPY"]["live"] is True)
+
+    # Cached just under the 1s poll, so one poll is one call - not two.
+    _ss.calls = 0
+    _ss.stock_snapshot(["SPY", "QQQ", "TSLA"])
+    check(66, "a second read inside the second is free", _ss.calls == 0, str(_ss.calls))
+    check(66, "the cache is shorter than the poll", wb.LiveSession._STOCK_TTL < 1.0)
+
+    # A symbol we did not ask for must never be attached to a chip.
+    check(66, "unrequested rows are dropped",
+          wb.LiveSession._parse_stock_snapshot(
+              {"data": [{"symbol": "NVDA", "close": 5}]}, ["SPY"]) == {})
+    check(66, "a malformed body is handled",
+          wb.LiveSession._parse_stock_snapshot("nope", ["SPY"]) == {})
+
+    # If the broker cannot answer, the chips fall back rather than going blank.
+    _m66 = io.open("main.py", encoding="utf-8").read()
+    check(66, "it prefers the broker", "e.stock_snapshot(syms)" in _m66)
+    check(66, "and falls back to Yahoo", "fall through to Yahoo rather than blank" in _m66)
+    _ix66 = io.open("index.html", encoding="utf-8").read()
+    check(66, "the browser polls prices every second",
+          "setInterval(refreshPrices,1000)" in _ix66)
+    # Option quotes must NOT ride the 1s beat - each is a separate request and
+    # a 0DTE quote does not need refreshing that often.
+    check(66, "option quotes stay on the slower beat",
+          "quoteTimer=setInterval" in _ix66 and "},5000);" in _ix66)
+    check(66, "and the new timer is cleared on disconnect",
+          _ix66.count("clearInterval(quoteTimer)") >= 4)
+
     import subprocess as _sp3
     _sm3 = _sp3.run(["node", "ui_smoke.js", "futures_index.html"], cwd=HERE,
                     capture_output=True, text=True, timeout=60)
@@ -3003,7 +3074,7 @@ print("\n"+"="*68)
 by={}
 for sc,name,ok,_ in results:
     by.setdefault(sc,[0,0]); by[sc][0]+=1; by[sc][1]+= (1 if ok else 0)
-T={65:"Journal never loses a trade",64:"Pacing must not stall",63:"Tick velocity",62:"Underlying at fill",61:"Tiered ratchet + anti-clip",60:"SDK audit is honest",59:"Batched option quotes",58:"Option price grid",57:"Webull rate budget",56:"NinjaScript compiles",55:"One-click NT install",54:"Ratchet inside NinjaTrader",53:"Limits die with the app",52:"NinjaTrader delivery check",51:"Futures header + footer",50:"Futures on by default",49:"Toggles + short hints",48:"Futures config stripped",47:"Futures ratchet",46:"NinjaScript in step",45:"Breadth + VIX",44:"Entry telemetry",43:"Trend module",42:"Audio cues",41:"Volatility gauges",40:"Volume gauge",39:"Dwell time",38:"Velocity vs feed artifacts",37:"Desktop icon",36:"Trade log detail",35:"Time value warns not blocks",34:"LOCK/X gone, size warns",33:"Page actually runs",32:"No SAVE / live trade frozen",31:"One switch / still modal",30:"Directional entry levels",29:"Percent only, no cash",28:"Grid/ATM/quality/one-armed",27:"Config screen cleanup",26:"Ratchet stop",25:"Console auto-hide",24:"Options auto-reconcile",23:"Daily trade log",22:"Options phantom clear",21:"Auto-reconcile w/ broker",20:"MY CONFIG always on",19:"Phantom position",18:"Futures hours",17:"Closed market honest",16:"Restart leaves no spinner",15:"One tab only",14:"Git lock self-heal",13:"Broker tabs + tray",12:"Velocity honest when shut",11:"Multi-broker sessions",1:"Futures login survives restart",2:"remember_login default",3:"Options profiles to disk",
+T={66:"One-second prices",65:"Journal never loses a trade",64:"Pacing must not stall",63:"Tick velocity",62:"Underlying at fill",61:"Tiered ratchet + anti-clip",60:"SDK audit is honest",59:"Batched option quotes",58:"Option price grid",57:"Webull rate budget",56:"NinjaScript compiles",55:"One-click NT install",54:"Ratchet inside NinjaTrader",53:"Limits die with the app",52:"NinjaTrader delivery check",51:"Futures header + footer",50:"Futures on by default",49:"Toggles + short hints",48:"Futures config stripped",47:"Futures ratchet",46:"NinjaScript in step",45:"Breadth + VIX",44:"Entry telemetry",43:"Trend module",42:"Audio cues",41:"Volatility gauges",40:"Volume gauge",39:"Dwell time",38:"Velocity vs feed artifacts",37:"Desktop icon",36:"Trade log detail",35:"Time value warns not blocks",34:"LOCK/X gone, size warns",33:"Page actually runs",32:"No SAVE / live trade frozen",31:"One switch / still modal",30:"Directional entry levels",29:"Percent only, no cash",28:"Grid/ATM/quality/one-armed",27:"Config screen cleanup",26:"Ratchet stop",25:"Console auto-hide",24:"Options auto-reconcile",23:"Daily trade log",22:"Options phantom clear",21:"Auto-reconcile w/ broker",20:"MY CONFIG always on",19:"Phantom position",18:"Futures hours",17:"Closed market honest",16:"Restart leaves no spinner",15:"One tab only",14:"Git lock self-heal",13:"Broker tabs + tray",12:"Velocity honest when shut",11:"Multi-broker sessions",1:"Futures login survives restart",2:"remember_login default",3:"Options profiles to disk",
    4:"Browser autofill guard",5:"ITM3 strike math",6:"Preview == Arm",7:"Live-only / dead modes",
    8:"Auto-sync safety",9:"Endpoints alive",10:"UI integrity"}
 for sc in sorted(by):
