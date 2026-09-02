@@ -721,7 +721,9 @@ try:
 
     def _rt(marks, step=10.0, entry=3.00):
         z=_w4.make_session("LIVE")
-        z.settings.update({"my_enabled":True,"ratchet_step_pct":step})
+        z.settings.update({"my_enabled":True,"ratchet_step_pct":step,
+                           # flat rungs under test here; tiers are scenario 61
+                           "ratchet_tiers":False})
         z.position={"symbol":"QQQ","side":"CALLS","strike":711.0,"qty":1,
                     "entry":entry,"mark":entry,"expiration":"2026-08-26"}
         out=[]
@@ -1078,6 +1080,7 @@ try:
             import config as _c
             self.settings = dict(_c.DEFAULT_SETTINGS); self.strategies = []
     _lv = _Live()
+    _lv.settings["ratchet_tiers"] = False       # flat rungs under test here
     # Opened at 10% step, then the step is changed to 50% mid-trade.
     _lv.position = {"entry": 3.00, "mark": 3.30, "qty": 1,
                     "ratchet_on": True, "ratchet_step": 10.0}
