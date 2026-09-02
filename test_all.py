@@ -3403,7 +3403,7 @@ finally:
           and _z2._close_fails == 0, str(_z2._close_retry_at))
 
     # The futures side had the identical fault.
-    _f = fc.FuturesSession.__new__(fc.FuturesSession)
+    _f = fc.BaseFuturesSession.__new__(fc.BaseFuturesSession)
     _f.last_event = ""; _f.blotter = []
     _f.position = {"symbol": "MNQ", "side": "SHORT", "qty": 1}
     _f._bracket_hit = lambda: "SL"
