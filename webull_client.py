@@ -920,19 +920,27 @@ class OptionData:
         if not fns:
             return self._one_at_a_time(occs)
 
+        # BUILT FRESH FOR THESE CONTRACTS, EVERY TIME.
+        # The remembered shape is an INDEX, never the arguments themselves -
+        # the arguments contain the contract symbols, so remembering them made
+        # every later call ask about the FIRST set of contracts again. Same
+        # fault as snapshot_row, same consequence: confidently wrong prices.
         joined = ",".join(occs)
         shapes = [((occs,), {}), ((joined,), {}),
                   ((), {"symbols": occs}), ((), {"symbols": joined}),
                   ((occs, "US_OPTION"), {}), ((joined, "US_OPTION"), {}),
                   ((), {"symbols": occs, "category": "US_OPTION"}),
                   ((), {"symbols": joined, "category": "US_OPTION"})]
+        order = list(range(len(shapes)))
         remembered = getattr(self, "_batch_shape", None)
-        if remembered is not None:
-            shapes = [remembered] + [x for x in shapes if x != remembered]
+        if isinstance(remembered, int) and 0 <= remembered < len(shapes):
+            order = [remembered] + [i for i in order if i != remembered]
+        elif remembered is not None:
+            self._batch_shape = None        # old-format memory: discard it
 
         for _name, fn in fns:
-            for shape in shapes:
-                args, kwargs = shape
+            for i in order:
+                args, kwargs = shapes[i]
                 try:
                     body = self._result(paced(fn, *args, **kwargs))
                 except Exception:                        # noqa: BLE001
@@ -942,7 +950,7 @@ class OptionData:
                 # A shape that answers one of three looks like success and
                 # silently starves the rest.
                 if parsed and len(parsed) == len(occs):
-                    self._batch_shape = shape
+                    self._batch_shape = i
                     return parsed
                 if parsed:
                     return parsed
