@@ -396,7 +396,9 @@ CONNECT_RETRIES = 3
 # Picking an account calls connect() again. The list cannot have changed in the
 # seconds between, so the second call reads this instead of spending a request.
 ACCOUNTS_TTL = 90.0
-_ACCOUNTS_CACHE = {"rows": None, "at": 0.0}
+# KEYED BY APP KEY. A cache that ignored which key asked would hand a second
+# key the first key's accounts - a wrong account id is a wrong account traded.
+_ACCOUNTS_CACHE = {"key": None, "rows": None, "at": 0.0}
 
 class _Budget:
     """Serialises and paces every Webull request this process makes.
@@ -1776,7 +1778,8 @@ class LiveSession(BaseSession):
         # a wasted request against a budget that was the reason the first call
         # failed. Cache it for the length of a sign-in.
         cached = _ACCOUNTS_CACHE.get("rows")
-        if cached and time.time() - _ACCOUNTS_CACHE.get("at", 0) < ACCOUNTS_TTL:
+        if (cached and _ACCOUNTS_CACHE.get("key") == app_key
+                and time.time() - _ACCOUNTS_CACHE.get("at", 0) < ACCOUNTS_TTL):
             data = cached
         else:
             try:
@@ -1803,7 +1806,7 @@ class LiveSession(BaseSession):
                         "again.")
                 raise OrderRejected("account list failed: %s" % code)
             data = res.json()
-            _ACCOUNTS_CACHE.update({"rows": data, "at": time.time()})
+            _ACCOUNTS_CACHE.update({"key": app_key, "rows": data, "at": time.time()})
         if isinstance(data, list):
             accounts = data
         elif isinstance(data, dict):
