@@ -82,6 +82,37 @@ def occ_symbol(symbol, expiration, option_type, strike):
     cp = "C" if option_type == "CALL" else "P"
     return f"{symbol}{d}{cp}{int(round(strike * 1000)):08d}"
 
+_OCC_RE = re.compile(r"^([A-Z]{1,6})(\d{6})([CP])(\d{8})$")
+
+
+def parse_occ(occ):
+    """The exact inverse of occ_symbol(). Returns
+    (underlying, 'YYYY-MM-DD', 'CALL'|'PUT', strike) or None.
+
+    Written as the inverse ON PURPOSE and tested round-trip both ways: a
+    parser that drifts from the builder would adopt a position onto the wrong
+    strike, and a wrong strike is a wrong trade being managed silently.
+
+    The 2-digit year becomes 20xx. OCC has no other option, and this app trades
+    same-day expiries, so a 1900s reading is never right.
+    """
+    if not occ:
+        return None
+    m = _OCC_RE.match(str(occ).strip().upper().replace(" ", ""))
+    if not m:
+        return None
+    under, ymd, cp, strike = m.groups()
+    try:
+        expiry = "20%s-%s-%s" % (ymd[0:2], ymd[2:4], ymd[4:6])
+        datetime.strptime(expiry, "%Y-%m-%d")          # refuse 20xx-13-45
+    except ValueError:
+        return None
+    return (under, expiry, "CALL" if cp == "C" else "PUT", int(strike) / 1000.0)
+
+
+_parse_occ = parse_occ          # internal alias
+
+
 def first_otm_strike(spot, side, step):
     if side == "CALLS":
         return math.floor(spot / step) * step + step
