@@ -398,6 +398,19 @@ CONNECT_RETRIES = 3
 # sell retried once a second is what caused the 9/2 storm.
 CLOSE_RETRY_MAX = 15.0
 
+# Webull's way of saying "you do not hold that". Selling a long option you no
+# longer own is read by their API as an uncovered call, so the rejection talks
+# about stock. It is a DEFINITE answer - unlike a 429, which means "ask later"
+# - and it is the one rejection that must clear the screen instead of being
+# retried.
+#
+# 9/2: 1,938 of these in 100 seconds, ~19 a second, selling a QQQ 708 he had
+# already closed. That flood is what rate-limited the key, which is what
+# stopped his P&L updating. The phantom caused the blindness.
+_NO_POSITION_WORDS = ("CAVERED_CALL_STOCK_NO_ENOUGH", "COVERED_CALL_STOCK_NO_ENOUGH",
+                      "STOCK_NO_ENOUGH", "NO_ENOUGH_POSITION", "POSITION_NOT_ENOUGH",
+                      "INSUFFICIENT_POSITION", "NO_SUCH_POSITION")
+
 # Picking an account calls connect() again. The list cannot have changed in the
 # seconds between, so the second call reads this instead of spending a request.
 ACCOUNTS_TTL = 90.0
@@ -1050,6 +1063,27 @@ class BaseSession:
             self._close_fails = 0
             self._close_retry_at = 0.0
         except OrderRejected as e:
+            # THE BROKER SAYING "YOU DO NOT HOLD THAT" IS AN ANSWER, NOT A
+            # FAILURE. Retrying it cannot ever succeed, and retrying it fast is
+            # what took the whole app down on 9/2. Clear the ghost and journal
+            # the trade instead.
+            if any(w in str(e).upper() for w in _NO_POSITION_WORDS):
+                ghost = self.position
+                self._close_fails = 0
+                self._close_retry_at = 0.0
+                try:
+                    self._record_vanished(ghost, "CLOSED-ELSEWHERE")
+                except Exception:
+                    pass
+                self.position = None
+                self.last_event = (
+                    "Webull says you do not hold that %s %s any more, so the "
+                    "app has stopped trying to sell it and cleared the screen. "
+                    "It was closed somewhere else — logged as CLOSED-ELSEWHERE."
+                    % (ghost.get("symbol", "") if ghost else "",
+                       ghost.get("option_type", "") if ghost else ""))
+                print("[PHANTOM] %s" % self.last_event, flush=True)
+                return
             n = getattr(self, "_close_fails", 0) + 1
             self._close_fails = n
             # 1s, 2s, 4s, 8s, then every 15s. Capped so an exit is always
