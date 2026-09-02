@@ -200,11 +200,76 @@ def _restore_strategies(saved):
     return kept
 
 
+# ---- EXCHANGE PRICE STEPS -------------------------------------------------
+# Option limits must sit on the exchange's grid: $0.05 steps below $3.00,
+# $0.10 at or above. Off-grid prices come back 417 OPTION_PRICE_STEP_LT.
+#
+# Market Sniper was rounding to 2 DECIMALS, which is not the same thing.
+# Measured across asks from $0.20 to $6.00, 85% of the limits it produced
+# were off the grid - ask 2.38 became 2.43, which is not a price that exists.
+# Ported from discord-sniper/webull_options.py, which learned this the
+# expensive way.
+def tick_step(px):
+    return 0.05 if float(px) < 3.0 else 0.10
+
+
+def tick_round(px):
+    """Nearest legal tick. Floored at one step so it stays a real order."""
+    try:
+        p = float(px)
+    except (TypeError, ValueError):
+        return px
+    if p <= 0:
+        return 0.05
+    step = tick_step(p)
+    snapped = round(round(p / step) * step, 2)
+    return snapped if snapped > 0 else step
+
+
+def tick_up(px):
+    """Round UP to a legal tick."""
+    p = max(0.0, float(px))
+    step = tick_step(p)
+    return round(math.ceil(p / step - 1e-9) * step, 2) or step
+
+
+def tick_down(px):
+    """Round DOWN to a legal tick, never below one step."""
+    p = max(0.0, float(px))
+    step = tick_step(p)
+    return max(step, round(math.floor(p / step + 1e-9) * step, 2))
+
+
 def buy_limit(ask):
-    return round(ask + max(config.MARKETABLE_BUFFER_MIN, ask * config.MARKETABLE_BUFFER_PCT), 2)
+    """Marketable BUY limit, snapped UP to the grid.
+
+    UP, not nearest. The buffer exists to make this order marketable; rounding
+    to the nearest tick can land it BELOW the ask, and a limit under the offer
+    does not fill - it rests. Nearest-rounding is right for a stop, wrong here.
+    """
+    raw = ask + max(config.MARKETABLE_BUFFER_MIN, ask * config.MARKETABLE_BUFFER_PCT)
+    return tick_up(raw)
+
 
 def sell_limit(bid):
-    return max(0.01, round(bid - max(config.MARKETABLE_BUFFER_MIN, bid * config.MARKETABLE_BUFFER_PCT), 2))
+    """Marketable SELL limit, snapped DOWN to the grid, for the same reason."""
+    raw = bid - max(config.MARKETABLE_BUFFER_MIN, bid * config.MARKETABLE_BUFFER_PCT)
+    return max(0.01, tick_down(raw))
+
+
+def stop_below(reference, pct):
+    """A protective stop strictly BELOW the reference. Never AT it.
+
+    From discord-sniper: a 0.22 bid x 0.90 = 0.198, which nearest-rounds UP to
+    0.20 - the exact fill price - and the trade stopped out seven seconds after
+    filling on one downtick. Cheap contracts round on a coarse grid, so
+    whenever rounding lands at or above the reference, drop a whole step.
+    """
+    ref = float(reference)
+    px = max(0.01, float(tick_round(ref * (1 - float(pct) / 100.0))))
+    if px >= ref - 1e-9:
+        px = max(0.01, round(ref - tick_step(ref), 2))
+    return px
 
 
 class OrderRejected(Exception):
