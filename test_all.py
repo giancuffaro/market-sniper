@@ -3486,8 +3486,11 @@ finally:
     check(69, "a successful list is written down for next time",
           "_remember_accounts(app_key, data)" in _cn69)
     uc.save, uc.load = _uc_save, _uc_load
-    check(69, "and the test wrote nothing to his real settings",
-          "known_accounts" not in (io.open("my-settings.json", encoding="utf-8").read()))
+    # NOT "the section is absent" - the app writes that section legitimately
+    # after a real sign-in. What must never appear is anything THIS TEST made.
+    check(69, "the test's own key never reaches his real settings",
+          wb._acct_key(_KEY69) not in
+          io.open("my-settings.json", encoding="utf-8").read())
 
     # The message has to name the cause. "account list failed: 429" reads like
     # a broken app; it is a shared budget, and it clears on its own.
@@ -3682,8 +3685,8 @@ finally:
     check(71, "buying power is LOW",
           "get_account_balance, aid,\n                        priority=LOW" in _w71
           or "priority=LOW" in _w71)
-    check(71, "signing in waits rather than being skipped",
-          'kwargs.setdefault("priority", CRITICAL)' in _w71)
+    check(71, "signing in is never skipped for budget reasons",
+          'kwargs.setdefault("priority", IMMEDIATE)' in _w71)
     check(71, "and a skip during sign-in is retried, not fatal",
           "except BudgetSkipped" in _w71)
 
