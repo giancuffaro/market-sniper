@@ -272,6 +272,18 @@ def market_breadth():
     return {**b, "label": trendmod.breadth_label(b)}
 
 
+@app.get("/api/budget")
+def budget():
+    """How much of the shared Webull rate budget this app is using.
+
+    One app key allows 300 requests / 60 s and THREE processes share it: this
+    app, the discord-sniper bridge and the Fill Announcer. If rate_limits is
+    anything but 0, something is starving the others."""
+    return {"ok": True, **wb.BUDGET.stats(),
+            "min_interval": wb.MIN_CALL_INTERVAL,
+            "backoff_seconds": wb.BACKOFF_AFTER_429}
+
+
 @app.get("/api/preview")
 def preview(symbol: str = "QQQ", side: str = "CALLS"):
     """Where an armed entry would trigger, and which strike you'd end up with.

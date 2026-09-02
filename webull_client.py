@@ -1625,6 +1625,10 @@ class LiveSession(BaseSession):
 
     def place(self, symbol, side, qty):
         self._guard_open(qty)
+        # Real money: price this off a FRESH quote, never the display cache.
+        # 0.8s of staleness is fine for a number on a screen and is not fine
+        # for the limit that decides your fill.
+        self._od.forget_snapshot()
         q = self.quote(symbol, side)
         # Hard stop. A contract that fails the quality filter is not shown and
         # cannot be bought - checked HERE as well as on screen, because the
