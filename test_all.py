@@ -765,10 +765,22 @@ try:
     check(26,"a 1c take-profit can NOT close a ratcheted trade", z4._bracket_hit() is None)
 
     z5=_w4.make_session("LIVE"); z5._guard_open=lambda q: None
+    # Set the state this asserts on, rather than inheriting whatever is saved
+    # in my-settings.json. Reading his live profile made this test pass or fail
+    # depending on what he last clicked, which is not a test.
     z5.settings["my_enabled"]=True
+    z5.settings["tp_enabled"]=False
     z5._underlying=lambda sym: 713.0
     z5.arm("QQQ","CALLS",1)
     check(26,"arming does not re-enable a take-profit", z5.settings["tp_enabled"] is False)
+    # And the reverse: with the ratchet OFF, arming is what turns the brackets
+    # on - that is the path this rule was carved out of.
+    z5b=_w4.make_session("LIVE"); z5b._guard_open=lambda q: None
+    z5b.settings["my_enabled"]=False; z5b.settings["tp_enabled"]=False
+    z5b._underlying=lambda sym: 713.0
+    z5b.arm("QQQ","CALLS",1)
+    check(26,"with the ratchet off, arming does set one",
+          z5b.settings["tp_enabled"] is True)
 
     cfg = io.open(os.path.join(HERE,"config.py"),encoding="utf-8").read()
     check(26,"on by default", '"my_enabled": True' in cfg)
