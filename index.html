@@ -437,7 +437,7 @@
       <div id="adoptBand" class="adopt hidden">
         <div class="t">FOUND AT THE BROKER — NOT BEING MANAGED</div>
         <div class="s" id="adoptSub"></div>
-        <button id="manageBtn" class="mbtn">MANAGE IT — ARM THE RATCHET</button>
+        <button id="manageBtn" class="mbtn" onclick="EZ.managePosition()">MANAGE IT — ARM THE RATCHET</button>
       </div>
     </div>
 
@@ -1643,7 +1643,7 @@ const EZ = (function(){
     }catch(e){ /* no BroadcastChannel - harmless, tabs just do not auto-close */ }
   })();
 
-  return {step,buy,close,disarm,hideReject,forgetPosition,disconnect,quitApp,switchAccount,toggleTheme,setTheme,lockNow,
+  return {step,buy,close,disarm,hideReject,forgetPosition,managePosition,disconnect,quitApp,switchAccount,toggleTheme,setTheme,lockNow,
           openSettings,closeSettings,applySettings,setStrikeMode,hideEvent,toggleSound,
           mirrorToggle,selectProfile,saveProfile,deleteProfile,pickAccount,
           showTab,toggleStrategy,newStrategy,editStrategy,saveStrategy,deleteStrategy,cancelStrategyEdit,stTypeChanged};
