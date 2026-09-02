@@ -32,6 +32,8 @@ FUT = {
     "MES": {"yahoo": "ES=F", "tick": 0.25, "point_value": 5.0, "seed": 6360.0},
 }
 
+# The longest a rejected auto-exit will wait before trying again.
+CLOSE_RETRY_MAX = 15.0
 MAX_CONTRACTS = 10
 DAILY_LOSS_LIMIT = 500.0
 
