@@ -324,3 +324,129 @@ def label(reading):
     arrow = {"up": "↑", "down": "↓", "flat": "→"}.get(
         reading.get("direction"), "")
     return "%s %s %d" % (reading["state"].upper(), arrow, round(reading["score"]))
+
+
+# =========================================================================
+# REAL TIME-AND-SALES  (Webull get_tick)
+#
+# Everything above measures speed from 1-MINUTE BARS, and says so. That is an
+# inference: "the last bar was quiet" is not the same statement as "there have
+# been two prints in the last thirty seconds", and for a rule like "silent tape
+# means do not enter" the difference IS the signal.
+#
+# Webull's get_tick returns the actual prints, up to 1000 of them. This turns
+# the meter into a measurement: trades per second, size per trade, and whether
+# prints are hitting the bid or lifting the offer.
+#
+# The bar path above stays. It is broker-free, so it still works before you
+# connect and on the login screen - and it is the fallback whenever the tick
+# feed is unavailable, entitled differently, or the market is shut.
+# =========================================================================
+
+TICK_WINDOW_SECONDS = 60.0     # "right now"
+TICK_BASELINE_SECONDS = 600.0  # what right now is compared against
+TICK_MIN_PRINTS = 8            # below this there is nothing to measure
+
+
+def _tick_rows(body):
+    """Pull a list of prints out of whatever shape the SDK hands back."""
+    rows = body
+    if isinstance(body, dict):
+        for k in ("data", "result", "list", "items", "ticks", "records"):
+            if isinstance(body.get(k), list):
+                rows = body[k]
+                break
+    return rows if isinstance(rows, list) else []
+
+
+def _tick_num(row, *names):
+    for n in names:
+        if n in row and row[n] not in (None, ""):
+            try:
+                return float(row[n])
+            except (TypeError, ValueError):
+                continue
+    return None
+
+
+def parse_ticks(body):
+    """[{t, price, size, side}] oldest-first. Unparseable rows are dropped.
+
+    Timestamps arrive in seconds on some endpoints and milliseconds on others.
+    Anything past the year 2500 in seconds is milliseconds - guessing wrong
+    puts every print 50,000 years away and the window catches nothing.
+    """
+    out = []
+    for row in _tick_rows(body):
+        if not isinstance(row, dict):
+            continue
+        t = _tick_num(row, "tradeTime", "trade_time", "timestamp", "time", "ts")
+        px = _tick_num(row, "price", "dealPrice", "deal_price", "tradePrice", "last")
+        sz = _tick_num(row, "volume", "size", "qty", "quantity", "tradeSize")
+        if t is None or px is None:
+            continue
+        if t > 16725225600:            # > year 2500 in seconds -> milliseconds
+            t = t / 1000.0
+        side = row.get("side") or row.get("direction") or row.get("tradeBsFlag")
+        side = str(side).upper() if side is not None else ""
+        if side.startswith("B") or side in ("1", "BUY", "BID"):
+            side = "buy"
+        elif side.startswith("S") or side in ("2", "SELL", "ASK"):
+            side = "sell"
+        else:
+            side = ""
+        out.append({"t": t, "price": px, "size": sz or 0.0, "side": side})
+    out.sort(key=lambda r: r["t"])
+    return out
+
+
+def compute_ticks(ticks, now=None):
+    """Velocity from real prints. Same output shape as compute(), so the
+    screen and every caller are unchanged."""
+    if not ticks:
+        return {"ok": False, "reason": "no prints"}
+    now = now or ticks[-1]["t"]
+    recent = [r for r in ticks if now - r["t"] <= TICK_WINDOW_SECONDS]
+    base = [r for r in ticks
+            if TICK_WINDOW_SECONDS < now - r["t"] <= TICK_BASELINE_SECONDS]
+    if len(recent) < TICK_MIN_PRINTS or not base:
+        return {"ok": False, "reason": "not enough prints yet"}
+
+    base_secs = min(TICK_BASELINE_SECONDS - TICK_WINDOW_SECONDS,
+                    max(1.0, base[-1]["t"] - base[0]["t"]))
+    recent_secs = max(1.0, min(TICK_WINDOW_SECONDS, recent[-1]["t"] - recent[0]["t"]))
+
+    tps_now = len(recent) / recent_secs
+    tps_base = len(base) / base_secs
+    # Medians, for the same reason the bar path uses them: one 10,000-lot
+    # print should not decide what the tape is doing.
+    sz_now = _median([r["size"] for r in recent if r["size"] > 0]) or 0.0
+    sz_base = _median([r["size"] for r in base if r["size"] > 0]) or 0.0
+
+    rate_ratio = (tps_now / tps_base) if tps_base > 0 else 1.0
+    size_ratio = (sz_now / sz_base) if sz_base > 0 else 1.0
+    blended = VOL_WEIGHT * rate_ratio + RANGE_WEIGHT * size_ratio
+    score = max(0.0, min(100.0, 50.0 * blended))
+
+    # Direction from where the prints went off, when the feed says. This is
+    # the thing bars cannot tell you: heavy volume that is all hitting the bid
+    # is a different tape from the same volume lifting the offer.
+    buys = sum(1 for r in recent if r["side"] == "buy")
+    sells = sum(1 for r in recent if r["side"] == "sell")
+    if buys or sells:
+        share = buys / float(buys + sells)
+        direction = "up" if share >= 0.58 else ("down" if share <= 0.42 else "flat")
+    else:
+        drift = recent[-1]["price"] - recent[0]["price"]
+        direction = "flat" if drift == 0 else ("up" if drift > 0 else "down")
+        share = None
+
+    return {"ok": True, "score": round(score, 1), "state": _state(score),
+            "direction": direction,
+            "prints_per_sec": round(tps_now, 2),
+            "baseline_per_sec": round(tps_base, 2),
+            "median_size": int(sz_now),
+            "buy_share": round(share * 100, 1) if share is not None else None,
+            "prints": len(recent),
+            "source": "ticks",
+            "last_bar_ts": int(recent[-1]["t"])}
