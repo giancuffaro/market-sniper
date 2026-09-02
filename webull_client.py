@@ -836,10 +836,10 @@ class OptionData:
                     continue
                 except Exception as e:
                     errors.append(f"{name}: {str(e)[:150]}")
-            for kw in kw_shapes:
+            for _j, kw in enumerate(kw_shapes):
                 try:
                     body = self._result(paced(fn, **kw))
-                    self._shape_row = (name, "kw", kw)
+                    self._shape_row = (name, "kw", _j)
                     return body[0] if isinstance(body, list) and body else body
                 except OrderRejected:
                     raise
