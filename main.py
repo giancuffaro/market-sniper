@@ -44,6 +44,9 @@ except Exception:
 
 _EXEC = ThreadPoolExecutor(max_workers=3)
 CONNECT_TIMEOUT_S = 25
+# After a timeout the abandoned task keeps its worker for a while. Refuse new
+# attempts for this long rather than letting them queue up invisibly.
+CONNECT_COOLDOWN_S = 15
 
 # ONE SIGN-IN AT A TIME.
 #
@@ -389,6 +392,10 @@ def connect(req: ConnectReq):
             % max(1, int(_CONNECTING["until"] - now)))
     # Reserve a worker for at most this long, whatever happens below.
     _CONNECTING["until"] = now + CONNECT_TIMEOUT_S
+    # Normally the reservation is released the moment we finish, success or
+    # failure. A TIMEOUT is the exception: the task is still running and still
+    # holding its worker, so the next attempt has to wait for it to let go.
+    cooldown = 0.0
 
     s = wb.make_session("LIVE")
     try:
@@ -396,6 +403,7 @@ def connect(req: ConnectReq):
                            req.account_id)
         state = fut.result(timeout=CONNECT_TIMEOUT_S)
     except FutTimeout:
+        cooldown = time.time() + CONNECT_COOLDOWN_S
         raise HTTPException(400,
             f"Webull didn't answer within {CONNECT_TIMEOUT_S}s. Wait a few "
             "seconds and press CONNECT once — pressing it repeatedly queues "
@@ -406,7 +414,6 @@ def connect(req: ConnectReq):
     except wb.OrderRejected as e:
         raise HTTPException(400, str(e))
     except wb.BudgetSkipped:
-        _CONNECTING["until"] = 0.0
         raise HTTPException(400, "The API is backing off after a rate limit. "
                                  "Wait ten seconds and press CONNECT once.")
     except Exception as e:
@@ -417,6 +424,11 @@ def connect(req: ConnectReq):
                                      "(or they're mistyped). Re-copy BOTH from Webull. If they're "
                                      "correct, check your PC clock is set to sync automatically.")
         raise HTTPException(400, f"connect failed: {type(e).__name__}: {msg[:200]}")
+    finally:
+        # Released on EVERY path - success, rejection, account picker, error.
+        # A reservation that leaked would lock him out of his own app until he
+        # restarted it, which is the failure this whole guard exists to stop.
+        _CONNECTING["until"] = cooldown
     SESSION["s"] = s
 
     # Start the push feed. A stream costs NOTHING from the 300-per-60s budget
