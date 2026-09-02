@@ -3843,9 +3843,13 @@ finally:
           "const txt=await r.text();" in _ix72)
     check(72, "and says an internal error is a bug, not a dead app",
           "It IS running" in _ix72)
-    check(72, "the old blanket message no longer hides crashes",
-          _ix72.count("could not reach the local app") <= 1, 
-          str(_ix72.count("could not reach the local app")))
+    # Count CODE, not the comment that records why this changed.
+    _code72 = "\n".join(l for l in _ix72.split("\n")
+                        if not l.strip().startswith("//"))
+    check(72, "the misleading message is gone from the code",
+          "could not reach the local app" not in _code72)
+    check(72, "and a dead server says how to start it",
+          "MARKET SNIPER icon on your taskbar" in _code72)
 
     # THE JAM ITSELF, simulated: six clicks must not submit six tasks.
     from concurrent.futures import ThreadPoolExecutor as _TPE, TimeoutError as _FT

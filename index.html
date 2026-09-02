@@ -780,7 +780,11 @@ const EZ = (function(){
       if(r.choose_accounts){ showAccountPicker(r.choose_accounts,k,s); return; }
       startDash(r);
     }catch(e){
-      $('connectErr').textContent='could not reach the local app — is the black window still open?';
+      // A GENUINE network failure now - api() no longer throws on a 500.
+      // "Is the black window still open?" was also wrong: the launcher runs the
+      // server hidden, so there is no window to look for.
+      $('connectErr').textContent='The Market Sniper app is not running. '
+        +'Launch it from the MARKET SNIPER icon on your taskbar, then press CONNECT.';
     }finally{ btn.disabled=false; btn.textContent='CONNECT'; }
   };
 
