@@ -2153,15 +2153,25 @@ class LiveSession(BaseSession):
 
         self.account_id, self.account_type = chosen[0], chosen[1]
         self._load_balance()
-        # Before returning "connected", find out whether the account is already
-        # holding something. Reconnecting mid-trade is the case this exists for:
-        # the app used to come up FLAT and manage nothing until it was closed by
-        # hand. Never fatal - a connection that works is worth more than this.
+        # Look for a position you already hold - but IN THE BACKGROUND.
+        #
+        # This used to run inline, and it is why signing in started timing out:
+        # the positions read retries when the key is busy, so adoption could
+        # hold the whole sign-in past the 25-second limit and he got "Webull
+        # didn't respond within 25s" while pressing a button that worked. The
+        # answer arrives a second later on the poll instead; nothing is lost by
+        # not waiting for it, and the login is instant either way.
+        try:
+            threading.Thread(target=self._adopt_quietly, daemon=True).start()
+        except Exception:
+            pass
+        return self.state()
+
+    def _adopt_quietly(self):
         try:
             self.adopt_on_connect()
         except Exception:
             pass
-        return self.state()
 
     def _load_balance(self):
         bp = self._balance_for(self.account_id)
