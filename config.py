@@ -87,6 +87,11 @@ DEFAULT_SETTINGS = {
     "my_enabled": True,
     # Step size, in percent. 10 is the default and what every rung above assumes.
     "ratchet_step_pct": 10.0,
+    # TIERS: pick arm/lock/rung off the premium PAID rather than one flat
+    # number, and never let the stop sit closer than 40% of the gain already
+    # made. ratchet_step_pct above becomes the OPENING stop only.
+    # Off = the flat rungs G designed. See ratchet_tiers.py for why.
+    "ratchet_tiers": True,
 }
 # Legacy fallback stop, used ONLY if the ratchet is switched off. With the
 # ratchet on (the default) nothing reads this.

@@ -11,6 +11,12 @@ except Exception:
 
 import config
 import user_config as uc
+# Tiered ratchet. Optional like everything else: a missing analytics file must
+# never stop the trading app loading.
+try:
+    import ratchet_tiers as rt
+except Exception:                                            # noqa: BLE001
+    rt = None
 try:
     import quotes
 except Exception:
@@ -800,9 +806,39 @@ class BaseSession:
         # High-water mark. It only ever goes UP, which is what makes the stop
         # a ratchet rather than something that can loosen again.
         p["peak_pct"] = max(p.get("peak_pct", 0.0), pct)
-        lv = self.ratchet_levels(p["peak_pct"],
-                                 p.get("ratchet_step",
-                                       self.settings.get("ratchet_step_pct", 10.0)))
+        step = float(p.get("ratchet_step",
+                           self.settings.get("ratchet_step_pct", 10.0)) or 10.0)
+
+        # TIERED RATCHET + ANTI-CLIP (discord-sniper/ratchet_tiers.py).
+        # A percentage is not the same amount of noise at every premium: one
+        # tick on a $0.40 contract is 2.5%, so a "breakeven" stop there sits
+        # inside the spread and gets scratched by a quote flicker. The tiers
+        # pick arm/lock/rung off what was actually PAID, and anti-clip stops a
+        # runner being strangled - the 520-trade study put it at +$6,433
+        # against +$2,872 for the flat rule.
+        if p.get("ratchet_tiers", self.settings.get("ratchet_tiers", True)) and rt is not None:
+            # PEAK, not the live gain. anti_clip caps the lock at a share of
+            # the gain, so feeding it a falling number would walk the stop back
+            # DOWN - the one thing a ratchet must never do. The bot can use the
+            # live gain because its "never loosen" check happens later against
+            # the resting order; there is no resting order here.
+            peak = p["peak_pct"]
+            locked = rt.ratchet_locked_pct(peak, p["entry"])
+            locked = rt.anti_clip(locked, peak)
+            arm, first, tier_step = rt.ratchet_plan(p["entry"])
+            if locked is None:
+                # Not armed yet: the opening stop stands.
+                stop_pct, next_pct, rung = -step, arm, 0.0
+            else:
+                stop_pct = locked
+                rung = locked
+                # The next rung is one tier-step further along in GAIN, which
+                # is what the screen should count down to.
+                k = int((peak - arm + 1e-9) // tier_step) + 1
+                next_pct = arm + tier_step * k
+            lv = {"rung": rung, "stop_pct": stop_pct, "next_pct": next_pct}
+        else:
+            lv = self.ratchet_levels(p["peak_pct"], step)
         p["ratchet"] = {**lv, "pct": round(pct, 2),
                         "stop_price": round(p["entry"] * (1 + lv["stop_pct"] / 100.0), 4),
                         "next_price": round(p["entry"] * (1 + lv["next_pct"] / 100.0), 4)}
