@@ -2531,6 +2531,86 @@ try:
     check(58, "the ported reason is recorded", "stopped out seven seconds after" in
           io.open("webull_client.py", encoding="utf-8").read())
 
+    # --- 59. Batched option quotes ----------------------------------------
+    # Webull's snapshot endpoint takes up to 20 contracts per call - confirmed
+    # in the installed SDK 2.0.14. Market Sniper asked per contract, per poll,
+    # and the mirror account asked again: two positions plus a mirror was four
+    # calls a second against 300 a minute shared three ways.
+    import threading as _th59
+
+    class _FakeOD(object):
+        def __init__(self, mode="list", partial=False):
+            self.mode, self.partial = mode, partial
+            self.calls = 0
+            self._snap_cache = {}
+            self._snap_lock = _th59.Lock()
+        _fns_impl = None
+        def _fns(self):
+            def fn(*a, **kw):
+                self.calls += 1
+                syms = None
+                if a and isinstance(a[0], list):
+                    syms = a[0]
+                elif kw.get("symbols") and isinstance(kw["symbols"], list):
+                    syms = kw["symbols"]
+                if syms is None or self.mode != "list":
+                    raise Exception("wrong shape")
+                if self.partial:
+                    syms = syms[:1]
+                return {"data": [{"symbol": o, "askPrice": 1.0 + i,
+                                  "bidPrice": 0.9 + i, "price": 0.95 + i}
+                                 for i, o in enumerate(syms)]}
+            return [("fake.fn", fn)], []
+        def _result(self, r):
+            return r
+        def ask_bid_mark(self, occ, max_age=None):
+            self.calls += 1
+            return (1.0, 0.9, 0.95, {"symbol": occ})
+    for _m in ("ask_bid_many", "_one_at_a_time", "_parse_batch", "BATCH_MAX"):
+        setattr(_FakeOD, _m, getattr(wb.OptionData, _m))
+
+    _occs = ["QQQ260902C00700000", "QQQ260902P00700000", "SPY260902C00600000"]
+    _fk = _FakeOD()
+    _got = _fk.ask_bid_many(_occs)
+    check(59, "three contracts cost ONE call", _fk.calls == 1, str(_fk.calls))
+    check(59, "and all three come back", len(_got) == 3, str(len(_got)))
+    check(59, "with ask, bid and mark", all(len(v) == 4 for v in _got.values()))
+
+    # A full shape hunt on every sweep is a dozen failing HTTP requests a
+    # second - worse than the problem it solves.
+    _fk.calls = 0
+    _fk.ask_bid_many(_occs)
+    check(59, "the working shape is remembered", _fk.calls == 1, str(_fk.calls))
+
+    # The single-quote cache is warmed, so a follow-up costs nothing.
+    check(59, "the batch warms the single-quote cache", len(_fk._snap_cache) == 3)
+
+    # A row for a contract we did NOT ask for must be DROPPED. A price on the
+    # wrong contract would price an exit against a position not held.
+    check(59, "unrequested rows are dropped, never guessed",
+          _fk._parse_batch({"data": [{"symbol": "OTHER123", "askPrice": 9}]}, _occs) == {})
+    check(59, "a malformed body is handled",
+          _fk._parse_batch("not a list", _occs) == {}
+          and _fk._parse_batch({"nope": 1}, _occs) == {})
+
+    # A shape that answers ONE of three looks like success and starves the
+    # rest, so it must not be remembered as the winner.
+    _fp = _FakeOD(partial=True)
+    _fp.ask_bid_many(_occs)
+    check(59, "a partial answer is not remembered as the shape",
+          getattr(_fp, "_batch_shape", None) is None)
+
+    # If batching is refused entirely, it must still work - just expensively.
+    _fb = _FakeOD(mode="nope")
+    _out = _fb.ask_bid_many(_occs)
+    check(59, "it falls back to one call each", len(_out) == 3, str(len(_out)))
+    check(59, "and warns once, not every sweep", getattr(_fb, "_warned_no_batch", False) is True)
+
+    check(59, "empty input is a no-op", _fk.ask_bid_many([]) == {} and _fk.ask_bid_many(None) == {})
+    check(59, "the 20-per-call cap is respected", wb.OptionData.BATCH_MAX <= 20)
+    _w59 = io.open("webull_client.py", encoding="utf-8").read()
+    check(59, "the batch goes through the rate budget", "paced(fn, *args, **kwargs)" in _w59)
+
     import subprocess as _sp3
     _sm3 = _sp3.run(["node", "ui_smoke.js", "futures_index.html"], cwd=HERE,
                     capture_output=True, text=True, timeout=60)
@@ -2617,7 +2697,7 @@ print("\n"+"="*68)
 by={}
 for sc,name,ok,_ in results:
     by.setdefault(sc,[0,0]); by[sc][0]+=1; by[sc][1]+= (1 if ok else 0)
-T={58:"Option price grid",57:"Webull rate budget",56:"NinjaScript compiles",55:"One-click NT install",54:"Ratchet inside NinjaTrader",53:"Limits die with the app",52:"NinjaTrader delivery check",51:"Futures header + footer",50:"Futures on by default",49:"Toggles + short hints",48:"Futures config stripped",47:"Futures ratchet",46:"NinjaScript in step",45:"Breadth + VIX",44:"Entry telemetry",43:"Trend module",42:"Audio cues",41:"Volatility gauges",40:"Volume gauge",39:"Dwell time",38:"Velocity vs feed artifacts",37:"Desktop icon",36:"Trade log detail",35:"Time value warns not blocks",34:"LOCK/X gone, size warns",33:"Page actually runs",32:"No SAVE / live trade frozen",31:"One switch / still modal",30:"Directional entry levels",29:"Percent only, no cash",28:"Grid/ATM/quality/one-armed",27:"Config screen cleanup",26:"Ratchet stop",25:"Console auto-hide",24:"Options auto-reconcile",23:"Daily trade log",22:"Options phantom clear",21:"Auto-reconcile w/ broker",20:"MY CONFIG always on",19:"Phantom position",18:"Futures hours",17:"Closed market honest",16:"Restart leaves no spinner",15:"One tab only",14:"Git lock self-heal",13:"Broker tabs + tray",12:"Velocity honest when shut",11:"Multi-broker sessions",1:"Futures login survives restart",2:"remember_login default",3:"Options profiles to disk",
+T={59:"Batched option quotes",58:"Option price grid",57:"Webull rate budget",56:"NinjaScript compiles",55:"One-click NT install",54:"Ratchet inside NinjaTrader",53:"Limits die with the app",52:"NinjaTrader delivery check",51:"Futures header + footer",50:"Futures on by default",49:"Toggles + short hints",48:"Futures config stripped",47:"Futures ratchet",46:"NinjaScript in step",45:"Breadth + VIX",44:"Entry telemetry",43:"Trend module",42:"Audio cues",41:"Volatility gauges",40:"Volume gauge",39:"Dwell time",38:"Velocity vs feed artifacts",37:"Desktop icon",36:"Trade log detail",35:"Time value warns not blocks",34:"LOCK/X gone, size warns",33:"Page actually runs",32:"No SAVE / live trade frozen",31:"One switch / still modal",30:"Directional entry levels",29:"Percent only, no cash",28:"Grid/ATM/quality/one-armed",27:"Config screen cleanup",26:"Ratchet stop",25:"Console auto-hide",24:"Options auto-reconcile",23:"Daily trade log",22:"Options phantom clear",21:"Auto-reconcile w/ broker",20:"MY CONFIG always on",19:"Phantom position",18:"Futures hours",17:"Closed market honest",16:"Restart leaves no spinner",15:"One tab only",14:"Git lock self-heal",13:"Broker tabs + tray",12:"Velocity honest when shut",11:"Multi-broker sessions",1:"Futures login survives restart",2:"remember_login default",3:"Options profiles to disk",
    4:"Browser autofill guard",5:"ITM3 strike math",6:"Preview == Arm",7:"Live-only / dead modes",
    8:"Auto-sync safety",9:"Endpoints alive",10:"UI integrity"}
 for sc in sorted(by):
