@@ -391,7 +391,12 @@ ADOPT_EVERY = 5.0
 # wait is the full 20s backoff, so this is about a minute - long enough to
 # outlast a burst from the bridge or the announcer, short enough that a truly
 # dead key still answers while he is looking at the screen.
-CONNECT_RETRIES = 3
+CONNECT_RETRIES = 4
+
+# Sign-in retries fast and briefly: 1.5s, 3s, 6s. A button frozen for a minute
+# looks broken; a clear failure after ten seconds can be acted on.
+CONNECT_FIRST_WAIT = 1.5
+CONNECT_BUDGET_SECONDS = 12.0
 
 # The longest an auto-exit will ever wait before trying again. Being stuck in a
 # trade is worse than any request cost, so this stays short - but a rejected
@@ -457,6 +462,7 @@ def _remembered_accounts(app_key):
 # the app keeps making CRITICAL calls and drops the rest, instead of freezing
 # everything for twenty seconds - which is what it used to do, because pace()
 # slept for the full backoff while holding the lock that every thread needs.
+IMMEDIATE = -1    # signing in: ignores the long backoff, keeps its own pacing
 CRITICAL = 0      # entering, exiting, and the mark of an OPEN position
 NORMAL   = 1      # positions, fills, quotes
 LOW      = 2      # balance, trend, breadth, anything cosmetic
@@ -529,7 +535,7 @@ class _Budget:
         with self._lock:
             now = time.time()
             wait = 0.0
-            if now < self._blocked_until:
+            if now < self._blocked_until and priority > IMMEDIATE:
                 blocked_for = self._blocked_until - now
                 # DURING A BACKOFF, ONLY WHAT MATTERS GETS TO WAIT.
                 # A balance refresh has no business making you wait 20 seconds
@@ -612,24 +618,35 @@ def paced_retry(fn, *args, **kwargs):
     connect makes. One 429 there and the app was unusable - it gave up on a
     condition that clears itself in twenty seconds.
     """
-    # CRITICAL by default: signing in and reading what you hold are not
-    # optional, so they wait out a backoff instead of being dropped like a
-    # balance refresh.
-    kwargs.setdefault("priority", CRITICAL)
+    # IMMEDIATE, with SHORT waits of its own.
+    #
+    # This used to sit out the full 20-second backoff, three times: a CONNECT
+    # button frozen on "CONNECTING..." for over a minute, which reads as a dead
+    # app, not as a wait. And 20 seconds is the wrong shape of pause anyway -
+    # Webull's limit is 300 requests per ROLLING minute, so a slot frees up in
+    # seconds. Try again soon and briefly, then fail with a sentence he can act
+    # on. Total worst case is about CONNECT_BUDGET_SECONDS, not a minute.
+    kwargs.setdefault("priority", IMMEDIATE)
     last = None
+    started = time.time()
+    wait = CONNECT_FIRST_WAIT
     for attempt in range(CONNECT_RETRIES):
         try:
             return paced(fn, *args, **kwargs)
         except BudgetSkipped as e:
-            last = e                        # backing off: wait and try again
+            last = e
         except Exception as e:                               # noqa: BLE001
             last = e
             if not any(w in str(e).upper() for w in _RATE_WORDS):
                 raise                       # a real error: fail now, honestly
-            if attempt < CONNECT_RETRIES - 1:
-                print("[BUDGET ] rate limited during sign-in - waiting out the "
-                      "backoff, try %d of %d" % (attempt + 2, CONNECT_RETRIES),
-                      flush=True)
+        if attempt >= CONNECT_RETRIES - 1:
+            break
+        if time.time() - started + wait > CONNECT_BUDGET_SECONDS:
+            break                           # do not blow the time budget
+        print("[BUDGET ] rate limited signing in - retrying in %.1fs (try %d of "
+              "%d)" % (wait, attempt + 2, CONNECT_RETRIES), flush=True)
+        time.sleep(wait)
+        wait *= 2
     raise last
 
 
