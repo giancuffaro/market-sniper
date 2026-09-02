@@ -3229,7 +3229,30 @@ finally:
     check(67, "the poll adopts while flat", "adopt_broker_position()" in _rm67)
     check(67, "before it gives up on being flat",
           _rm67.index("adopt_broker_position()") < _rm67.index('fc = p.get'))
-    check(67, "connect adopts without waiting", "self.adopt_on_connect()" in _w67)
+    # ADOPTION MUST NEVER BLOCK SIGN-IN. It ran inline first, and the
+    # positions read retries when the key is busy, so it could hold the login
+    # past the 25-second limit: he got "Webull didn't respond within 25s" while
+    # pressing a button that was working fine.
+    _cn67 = _w67.split("def connect(self, app_key", 1)[1].split("\n    def ", 1)[0]
+    check(67, "connect starts adoption in the background",
+          "threading.Thread(target=self._adopt_quietly" in _cn67)
+    check(67, "and does NOT wait for it inline",
+          "self.adopt_on_connect()" not in _cn67, _cn67[-300:])
+    check(67, "the thread is a daemon, so it cannot hold the app open",
+          "daemon=True" in _cn67)
+    check(67, "and it swallows its own errors",
+          "def _adopt_quietly" in _w67)
+    # Measured: a two-second positions read must not delay the login at all.
+    _slow67 = wb.LiveSession.__new__(wb.LiveSession)
+    _slow67.position = None; _slow67._order_lock = threading.RLock()
+    _slow67.last_event = ""; _slow67.settings = {"ratchet_step_pct": 10.0}
+    def _slowpos():
+        time.sleep(1.0); return []
+    _slow67.broker_positions = _slowpos
+    _t67 = time.time()
+    threading.Thread(target=_slow67._adopt_quietly, daemon=True).start()
+    check(67, "a slow positions read costs the login nothing",
+          time.time() - _t67 < 0.2, "%.3fs" % (time.time() - _t67))
     # ...but not once a second. 60 requests a minute out of 300 shared three
     # ways, to answer a question that only changes on a fill.
     check(67, "and it is throttled", "ADOPT_EVERY" in _rm67 and wb.ADOPT_EVERY >= 3.0,
