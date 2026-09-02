@@ -3122,6 +3122,61 @@ finally:
         z.broker_positions = lambda: rows
         return z
 
+    # THE REAL WEBULL SHAPE. This first shipped parsing `symbol` as an OCC
+    # string and could therefore never adopt anything - Webull returns `symbol`
+    # as the plain underlying and puts the contract in legs[0] as separate
+    # fields. Confirmed against discord-sniper/webull_options.py positions(),
+    # which has read this shape in production for months. He restarted holding
+    # a position and the app still said flat; this is why.
+    _real = {"symbol": "QQQ", "quantity": "2", "cost_price": "1.35",
+             "legs": [{"option_type": "CALL", "option_exercise_price": "708",
+                       "option_expire_date": "2026-09-02"}]}
+    _r = _s67([_real]).adopt_broker_position()
+    check(67, "the REAL legs shape is adopted", _r is not None, str(_r))
+    check(67, "with the strike off the leg", _r and _r["strike"] == 708.0, str(_r))
+    check(67, "the type off the leg", _r and _r["side"] == "CALLS", str(_r))
+    check(67, "the expiry off the leg",
+          _r and _r["expiration"] == "2026-09-02", str(_r))
+    check(67, "and cost_price as the entry", _r and _r["entry"] == 1.35, str(_r))
+
+    _put = _s67([{"symbol": "SPY", "quantity": 1, "cost_price": 2.10,
+                  "legs": [{"option_type": "PUT", "option_exercise_price": 764,
+                            "option_expire_date": "2026-09-02"}]}]
+                ).adopt_broker_position()
+    check(67, "puts too", _put and _put["side"] == "PUTS"
+          and _put["strike"] == 764.0, str(_put))
+    # Flat fields with no legs at all, and leg-level cost.
+    check(67, "flat fields without legs work",
+          (_s67([{"symbol": "TSLA", "quantity": 3, "cost_price": 0.9,
+                  "option_type": "C", "strike_price": 332.5,
+                  "expire_date": "2026-09-02"}]).adopt_broker_position() or {})
+          .get("strike") == 332.5)
+    check(67, "leg-level cost is an entry price",
+          (_s67([{"symbol": "QQQ", "quantity": 1,
+                  "legs": [{"option_type": "CALL", "option_exercise_price": 708,
+                            "cost": 1.5, "option_expire_date": "2026-09-02"}]}])
+           .adopt_broker_position() or {}).get("entry") == 1.5)
+    # A STOCK row is not an option and must never be adopted as one.
+    check(67, "a stock row is refused",
+          _s67([{"symbol": "QQQ", "quantity": 100, "cost_price": 700.0}])
+          .adopt_broker_position() is None)
+
+    # A FAILED ask must never read as flat - that was the 9/2 fault exactly.
+    _fail = _s67(None)
+    for _ in range(3):
+        _fail.adopt_broker_position()
+    check(67, "a failed ask is counted, not treated as flat",
+          _fail._adopt_ask_fails == 3 and _fail.position is None,
+          str(_fail._adopt_ask_fails))
+    check(67, "and it says the app is NOT managing anything",
+          "NOT managing it" in _fail.last_event, _fail.last_event[:70])
+    check(67, "and names what to close",
+          "Fill Announcer" in _fail.last_event)
+    _fail.broker_positions = lambda: []
+    _fail.adopt_broker_position()
+    check(67, "a real flat answer resets the counter",
+          _fail._adopt_ask_fails == 0)
+
     _good = [{"symbol": "SPY260902P00764000", "quantity": "2", "costPrice": "1.35"}]
     _g = _s67(_good).adopt_broker_position()
     check(67, "a held position IS adopted", _g is not None)
