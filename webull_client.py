@@ -488,10 +488,35 @@ class OptionData:
         kw_shapes = ({"symbols": occ}, {"symbols": [occ]},
                      {"symbols": occ, "category": "US_OPTION"},
                      {"symbols": [occ], "category": "US_OPTION"})
+
+        # REMEMBER THE WINNING SHAPE.
+        # This loop probes up to 8 argument shapes per function until one is
+        # accepted. Before pacing, a rejected shape cost nothing. Now every
+        # attempt is a real 0.20s pause, so a winner sitting at position 5
+        # costs 0.8 SECONDS of dead time on every single quote - and the
+        # screen polls once a second. That is what made the data crawl while
+        # a position was open. The shape does not change between calls, so it
+        # is only ever discovered once.
+        won = getattr(self, "_shape_row", None)
+        if won is not None:
+            wname, wkind, wshape = won
+            for name, fn in fns:
+                if name != wname:
+                    continue
+                try:
+                    body = self._result(paced(fn, *wshape) if wkind == "arg"
+                                        else paced(fn, **wshape))
+                    return body[0] if isinstance(body, list) and body else body
+                except OrderRejected:
+                    raise
+                except Exception:
+                    self._shape_row = None      # it stopped working; re-probe
+                    break
         for name, fn in fns:
             for args in arg_shapes:
                 try:
                     body = self._result(paced(fn, *args))
+                    self._shape_row = (name, "arg", args)
                     return body[0] if isinstance(body, list) and body else body
                 except OrderRejected:
                     raise
@@ -502,6 +527,7 @@ class OptionData:
             for kw in kw_shapes:
                 try:
                     body = self._result(paced(fn, **kw))
+                    self._shape_row = (name, "kw", kw)
                     return body[0] if isinstance(body, list) and body else body
                 except OrderRejected:
                     raise
