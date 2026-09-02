@@ -3265,11 +3265,86 @@ finally:
           "STREAM_AVAILABLE = False" in _s68 and "except Exception:" in _s68)
 
 
+    # --- 69. Signing in must survive a rate limit --------------------------
+    # 9/2: "im not being able to select margin account". The key was rate
+    # limited - 14 429s on list-open, 2 on balance, three processes sharing 300
+    # requests a minute - and the account list is the FIRST call connect makes.
+    # One 429 there and the app was unusable, on a condition that clears itself
+    # in twenty seconds, behind a message that read "account list failed: 429".
+    _w69 = io.open("webull_client.py", encoding="utf-8").read()
+    _mi69, _bo69 = wb.MIN_CALL_INTERVAL, wb.BACKOFF_AFTER_429
+    wb.BACKOFF_AFTER_429 = 0.02
+    wb.BUDGET.min_interval = 0.0
+    try:
+        _n = {"i": 0}
+        def _flaky():
+            _n["i"] += 1
+            if _n["i"] < 3:
+                raise Exception("HTTP Status: 429, Code: TOO_MANY_REQUESTS")
+            return "accounts"
+        check(69, "a 429 is waited out, not surrendered to",
+              wb.paced_retry(_flaky) == "accounts" and _n["i"] == 3, str(_n))
+
+        def _dead():
+            raise Exception("TOO_MANY_REQUESTS")
+        try:
+            wb.paced_retry(_dead); _gave = False
+        except Exception:
+            _gave = True
+        check(69, "but it does give up eventually", _gave)
+        check(69, "after about a minute of trying", wb.CONNECT_RETRIES >= 2
+              and wb.CONNECT_RETRIES <= 6, str(wb.CONNECT_RETRIES))
+
+        # A REAL error must fail instantly. Retrying a bad key three times just
+        # makes a wrong password take a minute to say so.
+        _c = {"n": 0}
+        def _real():
+            _c["n"] += 1
+            raise Exception("INVALID_SYMBOL")
+        try:
+            wb.paced_retry(_real)
+        except Exception:
+            pass
+        check(69, "a real error is not retried", _c["n"] == 1, str(_c))
+    finally:
+        wb.BACKOFF_AFTER_429 = _bo69
+        wb.BUDGET.min_interval = _mi69
+
+    # ONLY reads may be retried. Retrying a place_order after a 429 could
+    # double a position - the order may have landed before the limiter replied.
+    for _danger in ("place_order", "place(", "cancel"):
+        check(69, "paced_retry is never used for %s" % _danger.strip("("),
+              ("paced_retry(self.trade.order" not in _w69)
+              and ("paced_retry" not in _w69.split("def place", 1)[-1][:3000]))
+    check(69, "sign-in uses the retry",
+          "paced_retry(self.trade.account_v2.get_account_list)" in _w69)
+
+    # Choosing an account calls connect() AGAIN. That second call must not
+    # spend another request on a list that cannot have changed.
+    check(69, "the account list is cached", "_ACCOUNTS_CACHE" in _w69)
+    check(69, "for longer than a click takes", wb.ACCOUNTS_TTL >= 30.0,
+          str(wb.ACCOUNTS_TTL))
+    _cn = _w69.split("def connect(self, app_key", 1)[1].split("\n    def ", 1)[0]
+    check(69, "and read before the network is touched",
+          _cn.index("_ACCOUNTS_CACHE.get") < _cn.index("paced_retry"))
+
+    # The message has to name the cause. "account list failed: 429" reads like
+    # a broken app; it is a shared budget, and it clears on its own.
+    check(69, "a rate limit says it is a rate limit",
+          "rate limiting this API key" in _cn)
+    check(69, "and names what to close",
+          "Fill Announcer" in _cn and "Discord" in _cn)
+    check(69, "and says it is not his fault",
+          "Nothing is wrong with the" in _cn)
+    check(69, "the bare status code is still there for real failures",
+          'account list failed: %s' in _cn)
+
+
 print("\n"+"="*68)
 by={}
 for sc,name,ok,_ in results:
     by.setdefault(sc,[0,0]); by[sc][0]+=1; by[sc][1]+= (1 if ok else 0)
-T={68:"Stream cannot blind the app",67:"Restart keeps the position",66:"One-second prices",65:"Journal never loses a trade",64:"Pacing must not stall",63:"Tick velocity",62:"Underlying at fill",61:"Tiered ratchet + anti-clip",60:"SDK audit is honest",59:"Batched option quotes",58:"Option price grid",57:"Webull rate budget",56:"NinjaScript compiles",55:"One-click NT install",54:"Ratchet inside NinjaTrader",53:"Limits die with the app",52:"NinjaTrader delivery check",51:"Futures header + footer",50:"Futures on by default",49:"Toggles + short hints",48:"Futures config stripped",47:"Futures ratchet",46:"NinjaScript in step",45:"Breadth + VIX",44:"Entry telemetry",43:"Trend module",42:"Audio cues",41:"Volatility gauges",40:"Volume gauge",39:"Dwell time",38:"Velocity vs feed artifacts",37:"Desktop icon",36:"Trade log detail",35:"Time value warns not blocks",34:"LOCK/X gone, size warns",33:"Page actually runs",32:"No SAVE / live trade frozen",31:"One switch / still modal",30:"Directional entry levels",29:"Percent only, no cash",28:"Grid/ATM/quality/one-armed",27:"Config screen cleanup",26:"Ratchet stop",25:"Console auto-hide",24:"Options auto-reconcile",23:"Daily trade log",22:"Options phantom clear",21:"Auto-reconcile w/ broker",20:"MY CONFIG always on",19:"Phantom position",18:"Futures hours",17:"Closed market honest",16:"Restart leaves no spinner",15:"One tab only",14:"Git lock self-heal",13:"Broker tabs + tray",12:"Velocity honest when shut",11:"Multi-broker sessions",1:"Futures login survives restart",2:"remember_login default",3:"Options profiles to disk",
+T={69:"Sign-in survives a rate limit",68:"Stream cannot blind the app",67:"Restart keeps the position",66:"One-second prices",65:"Journal never loses a trade",64:"Pacing must not stall",63:"Tick velocity",62:"Underlying at fill",61:"Tiered ratchet + anti-clip",60:"SDK audit is honest",59:"Batched option quotes",58:"Option price grid",57:"Webull rate budget",56:"NinjaScript compiles",55:"One-click NT install",54:"Ratchet inside NinjaTrader",53:"Limits die with the app",52:"NinjaTrader delivery check",51:"Futures header + footer",50:"Futures on by default",49:"Toggles + short hints",48:"Futures config stripped",47:"Futures ratchet",46:"NinjaScript in step",45:"Breadth + VIX",44:"Entry telemetry",43:"Trend module",42:"Audio cues",41:"Volatility gauges",40:"Volume gauge",39:"Dwell time",38:"Velocity vs feed artifacts",37:"Desktop icon",36:"Trade log detail",35:"Time value warns not blocks",34:"LOCK/X gone, size warns",33:"Page actually runs",32:"No SAVE / live trade frozen",31:"One switch / still modal",30:"Directional entry levels",29:"Percent only, no cash",28:"Grid/ATM/quality/one-armed",27:"Config screen cleanup",26:"Ratchet stop",25:"Console auto-hide",24:"Options auto-reconcile",23:"Daily trade log",22:"Options phantom clear",21:"Auto-reconcile w/ broker",20:"MY CONFIG always on",19:"Phantom position",18:"Futures hours",17:"Closed market honest",16:"Restart leaves no spinner",15:"One tab only",14:"Git lock self-heal",13:"Broker tabs + tray",12:"Velocity honest when shut",11:"Multi-broker sessions",1:"Futures login survives restart",2:"remember_login default",3:"Options profiles to disk",
    4:"Browser autofill guard",5:"ITM3 strike math",6:"Preview == Arm",7:"Live-only / dead modes",
    8:"Auto-sync safety",9:"Endpoints alive",10:"UI integrity"}
 for sc in sorted(by):
