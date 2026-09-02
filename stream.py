@@ -77,6 +77,8 @@ class PriceStream:
         self._messages = 0
         self._last_error = None
         self._stopping = False
+        self._subscribed_types = []
+        self._category = "US_STOCK"
 
     # ---- lifecycle -------------------------------------------------------
     def start(self, symbols, category="US_STOCK"):
@@ -98,12 +100,7 @@ class PriceStream:
                 # Called on every (re)connect, which is exactly when the
                 # subscription has to be re-established - a reconnect that
                 # does not resubscribe is a connection with no data.
-                try:
-                    client.subscribe(self._symbols, self._category,
-                                     [PAYLOAD_TYPE_QUOTE, PAYLOAD_TYPE_SHAPSHOT])
-                    self._connected = True
-                except Exception as e:                       # noqa: BLE001
-                    self._last_error = "subscribe failed: %s" % str(e)[:120]
+                self._sub(client, self._symbols)
 
             c.on_quotes_subscribe = _on_subscribe
             c.on_quotes_message = self._on_message
@@ -116,19 +113,40 @@ class PriceStream:
             self._client = None
             return False
 
+    def _sub(self, client, symbols):
+        """Subscribe ONE payload type per call.
+
+        Webull rejects a list: passing ["quote", "snapshot"] came back
+        `UNSUPPORTED_SUB_TYPE: Subtype not supported:quotesnapshot` - the
+        server concatenates the list rather than reading it as two types. That
+        is why the stream never delivered a single price on 9/2 while looking
+        like it had connected.
+
+        Snapshot first: it carries the previous close, which is what the change
+        and change-percent on the chips are measured from. Quote is the
+        fallback and gives bid/ask.
+        """
+        ok = False
+        for kind in (PAYLOAD_TYPE_SHAPSHOT, PAYLOAD_TYPE_QUOTE):
+            try:
+                client.subscribe(symbols, self._category, [kind])
+                ok = True
+                self._subscribed_types.append(kind)
+            except Exception as e:                           # noqa: BLE001
+                # Record it, but keep going - one working type is a stream.
+                self._last_error = "subscribe(%s) failed: %s" % (kind, str(e)[:100])
+        self._connected = ok
+        return ok
+
     def subscribe(self, symbols, category="US_STOCK"):
         """Add symbols to a running stream (a new option contract, say)."""
         new = [s for s in symbols if s and s not in self._symbols]
         if not new or self._client is None:
             return bool(self._client)
-        try:
-            self._client.subscribe(new, category,
-                                   [PAYLOAD_TYPE_QUOTE, PAYLOAD_TYPE_SHAPSHOT])
+        if self._sub(self._client, new):
             self._symbols.extend(new)
             return True
-        except Exception as e:                               # noqa: BLE001
-            self._last_error = "subscribe failed: %s" % str(e)[:120]
-            return False
+        return False
 
     def stop(self):
         self._stopping = True
@@ -216,6 +234,7 @@ class PriceStream:
                 "fresh_symbols": fresh,
                 "known_symbols": known,
                 "messages": self._messages,
+                "subscribed_types": list(self._subscribed_types),
                 "uptime": round(time.time() - self._started_at, 1) if self._started_at else 0,
                 "stale_after": STALE_SECONDS,
                 "error": self._last_error}
