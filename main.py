@@ -30,6 +30,13 @@ try:
     import gauges
 except Exception:
     gauges = None
+# Streaming prices. Optional and purely an accelerator: every reader falls
+# back to polling, so a stream that will not start costs speed, not function.
+try:
+    import stream as streammod
+except Exception:                                            # noqa: BLE001
+    streammod = None
+STREAM = {"s": None}
 try:
     import trend as trendmod
 except Exception:
@@ -111,6 +118,20 @@ def prices():
     limit, the source was. Webull's snapshot takes every symbol in ONE call,
     so a once-a-second chip costs one request no matter how many are shown."""
     syms = [s for s in config.SYMBOLS if config.SYMBOLS[s].get("enabled")]
+
+    # 1) THE STREAM. Pushed, real time, no request budget. Only symbols with a
+    #    FRESH value are taken - a stale streamed price is worse than a polled
+    #    one because it looks fine while it has quietly stopped moving.
+    ps = STREAM.get("s")
+    if ps is not None:
+        streamed = {}
+        for x in syms:
+            row = ps.price(x)
+            if row:
+                streamed[x] = row
+        if len(streamed) == len(syms):
+            return streamed
+
     e = SESSION.get("s")
     if e is not None and hasattr(e, "stock_snapshot"):
         try:
@@ -302,6 +323,21 @@ def market_breadth():
     return {**b, "label": trendmod.breadth_label(b)}
 
 
+@app.get("/api/stream")
+def stream_status():
+    """Is the push feed alive, and is it actually delivering?
+
+    'connected' is not the question - 'fresh_symbols' is. A connection that
+    stopped sending still reports itself connected, which is exactly the
+    failure that would leave a frozen price on screen looking healthy."""
+    ps = STREAM.get("s")
+    if ps is None:
+        return {"ok": True, "running": False,
+                "available": bool(streammod and streammod.STREAM_AVAILABLE),
+                "note": "not started - prices are being polled"}
+    return {"ok": True, **ps.status()}
+
+
 @app.get("/api/budget")
 def budget():
     """How much of the shared Webull rate budget this app is using.
@@ -355,6 +391,25 @@ def connect(req: ConnectReq):
                                      "correct, check your PC clock is set to sync automatically.")
         raise HTTPException(400, f"connect failed: {type(e).__name__}: {msg[:200]}")
     SESSION["s"] = s
+
+    # Start the push feed. A stream costs NOTHING from the 300-per-60s budget
+    # this app shares with the bridge and the announcer, where the 1-second
+    # poll it replaces was spending a fifth of it.
+    if streammod is not None and streammod.STREAM_AVAILABLE:
+        try:
+            if STREAM["s"] is not None:
+                STREAM["s"].stop()
+            ps = streammod.PriceStream(req.app_key.strip(), req.app_secret.strip(),
+                                       config.REGION)
+            syms = [x for x in config.SYMBOLS if config.SYMBOLS[x].get("enabled")]
+            if ps.start(syms):
+                STREAM["s"] = ps
+                print("[STREAM ] subscribed: %s" % ", ".join(syms), flush=True)
+            else:
+                print("[STREAM ] not started (%s) - polling instead."
+                      % ps.status().get("error"), flush=True)
+        except Exception as e:                               # noqa: BLE001
+            print("[STREAM ] failed (%s) - polling instead." % str(e)[:100], flush=True)
     return state
 
 @app.post("/api/mirror/connect")
