@@ -1189,13 +1189,14 @@ class BaseSession:
         pull, _brk = self.entry_window(spot, side)
         target = pull                            # the ONE level this waits for
         s = self.settings
+        # Arming ALWAYS turns the ratchet on - it is the exit for every armed
+        # entry. There used to be an "else" here that armed a take-profit and a
+        # stop instead, but it sat under `if not s.get("my_enabled")` one line
+        # after `s["my_enabled"] = True`, so it could never run. Dead code that
+        # reads like a policy is worse than no code: it was cited twice as the
+        # reason a take-profit would not fire. The real reason is that the
+        # ratchet owns the exit, and _bracket_hit ignores TP while it is on.
         s["my_enabled"] = True
-        # The RATCHET owns the exit when it is on, so do not also arm a
-        # take-profit that would close the trade at the exact moment the
-        # ratchet is trying to let it run.
-        if not s.get("my_enabled"):
-            s["tp_enabled"] = True; s["tp_unit"] = "whole"
-            s["sl_enabled"] = True; s["sl_unit"] = "pct"; s["sl_value"] = config.MY_CONFIG_SL_PCT
         self.armed = {"symbol": symbol, "side": side, "qty": qty,
                       "target": target, "spot_at_arm": round(spot, 2)}
         return dict(self.armed)
