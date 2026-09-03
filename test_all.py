@@ -309,9 +309,18 @@ try:
     check(13,"clicking a tab switches", "pickBroker" in fh and "'/api/switch'" in fh)
     check(13,"back arrow no longer disconnects",
           "function back(){" in fh and "api('/api/disconnect'" not in fh.split("function back(){",1)[1][:400])
-    check(13,"padlock is the real log-out", "function lockAll" in fh and "'/api/disconnect'" in fh)
-    check(13,"log-out warns about open positions", "stops this app managing" in fh)
-    for fn in ("pickBroker","lockAll","refreshSessions"):
+    # The padlock / log-out-every-broker control was REMOVED at his request.
+    # These checks used to pass on the leftover lockAll() function after its
+    # button was gone - a false green: the test proved a function existed that
+    # nothing on the screen could reach. Assert the removal instead.
+    check(13,"no log-out-every-broker control remains",
+          "function lockAll" not in fh and "FZ.lockAll" not in fh)
+    check(13,"and no quit button either",
+          "function quitApp" not in fh and "FZ.quitApp" not in fh)
+    check(13,"switching broker does not sign you out",
+          "'/api/disconnect'" not in fh.split("function pickBroker",1)[1][:400]
+          if "function pickBroker" in fh else True)
+    for fn in ("pickBroker","refreshSessions"):
         check(13,f"FZ.{fn} exported", bool(re.search(r"return \{[^}]*\b%s\b"%fn, fh, re.S)))
 
     import run_all
