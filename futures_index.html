@@ -72,6 +72,8 @@
   .pchip .s{font-size:11.5px;color:var(--dim);letter-spacing:.14em}
   .pchip .p{font-size:18.5px;font-weight:700;margin-top:2px}
   .pchip .c{font-size:11.5px;color:var(--dim)}
+.pchip.stale{border-color:var(--amber);opacity:.85}
+  .pchip.stale .c{color:var(--amber)}
   .pchip.up .c{color:var(--green)}.pchip.dn .c{color:var(--red)}
   .trendbar{border:1px solid var(--line);border-radius:10px;background:var(--panel);padding:10px 12px;margin-top:10px}
   .trendbar .tlbl{color:var(--dim);font-size:11px;letter-spacing:.12em}
@@ -846,13 +848,34 @@ const FZ = (function(){
 
   async function refreshPrices(){
     const d=await api('/api/prices');
+    if(!d) return;
     ['MNQ','MES'].forEach(s=>{
       const q=d[s]; if(!q) return;
-      const el=document.querySelector(`.pchip[data-s="${s}"]`);
+      const el=document.querySelector(`.pchip[data-s="${s}"]`); if(!el) return;
+      // NO PRICE IS A STATE, NOT A CRASH. The feed no longer invents a number
+      // when it fails, so price can be null - and this used to call
+      // .toLocaleString() on it straight away.
+      if(q.price==null){
+        el.querySelector('.p').textContent='—';
+        el.querySelector('.c').textContent='no feed';
+        el.classList.remove('up','dn'); el.classList.add('stale');
+        if(s===sym){ $('longSub').textContent='no price'; $('shortSub').textContent='no price'; }
+        return;
+      }
       const up=(q.change||0)>=0;
-      el.className='pchip '+(up?'up':'dn');
+      // Touch only the colour classes - reassigning className wiped state.
+      el.classList.toggle('up', up);
+      el.classList.toggle('dn', !up);
+      // SAY HOW OLD IT IS. "·delayed" did not distinguish four seconds from
+      // four minutes, which is exactly the difference between a quiet tape and
+      // a dead feed - and a stuck price is the one thing you cannot see.
+      const age = Number(q.stale_seconds||0);
+      const stale = !q.live;
+      el.classList.toggle('stale', stale);
       el.querySelector('.p').textContent=q.price.toLocaleString(undefined,{minimumFractionDigits:2});
-      el.querySelector('.c').textContent=`${up?'+':'−'}${Math.abs(q.change).toFixed(2)} (${up?'+':'−'}${Math.abs(q.change_pct).toFixed(2)}%)`+(q.live?'':' ·delayed');
+      el.querySelector('.c').textContent=
+        `${up?'+':'−'}${Math.abs(q.change).toFixed(2)} (${up?'+':'−'}${Math.abs(q.change_pct).toFixed(2)}%)`
+        + (stale ? (age>=1 ? '  ·  STALE '+(age<90?Math.round(age)+'s':Math.round(age/60)+'m') : '  ·  stale') : '');
       if(s!==sym) return;
       if(settings.round_enabled){
         const k=Number(settings.round_step)||25;
@@ -865,6 +888,16 @@ const FZ = (function(){
       }
     });
   }
+
+  // BROWSERS THROTTLE BACKGROUND TABS. Chrome slows setInterval to about once
+  // a minute in a hidden tab and can freeze it entirely, which is precisely
+  // what "the price is stuck" looks like - the app is fine, the tab was
+  // asleep. Refresh the moment it is looked at again.
+  document.addEventListener('visibilitychange',()=>{
+    if(document.visibilityState!=='visible') return;
+    if($('dash') && $('dash').classList.contains('hidden')) return;
+    try{ refreshPrices(); tick(); refreshTrend(); refreshVel(); }catch(e){}
+  });
 
   document.querySelectorAll('#seg button').forEach(b=>b.onclick=()=>{
     if(inTrade) return;
