@@ -1657,7 +1657,9 @@ const EZ = (function(){
     document.querySelectorAll('.pchip').forEach(b=>b.disabled=on);
     document.querySelectorAll('#flatActions button').forEach(b=>b.disabled=on);
     document.querySelectorAll('.stepper button').forEach(b=>b.disabled=on);
-    $('seg').classList.toggle('locked',on);
+    // The old #seg row is gone - the chips ARE the picker, and they are
+    // disabled on the line above, which is what locking it actually meant.
+    document.getElementById('prices').classList.toggle('locked',on);
     document.querySelector('.row').classList.toggle('locked',on);
     $('lockNote').classList.toggle('hidden',!on);
   }
