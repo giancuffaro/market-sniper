@@ -652,7 +652,7 @@ class BaseFuturesSession:
         self._guard_open(qty)
         if symbol not in FUT:
             raise OrderRejected("unknown symbol")
-        px = get_price(symbol)["price"]
+        px = require_price(symbol)
         step = float(self.settings.get("round_step") or 50.0)
         target = to_tick(symbol, round_target(px, side, step))
         order_id = None
@@ -682,7 +682,7 @@ class BaseFuturesSession:
         a = self.armed
         if not a or self.position is not None:
             return
-        px = get_price(a["symbol"])["price"]
+        px = require_price(a["symbol"])
         reached = (px <= a["target"]) if a["side"] == "LONG" else (px >= a["target"])
         if not reached:
             return
@@ -706,7 +706,7 @@ class BaseFuturesSession:
     def _adopt_filled(self, a):
         """Record the position for a limit that was already working at the broker."""
         self.position = {"symbol": a["symbol"], "side": a["side"], "qty": a["qty"],
-                         "entry": a["target"], "mark": get_price(a["symbol"])["price"],
+                         "entry": a["target"], "mark": price_now(a["symbol"]) or a["target"],
                          "opened_at": dt.datetime.now().strftime("%H:%M"),
                          # Frozen at the fill. Nudging the step mid-trade must
                          # not move the stop under a position already running.
@@ -1113,11 +1113,11 @@ class NinjaTraderSession(BaseFuturesSession):
                 self.account, symbol, action, int(qty), _fmt_px(px)))
             kind = "LIMIT %s" % _fmt_px(px)
         else:
-            px = get_price(symbol)["price"]
+            px = require_price(symbol)
             self._write_oif("PLACE;%s;%s;%s;%d;MARKET;;;DAY" % (self.account, symbol, action, int(qty)))
             kind = "MARKET"
         self.position = {"symbol": symbol, "side": side, "qty": int(qty),
-                         "entry": px, "mark": get_price(symbol)["price"],
+                         "entry": px, "mark": px,
                          "opened_at": dt.datetime.now().strftime("%H:%M"),
                          # Frozen at the fill. Nudging the step mid-trade must
                          # not move the stop under a position already running.
@@ -1156,7 +1156,12 @@ class NinjaTraderSession(BaseFuturesSession):
         p = self.position
         if not p:
             return None
-        p["mark"] = get_price(p["symbol"])["price"]
+        # Keep the last REAL mark if the feed is down. Overwriting it with
+        # nothing would blank the P&L; overwriting it with a guess is what the
+        # old fabricated fallback did, and that drove the brackets.
+        _px = price_now(p["symbol"])
+        if _px is not None:
+            p["mark"] = _px
         pv = FUT[p["symbol"]]["point_value"]
         p["pnl"] = round(self._points_pnl() * pv * p["qty"], 2)
         p["points"] = round(self._points_pnl(), 2)
@@ -1344,9 +1349,9 @@ class TopstepSession(BaseFuturesSession):
         if symbol not in FUT:
             raise OrderRejected("unknown symbol")
         contract, _ = self._order(symbol, 0 if side == "LONG" else 1, qty, limit)  # 0=Buy 1=Sell
-        px = float(limit) if limit else get_price(symbol)["price"]
+        px = float(limit) if limit else require_price(symbol)
         self.position = {"symbol": symbol, "side": side, "qty": int(qty), "entry": px,
-                         "mark": get_price(symbol)["price"],
+                         "mark": px,
                          "opened_at": dt.datetime.now().strftime("%H:%M"), "contract": contract,
                          # ALWAYS on. The toggle decides whether the ENTRY waits for a
                          # level; it never decides whether a live position has a
@@ -1385,7 +1390,12 @@ class TopstepSession(BaseFuturesSession):
         p = self.position
         if not p:
             return None
-        p["mark"] = get_price(p["symbol"])["price"]
+        # Keep the last REAL mark if the feed is down. Overwriting it with
+        # nothing would blank the P&L; overwriting it with a guess is what the
+        # old fabricated fallback did, and that drove the brackets.
+        _px = price_now(p["symbol"])
+        if _px is not None:
+            p["mark"] = _px
         pv = FUT[p["symbol"]]["point_value"]
         p["pnl"] = round(self._points_pnl() * pv * p["qty"], 2)
         p["points"] = round(self._points_pnl(), 2)
@@ -1630,7 +1640,7 @@ class WebullFuturesSession(BaseFuturesSession):
             raise OrderRejected("Webull rejected the order: HTTP %s %s"
                                 % (getattr(res, "status_code", "?"),
                                    str(getattr(res, "text", ""))[:150]))
-        px = get_price(symbol)["price"]
+        px = require_price(symbol)
         entry = float(limit) if limit is not None else px
         self.position = {"symbol": symbol, "side": side, "qty": int(qty),
                          "entry": round(entry, 2), "mark": px, "contract": contract,
