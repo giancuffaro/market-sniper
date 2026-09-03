@@ -114,9 +114,25 @@ def get_price(sym):
         v = {"price": round(price, 2), "change": round(price - prev, 2),
              "change_pct": round((price - prev) / prev * 100, 2) if prev else 0.0, "live": True}
     except Exception:
-        base = c["v"]["price"] if c else FUT[sym]["seed"]
-        v = {"price": round(base + random.uniform(-1, 1), 2), "change": 0.0,
-             "change_pct": 0.0, "live": False}
+        # NEVER INVENT A PRICE.
+        #
+        # This used to return `base + random.uniform(-1, 1)` - a random walk
+        # around the last value, or around a hardcoded seed of 23150.0 if there
+        # had never been one. It was flagged live:False, but a number that
+        # drifts a point at a time looks exactly like a real quiet tape, and
+        # the brackets and the ratchet compute off it. Made-up market data in a
+        # trading app is the worst failure mode there is: it cannot be noticed.
+        #
+        # Hold the LAST REAL price, say how old it is, and let the screen show
+        # it as stale. If there has never been one, say so and show nothing.
+        if c:
+            v = dict(c["v"])
+            v["live"] = False
+            v["stale_seconds"] = round(now - c["ts"], 1)
+        else:
+            v = {"price": None, "change": 0.0, "change_pct": 0.0,
+                 "live": False, "stale_seconds": None,
+                 "reason": "no price feed yet"}
     _CACHE[sym] = {"ts": now, "v": v}
     return v
 
