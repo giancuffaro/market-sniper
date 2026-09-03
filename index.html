@@ -109,6 +109,10 @@
   .pchip .p{font-size:17px;font-weight:700;margin-top:2px}
   .pchip .c{font-size:11.5px;margin-top:1px;color:var(--dim)}
   .pchip.up .c{color:var(--green)} .pchip.dn .c{color:var(--red)}
+  .pchip{cursor:pointer;font:inherit;transition:border-color .15s,background .15s}
+  .pchip:disabled{cursor:default;opacity:.55}
+  .pchip.on{border-color:var(--green);background:var(--green-deep)}
+  .pchip.on .s{color:var(--green)}
   /* TREND strip — one box per timeframe, green up / red down / amber flat */
   .trendbar{border:1px solid var(--line);border-radius:10px;background:var(--panel);padding:10px 12px;margin:0 0 12px}
   .trendbar .tlbl{color:var(--dim);font-size:11px;letter-spacing:.12em}
@@ -390,9 +394,9 @@
     </div>
 
     <div class="prices" id="prices">
-      <div class="pchip" data-s="SPY"><div class="s">SPY</div><div class="p">—</div><div class="c">—</div></div>
-      <div class="pchip" data-s="QQQ"><div class="s">QQQ</div><div class="p">—</div><div class="c">—</div></div>
-      <div class="pchip" data-s="TSLA"><div class="s">TSLA</div><div class="p">—</div><div class="c">—</div></div>
+      <button type="button" class="pchip" data-s="SPY"><div class="s">SPY</div><div class="p">—</div><div class="c">—</div></button>
+      <button type="button" class="pchip" data-s="QQQ"><div class="s">QQQ</div><div class="p">—</div><div class="c">—</div></button>
+      <button type="button" class="pchip" data-s="TSLA"><div class="s">TSLA</div><div class="p">—</div><div class="c">—</div></button>
     </div>
 
     <div class="trendbar" id="trendBar">
@@ -467,11 +471,10 @@
       <div class="b" id="rejectBody"></div>
       <button id="rejectFix" class="fixbtn" onclick="EZ.forgetPosition()">I'M ACTUALLY FLAT — CLEAR IT</button></div>
 
-    <div class="seg" id="seg">
-      <button data-s="SPY">SPY</button>
-      <button data-s="QQQ" class="on">QQQ</button>
-      <button data-s="TSLA">TSLA</button>
-    </div>
+    <!-- The SPY/QQQ/TSLA row that used to live here is gone. The symbol was
+         on the screen twice for one job: the price chips showed it, a separate
+         segmented control picked it. The chips ARE the picker now - a bigger
+         target, and the price you are choosing is on the thing you click. -->
 
     <div class="row">
       <div class="lbl">CONTRACTS</div>
@@ -700,7 +703,7 @@ const EZ = (function(){
       if(prefs.symbol) sym=prefs.symbol;
       if(prefs.qty) qty=Math.max(1,parseInt(prefs.qty)||1);
       const qEl=$('qty'); if(qEl) qEl.textContent=qty;
-      document.querySelectorAll('#seg button').forEach(b=>b.classList.toggle('on',b.dataset.s===sym));
+      document.querySelectorAll('.pchip').forEach(b=>b.classList.toggle('on',b.dataset.s===sym));
     }
     prefsReady=true;
     // Re-run with the disk copy now that it has landed. The earlier call ran
@@ -1223,9 +1226,9 @@ const EZ = (function(){
     });
   }
 
-  document.querySelectorAll('#seg button').forEach(b=>b.onclick=()=>{
+  document.querySelectorAll('.pchip').forEach(b=>b.onclick=()=>{
     if(inTrade) return;
-    document.querySelectorAll('#seg button').forEach(x=>x.classList.remove('on'));
+    document.querySelectorAll('.pchip').forEach(x=>x.classList.remove('on'));
     b.classList.add('on'); sym=b.dataset.s; savePrefs({symbol:sym}); refreshQuote(); refreshTrend(); refreshVel();
   });
   // Hotkeys: A=SPY  S=QQQ  D=TSLA  (ignored while typing or in a trade)
@@ -1236,7 +1239,7 @@ const EZ = (function(){
     if(e.metaKey||e.ctrlKey||e.altKey) return;
     const want=HOTKEYS[(e.key||'').toLowerCase()];
     if(!want||inTrade) return;
-    const btn=[...document.querySelectorAll('#seg button')].find(b=>b.dataset.s===want);
+    const btn=[...document.querySelectorAll('.pchip')].find(b=>b.dataset.s===want);
     if(btn){ e.preventDefault(); btn.click(); }
   });
   function step(d){
@@ -1642,7 +1645,7 @@ const EZ = (function(){
   // starting a new trade — the two buy buttons, the symbol picker, the contract
   // stepper, the A/S/D hotkeys — is switched off until you're flat again.
   function lockdown(on){
-    document.querySelectorAll('#seg button').forEach(b=>b.disabled=on);
+    document.querySelectorAll('.pchip').forEach(b=>b.disabled=on);
     document.querySelectorAll('#flatActions button').forEach(b=>b.disabled=on);
     document.querySelectorAll('.stepper button').forEach(b=>b.disabled=on);
     $('seg').classList.toggle('locked',on);
