@@ -1219,7 +1219,12 @@ const EZ = (function(){
       const q=d[s]; if(!q) return;
       const el=document.querySelector(`.pchip[data-s="${s}"]`); if(!el) return;
       const up=(q.change||0)>=0;
-      el.className='pchip '+(up?'up':'dn');
+      // TOUCH ONLY THE COLOUR CLASSES. This used to reassign className
+      // wholesale, which wiped the `on` class marking the selected symbol -
+      // once a second, so the selection highlight would vanish the instant
+      // prices refreshed.
+      el.classList.toggle('up', up);
+      el.classList.toggle('dn', !up);
       el.querySelector('.p').textContent=q.price.toLocaleString(undefined,{minimumFractionDigits:2,maximumFractionDigits:2});
       el.querySelector('.c').textContent=`${up?'+':'−'}${Math.abs(q.change).toFixed(2)} (${up?'+':'−'}${Math.abs(q.change_pct).toFixed(2)}%)`;
       if(!q.live) el.querySelector('.c').textContent+=' ·delayed';
@@ -1229,7 +1234,11 @@ const EZ = (function(){
   document.querySelectorAll('.pchip').forEach(b=>b.onclick=()=>{
     if(inTrade) return;
     document.querySelectorAll('.pchip').forEach(x=>x.classList.remove('on'));
-    b.classList.add('on'); sym=b.dataset.s; savePrefs({symbol:sym}); refreshQuote(); refreshTrend(); refreshVel();
+    b.classList.add('on'); sym=b.dataset.s; savePrefs({symbol:sym});
+    refreshQuote(); refreshTrend(); refreshVel();
+    // The conditions row is per-symbol too - without this it would keep
+    // showing the previous symbol's dwell and volume until the 45s tick.
+    try{ refreshConditions(); }catch(e){}
   });
   // Hotkeys: A=SPY  S=QQQ  D=TSLA  (ignored while typing or in a trade)
   const HOTKEYS={a:'SPY',s:'QQQ',d:'TSLA'};
