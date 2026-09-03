@@ -441,6 +441,30 @@ def disconnect(req: DisconnectReq = None):
     return {"ok": True, "disconnected": "all", "active": None, "sessions": [],
             "cancelled": pulled, "cancel_failed": failed}
 
+@app.get("/api/debug/positions")
+def debug_positions():
+    """What each broker session believes it holds, and the app's own view.
+
+    The options equivalent is what found the wrong-contract price bug in two
+    minutes after an hour of guessing. Read-only: it sends nothing.
+    """
+    out = []
+    for mode, s in SESSIONS.items():
+        row = {"mode": mode, "account_id": getattr(s, "account_id", None),
+               "position": getattr(s, "position", None),
+               "armed": getattr(s, "armed", None),
+               "day_points": (s._day_points() if hasattr(s, "_day_points") else None),
+               "last_event": (getattr(s, "last_event", "") or "")[:200]}
+        if hasattr(s, "broker_positions"):
+            try:
+                row["broker_rows"] = s.broker_positions()
+            except Exception as e:                           # noqa: BLE001
+                row["broker_rows"] = "read failed: %s" % str(e)[:120]
+        out.append(row)
+    return {"active": ACTIVE.get("mode"), "sessions": out,
+            "prices": {k: fc.get_price(k) for k in fc.FUT}}
+
+
 @app.post("/api/shutdown")
 def shutdown():
     import threading, time

@@ -538,8 +538,20 @@ const FZ = (function(){
                 round_enabled:true,round_step:25};
   let prefs={}, prefsReady=false, prefsLoaded=null;
   const $=id=>document.getElementById(id);
-  const api=(p,b)=>fetch(p,{method:b?'POST':'GET',headers:{'Content-Type':'application/json'},
-                           body:b?JSON.stringify(b):undefined}).then(r=>r.json());
+  // A 500 returns PLAIN TEXT, not JSON, so r.json() threw and every server
+  // crash was reported as a connection problem. Read the body, then decide.
+  const api=async(p,b)=>{
+    const r=await fetch(p,{method:b?'POST':'GET',
+                           headers:{'Content-Type':'application/json'},
+                           body:b?JSON.stringify(b):undefined});
+    const txt=await r.text();
+    try{ return JSON.parse(txt); }
+    catch(e){
+      return {detail:'The app hit an internal error ('+r.status+'). It IS running — '
+                    +'this is a bug, not a connection problem. Tell Claude: '
+                    +(txt||'no detail').slice(0,120)};
+    }
+  };
   try{ const sv=JSON.parse(localStorage.getItem(LSS)||"null"); if(sv) settings={...settings,...sv}; }catch(e){}
 
   function applyTheme(t){ if(t==="white")t="light"; if(t==="black")t="dark"; document.body.dataset.theme=t; localStorage.setItem(LST,t); document.querySelectorAll(".tdot").forEach(function(d){d.classList.toggle("active",d.dataset.set===t);}); savePrefs({theme:t}); }
