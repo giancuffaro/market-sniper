@@ -99,6 +99,42 @@ _CACHE = {}
 _UA = {"User-Agent": "Mozilla/5.0 (MARKET-SNIPER-FUT)"}
 
 
+def price_now(sym):
+    """A REAL price, or None. Never a guess.
+
+    get_price() no longer invents a number when the feed fails, so every caller
+    has to decide what "no price" means for it. There are only two right
+    answers and they are different:
+      - about to trade   -> refuse (require_price below)
+      - refreshing a mark -> keep the last real one, do not overwrite with None
+    """
+    try:
+        v = get_price(sym) or {}
+    except Exception:                                        # noqa: BLE001
+        return None
+    px = v.get("price")
+    try:
+        px = float(px)
+    except (TypeError, ValueError):
+        return None
+    return px if px > 0 else None
+
+
+def require_price(sym):
+    """The price, or a refusal. Used everywhere an order or a size is decided.
+
+    Trading off a fabricated price is how you get a stop 2,000 points away on
+    a contract worth $2 a point. If there is no feed, there is no trade.
+    """
+    px = price_now(sym)
+    if px is None:
+        raise OrderRejected(
+            "No live price for %s right now, so this app will not open or size "
+            "a trade. Check the feed and try again - your platform is still "
+            "the place to trade by hand." % sym)
+    return px
+
+
 def get_price(sym):
     now = time.time()
     c = _CACHE.get(sym)
