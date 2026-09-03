@@ -19,7 +19,6 @@ import json
 import time
 import math
 import uuid
-import random
 import datetime as dt
 import urllib.request
 import urllib.error

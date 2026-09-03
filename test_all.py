@@ -4348,8 +4348,13 @@ finally:
     #    had never been a real price. Flagged live:False, but a number that
     #    drifts a point at a time is indistinguishable from a quiet tape, and
     #    the brackets and the ratchet computed off it.
+    # CODE, not comments - the note explaining why this was removed mentions
+    # random.uniform on purpose, and a test that trips over its own changelog
+    # is a test that pushes you to delete the explanation.
+    _fc_code = "\n".join(l for l in _fcs.split("\n")
+                         if not l.strip().startswith("#"))
     check(77, "the feed never invents a price",
-          "random.uniform" not in _fcs, "random.uniform still present")
+          "random." not in _fc_code, "random still called in code")
     _gp = _fcs.split("def get_price", 1)[1].split("\ndef ", 1)[0]
     check(77, "and no longer falls back to a hardcoded seed",
           '["seed"]' not in _gp)
