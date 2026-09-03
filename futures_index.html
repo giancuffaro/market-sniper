@@ -1018,13 +1018,14 @@ const FZ = (function(){
     // in the trade log, where reviewing is the point and reacting is not.
     const dfEl=$('dayFees'); if(dfEl) dfEl.textContent='';
     $('blotterRows').innerHTML=(st.blotter||[]).slice().reverse().map(t=>{
-      const up=t.pnl>=0;
-      // Newer trades carry gross + fees; older ones only have net (pnl).
-      const sub=(t.fees!==undefined)
-        ? 
-        : '';
+      // Direction from POINTS, which is the number now on screen - reading
+      // the colour off a cash figure the row no longer shows would let the two
+      // disagree on a fee-heavy scratch.
+      const up=Number(t.points||0)>=0;
+      // The gross/fees annotation was cash and is gone with the rest of it.
+      // It is still in the trade log, where reviewing is the point.
       return `<div class="trow"><span>${t.time}</span><span class="s">&nbsp;${t.desc}</span>
-        <span>${t.move}${sub}</span><span class="pl ${up?'up':'dn'}">&nbsp;${up?'+':'−'}${Math.abs(Number(t.points||0)).toFixed(2)} pts</span></div>`;
+        <span>${t.move}</span><span class="pl ${up?'up':'dn'}">&nbsp;${up?'+':'−'}${Math.abs(Number(t.points||0)).toFixed(2)} pts</span></div>`;
     }).join('');
     paintNinjaWarning(st);
     const pos=st.position, armed=st.armed; inTrade=!!pos;
