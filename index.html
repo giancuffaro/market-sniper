@@ -420,6 +420,22 @@
       </div>
     </div>
 
+    <!-- CONDITIONS. Dwell, volume, volatility and sector breadth were all
+         built, tested and served by the app - and none of them had a single
+         pixel on the screen. Four working features he could never see is the
+         definition of a dead end, so they get one row, in the same language as
+         TREND and DIRECTION above. -->
+    <div class="trendbar" id="condBar">
+      <div class="tlbl">CONDITIONS <b id="condSym">QQQ</b>
+        <span class="tmeta">· dwell · volume · volatility · sectors</span></div>
+      <div class="dirrow">
+        <span class="dsig" id="cDwell" title="How long since price last touched the dollar above and below. PINNED means it keeps coming back - round-number entries fill there.">dwell —</span>
+        <span class="dsig" id="cVol" title="Today's volume against 500 sessions, adjusted for how much of the day has passed. Thin volume is where round numbers hold and breakouts fail.">volume —</span>
+        <span class="dsig" id="cRv" title="Realized volatility over 20 days with today's percentile, and VIX. High RV means wider stops or smaller size.">vol —</span>
+        <span class="dsig" id="cSect" title="How many of the 11 sector ETFs are green. An approximation of advancers minus decliners - there is no free A/D feed.">sectors —</span>
+      </div>
+    </div>
+
     <div id="hero" class="hero">
       <div id="heroBig" class="big">FLAT</div>
       <div id="heroSub" class="sub">No open position</div>
@@ -621,7 +637,7 @@ const EZ = (function(){
   // Buying power is never shown. It exists to answer one question: can this
   // account cover the number of contracts currently selected?
   let buyingPower=0, lastAsks={CALLS:null, PUTS:null};
-  let sym="QQQ", side="CALLS", qty=1, inTrade=false, poll=null, priceTimer=null, trendTimer=null, velTimer=null, dirTimer=null, quoteTimer=null;
+  let sym="QQQ", side="CALLS", qty=1, inTrade=false, poll=null, priceTimer=null, trendTimer=null, velTimer=null, dirTimer=null, quoteTimer=null, condTimer=null;
   let profiles=[], activeProf=null, mirrorOn=false;
   let settings={strike_mode:"ITM2",ratchet_step_pct:10,tp_enabled:false,tp_value:30,tp_unit:"cents",
                 sl_enabled:false,sl_value:20,sl_unit:"cents",my_enabled:true};
@@ -811,6 +827,35 @@ const EZ = (function(){
     startDash(r);
   }
 
+  // These four move on the scale of minutes, not ticks, so they are polled
+  // slowly on purpose. Every one is LOW priority server-side: a conditions
+  // chip must never be the reason a quote or an exit is late.
+  async function refreshConditions(){
+    const s2 = (typeof sym === 'string' && sym) ? sym : 'QQQ';
+    $('condSym').textContent = s2;
+    const set = (id, txt, ok) => {
+      const el = $(id); if(!el) return;
+      el.textContent = txt;
+      el.style.opacity = ok ? '1' : '.45';
+    };
+    const grab = async (url, id, prefix) => {
+      try{
+        const j = await api(url);
+        if(!j || j.ok === false || !j.label){ set(id, prefix+' —', false); return null; }
+        set(id, j.label, true);
+        return j;
+      }catch(e){ set(id, prefix+' —', false); return null; }
+    };
+    await grab('/api/dwell?symbol='+encodeURIComponent(s2), 'cDwell', 'dwell');
+    await grab('/api/volume?symbol='+encodeURIComponent(s2), 'cVol', 'volume');
+    const v = await grab('/api/volatility?symbol='+encodeURIComponent(s2), 'cRv', 'vol');
+    // VIX is worth having on the line - it is the number every desk quotes.
+    if(v && v.vix && v.vix.ok){
+      $('cRv').textContent = (v.label || 'vol') + '  ·  VIX ' + Number(v.vix.level).toFixed(1);
+    }
+    await grab('/api/market', 'cSect', 'sectors');
+  }
+
   function startDash(state){
     connected = true;
     $('connectScreen').classList.add('hidden');
@@ -840,6 +885,11 @@ const EZ = (function(){
     // Bars only close once a minute, so polling faster than this just burns
     // requests for a number that cannot have changed.
     velTimer=setInterval(refreshVel,15000);
+    // 45s: dwell is measured in minutes, the volume percentile moves over
+    // hours, and realized vol is a 20-day number. Polling these fast would
+    // spend budget to redraw an identical string.
+    refreshConditions();
+    condTimer=setInterval(refreshConditions,45000);
   }
 
   // AUTO-LOCK IS GONE, INCLUDING ITS TIMER.
