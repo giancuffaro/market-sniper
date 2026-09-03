@@ -616,7 +616,7 @@
 
 <script>
 const EZ = (function(){
-  const LSK="ezexec_creds", LSS="ezexec_settings", LSP="ezexec_profiles", LSPA="ezexec_active_profile", LST="ezexec_theme", LSA="ezexec_autolock", LSST="ezexec_strategies";
+  const LSK="ezexec_creds", LSS="ezexec_settings", LSP="ezexec_profiles", LSPA="ezexec_active_profile", LST="ezexec_theme", LSST="ezexec_strategies";
   let connected=false, marketClosed=false, lastPreview=null, prevPos=false;
   // Buying power is never shown. It exists to answer one question: can this
   // account cover the number of contracts currently selected?
@@ -625,7 +625,7 @@ const EZ = (function(){
   let profiles=[], activeProf=null, mirrorOn=false;
   let settings={strike_mode:"ITM2",ratchet_step_pct:10,tp_enabled:false,tp_value:30,tp_unit:"cents",
                 sl_enabled:false,sl_value:20,sl_unit:"cents",my_enabled:true};
-  let autolock={enabled:false,minutes:10}, lastActivity=Date.now();
+  // (autolock removed - see the note further down)
   let prefs={}, prefsReady=false, prefsLoaded=null;
   const $=id=>document.getElementById(id);
   // A 500 returns PLAIN TEXT, not JSON, so r.json() threw and every server
@@ -655,7 +655,7 @@ const EZ = (function(){
   // overwrote the file on every connect - which is exactly how MY CONFIG kept
   // turning itself back off no matter how many times the default was fixed.
   // localStorage is still WRITTEN as a cache; it is simply never read back.
-  try{ const av=JSON.parse(localStorage.getItem(LSA)||"null"); if(av) autolock={...autolock,...av}; }catch(e){}
+  // autolock is not read back: the feature no longer exists.
 
   function applyTheme(t){ if(t==="white")t="light"; if(t==="black")t="dark"; document.body.dataset.theme=t; localStorage.setItem(LST,t); document.querySelectorAll(".tdot").forEach(function(d){d.classList.toggle("active",d.dataset.set===t);}); savePrefs({theme:t}); }
   function setTheme(t){ applyTheme(t); }
@@ -679,7 +679,7 @@ const EZ = (function(){
       if(r.strategies&&r.strategies.length) strategies=r.strategies;
       prefs=r.prefs||{};
       if(prefs.theme) applyTheme(prefs.theme);
-      if(prefs.autolock) autolock={...autolock,...prefs.autolock};
+      // prefs.autolock is ignored - the feature no longer exists.
       if(prefs.symbol) sym=prefs.symbol;
       if(prefs.qty) qty=Math.max(1,parseInt(prefs.qty)||1);
       const qEl=$('qty'); if(qEl) qEl.textContent=qty;
@@ -842,19 +842,14 @@ const EZ = (function(){
     velTimer=setInterval(refreshVel,15000);
   }
 
-  ['click','keydown','touchstart'].forEach(ev=>document.addEventListener(ev,()=>{lastActivity=Date.now();}));
-  setInterval(()=>{
-    if(!autolock.enabled) return;   // AUTO-LOCK removed from the UI - never true now
-    if($('dash').classList.contains('hidden')) return;
-    if(inTrade) return;
-    if(Date.now()-lastActivity > autolock.minutes*60000) lockNow(true);
-  },5000);
-  async function lockNow(auto){
-    if(inTrade && !auto && !confirm('You have an OPEN position. Lock anyway?')) return;
-    await api('/api/disconnect',{});
-    clearInterval(poll); clearInterval(priceTimer); clearInterval(quoteTimer); clearInterval(trendTimer); clearInterval(dirTimer); clearInterval(velTimer);
-    location.reload();
-  }
+  // AUTO-LOCK IS GONE, INCLUDING ITS TIMER.
+  //
+  // The LOCK button was removed at his request, but the 5-second timer behind
+  // it stayed - and it still LOADED `autolock` from localStorage and from
+  // saved prefs. A stale enabled:true from before the removal would have
+  // signed him out and reloaded the page on a timer, with no button anywhere
+  // to turn it off. A feature with no switch is a trapdoor, so the whole
+  // mechanism goes rather than being guarded by a comment.
 
   function openSettings(){
     // Show the window FIRST. Every line below is decoration, and decoration
@@ -941,8 +936,7 @@ const EZ = (function(){
     settings.ratchet_step_pct=Math.max(1,Math.min(parseFloat($('ratchetStep').value)||10,100));
     $('ratchetStep').value=settings.ratchet_step_pct;
     localStorage.setItem(LSS,JSON.stringify(settings));
-    localStorage.setItem(LSA,JSON.stringify(autolock));
-    savePrefs({autolock});
+
     await api('/api/settings',settings);
     paintActiveMode(); paintLiveNote(); flashSaved();
     refreshQuote();               // stays open - closing is the DONE button
@@ -1661,7 +1655,7 @@ const EZ = (function(){
     }catch(e){ /* no BroadcastChannel - harmless, tabs just do not auto-close */ }
   })();
 
-  return {step,buy,close,disarm,hideReject,forgetPosition,managePosition,disconnect,quitApp,switchAccount,toggleTheme,setTheme,lockNow,
+  return {step,buy,close,disarm,hideReject,forgetPosition,managePosition,disconnect,switchAccount,setTheme,
           openSettings,closeSettings,applySettings,setStrikeMode,hideEvent,toggleSound,
           mirrorToggle,selectProfile,saveProfile,deleteProfile,pickAccount,
           showTab,toggleStrategy,newStrategy,editStrategy,saveStrategy,deleteStrategy,cancelStrategyEdit,stTypeChanged};
