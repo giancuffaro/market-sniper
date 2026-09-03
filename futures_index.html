@@ -335,7 +335,7 @@
       </div>
       <div class="meta">
         <span class="pill" id="modePill">WEBULL LIVE</span>
-        <span>BAL <b id="bp">—</b></span>
+        <span class="hidden"><b id="bp">—</b></span>
         <span class="setbtn" style="color:var(--green);border-color:var(--green)" onclick="location.href='http://127.0.0.1:8000'">⇄ OPTIONS</span>
         <span class="setbtn" onclick="FZ.openSettings()">CONFIGURATION</span>
         <div class="theme-dots" role="group" aria-label="Theme color"><button class="tdot tdot-white" data-set="light" onclick="FZ.setTheme('light')" aria-label="White theme"></button><button class="tdot tdot-gray" data-set="gray" onclick="FZ.setTheme('gray')" aria-label="Gray theme"></button><button class="tdot tdot-black" data-set="dark" onclick="FZ.setTheme('dark')" aria-label="Black theme"></button></div>
@@ -645,8 +645,12 @@ const FZ = (function(){
       const on=(m===active);
       const cls=['',s?'live':'off',on?'on':'',s&&s.has_position?'holding':''].join(' ').trim();
       let sub='not logged in';
+      // No cash on the broker tabs either. WHICH broker holds WHAT is the
+      // useful fact here; the points figure lives on the hero line, once,
+      // where it belongs.
       if(s) sub = s.has_position
-        ? (s.side+' '+(s.symbol||'')+(s.pnl!=null?'  '+(s.pnl>=0?'+':'')+'$'+Math.abs(s.pnl).toFixed(2):''))
+        ? (s.side+' '+(s.symbol||'')
+           + (s.points!=null ? '  '+(s.points>=0?'+':'−')+Math.abs(Number(s.points)).toFixed(2)+' pts' : ''))
         : (on?'active · flat':'logged in · flat');
       return `<button class="${cls}" data-b="${m}" onclick="FZ.pickBroker('${m}')">${label}<small>${sub}</small></button>`;
     }).join('');
@@ -1000,7 +1004,10 @@ const FZ = (function(){
     if(st.sessions) applySessions(st.sessions, st.active_mode);
     if(st.event) showEvent(st.event);
     if(st.settings) settings={...settings,...st.settings};
-    $('bp').textContent='$'+Number(st.buying_power||0).toLocaleString(undefined,{minimumFractionDigits:2,maximumFractionDigits:2});
+    // BALANCE REMOVED. It is the purest cash figure on the screen and it is
+    // never actionable mid-trade - the platform is the place to check what the
+    // account is worth. The element stays so nothing that reads it breaks.
+    $('bp').textContent='—';
     const dn=Number(st.day_realized||0);
     const dp=Number(st.day_points||0), w=Number(st.day_wins||0), l=Number(st.day_losses||0);
     const el=$('dayNet');
