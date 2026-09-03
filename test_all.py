@@ -4613,7 +4613,10 @@ finally:
               not _bad_send, str(_bad_send))
         # and the outcome is always inspected
         for _i, _l in enumerate(_ls):
-            if "place_order" in _l and "def " not in _l and "#" not in _l.split("place_order")[0]:
+            # A CALL SITE, not the word. Prose in a docstring ("retrying a
+            # place_order after a 429") is not an order being sent, and a test
+            # that cannot tell the difference pushes you to delete the note.
+            if re.search(r"place_order\s*[,(]", _l) and "def " not in _l:
                 _after = "\n".join(_ls[_i:_i + 12])
                 check(78, "%s: the order result is checked (line %d)" % (_f, _i + 1),
                       "status_code" in _after, _after[:80])
