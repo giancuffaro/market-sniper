@@ -88,6 +88,10 @@ def _summary(mode, s):
             "symbol": (pos or {}).get("symbol"),
             "side": (pos or {}).get("side"),
             "pnl": (pos or {}).get("pnl"),
+            # Points, so the broker tabs can say what is held without a cash
+            # figure. pnl stays in the payload for the trade log, unshown.
+            "points": (pos or {}).get("points"),
+            "day_points": (s._day_points() if hasattr(s, "_day_points") else None),
             "day_realized": round(getattr(s, "day_realized", 0.0), 2)}
 
 
