@@ -34,6 +34,16 @@ FUT = {
 
 # The longest a rejected auto-exit will wait before trying again.
 CLOSE_RETRY_MAX = 15.0
+
+# The broker's way of saying "you do not hold that". It is a DEFINITE answer,
+# unlike a rate limit, and it is the one rejection that must clear the screen
+# instead of being retried. Ported from the options side, where a phantom
+# QQQ position sent 1,938 sell orders in 100 seconds on 9/2 - each one
+# rejected, each one costing budget, none of them ever able to succeed.
+_NO_POSITION_WORDS = ("NO_POSITION", "NO_SUCH_POSITION", "POSITION_NOT_FOUND",
+                      "NOT_ENOUGH_POSITION", "POSITION_NOT_ENOUGH",
+                      "INSUFFICIENT_POSITION", "STOCK_NO_ENOUGH",
+                      "NO OPEN POSITION", "FLAT", "NOT FOUND")
 MAX_CONTRACTS = 10
 DAILY_LOSS_LIMIT = 500.0
 
@@ -986,6 +996,21 @@ class BaseFuturesSession:
             self._close_fails = 0
             self._close_retry_at = 0.0
         except OrderRejected as e:
+            # "YOU DO NOT HOLD THAT" IS AN ANSWER, NOT A FAILURE. Retrying it
+            # can never succeed; retrying it fast is what took the options app
+            # down. Clear the ghost and say so.
+            if any(w in str(e).upper() for w in _NO_POSITION_WORDS):
+                ghost = self.position
+                self._close_fails = 0
+                self._close_retry_at = 0.0
+                self.position = None
+                self.last_event = (
+                    "Your platform says you are not holding that %s any more, "
+                    "so the app has stopped trying to close it and cleared the "
+                    "screen. Confirm you are flat in your platform."
+                    % ((ghost or {}).get("symbol") or "position"))
+                print("[PHANTOM] %s" % self.last_event, flush=True)
+                return
             n = getattr(self, "_close_fails", 0) + 1
             self._close_fails = n
             wait = min(CLOSE_RETRY_MAX, 2.0 ** (n - 1))
