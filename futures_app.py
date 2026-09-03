@@ -122,6 +122,14 @@ def health():
 def prices():
     return {s: fc.get_price(s) for s in fc.FUT}
 
+# ONE START AT A TIME. Ported from the options app, where three impatient
+# clicks filled a three-worker pool with abandoned tasks and every click after
+# that queued invisibly and timed out. The futures connect talks to
+# NinjaTrader, TopstepX or Webull, any of which can be slow to answer.
+_CONNECTING = {"until": 0.0}
+CONNECT_COOLDOWN_S = 15
+
+
 @app.post("/api/connect")
 def connect(req: ConnectReq):
     # normalize_mode also maps the pre-v3.6 name "LIVE" onto NINJA, so a saved
