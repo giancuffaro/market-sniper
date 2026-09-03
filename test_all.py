@@ -4228,11 +4228,104 @@ finally:
           or abs(_pnl75 - (-30.0)) < 7.0, "%.2f" % _pnl75)
 
 
+    # --- 76. Full-app audit: no dead buttons, dead ends or runaway loops ---
+    # He asked for this directly: "double check every single function ... make
+    # sure every button in the app works and there are no loops anywhere, no
+    # repeated buttons and also no dead ends".
+    import collections as _co
+    _pages = {"index.html": "EZ", "futures_index.html": "FZ"}
+    for _f, _ns in _pages.items():
+        _src = io.open(_f, encoding="utf-8").read()
+
+        # 1. Every control the HTML calls must exist on the exported object.
+        _exported = set()
+        for _blk in re.findall(r"return \{([^{}]*)\};?\s*\}\)\(\)", _src, re.S):
+            for _x in _blk.split(","):
+                _x = _x.strip().split(":")[0].strip()
+                if re.fullmatch(r"[A-Za-z_][A-Za-z0-9_]*", _x):
+                    _exported.add(_x)
+        _called = {m.group(1) for m in re.finditer(r"%s\.([A-Za-z0-9_]+)\(" % _ns, _src)}
+        check(76, "%s: no button calls a handler that isn't there" % _f,
+              not (_called - _exported), str(sorted(_called - _exported)))
+
+        # 2. Nothing exported that no button and no code can reach. Dead code
+        #    around a real-money app is a liability, not a spare.
+        _internal = {e for e in _exported
+                     if len(re.findall(r"(?<![A-Za-z0-9_.])%s\s*\(" % re.escape(e), _src)) > 1}
+        check(76, "%s: nothing exported is unreachable" % _f,
+              not (_exported - _called - _internal),
+              str(sorted(_exported - _called - _internal)))
+
+        # 3. Duplicate ids silently break getElementById - it returns the first.
+        _ids = re.findall(r'id="([A-Za-z0-9_]+)"', _src)
+        _dups = [k for k, v in _co.Counter(_ids).items() if v > 1]
+        check(76, "%s: no duplicated element ids" % _f, not _dups, str(_dups))
+
+        # 4. Every id the code reads must exist in the page.
+        _used = set(re.findall(r"\$\('([A-Za-z0-9_]+)'\)", _src))
+        check(76, "%s: no code reads an element that isn't there" % _f,
+              not (_used - set(_ids)), str(sorted(_used - set(_ids))))
+
+        # 5. Every repeating timer must be stoppable, and starting the
+        #    dashboard twice must not double them.
+        _timers = set(re.findall(r"(\w+Timer|poll)\s*=\s*setInterval", _src))
+        for _t in sorted(_timers):
+            check(76, "%s: %s can be stopped" % (_f, _t),
+                  ("clearInterval(%s)" % _t) in _src)
+        check(76, "%s: timers are cleared before being started again" % _f,
+              "stopTimers()" in _src and "function stopTimers" in _src)
+
+    # 6. THE TRAPDOOR. Auto-lock had no button left but kept its 5s timer and
+    #    still read `enabled` back from localStorage and saved prefs. A stale
+    #    true would have signed him out on a timer with nothing to turn it off.
+    _ix76 = io.open("index.html", encoding="utf-8").read()
+    check(76, "the auto-lock timer is gone", "autolock.enabled" not in _ix76)
+    check(76, "and it is not read back from storage",
+          "ezexec_autolock" not in _ix76)
+    check(76, "and lockNow cannot be reached", "function lockNow" not in _ix76)
+
+    # 7. DEAD ENDS: four features were built, served and tested with no pixel
+    #    on the screen. If the app answers a route, the screen should use it.
+    _m76 = io.open("main.py", encoding="utf-8").read()
+    _routes = set(re.findall(r'@app\.(?:get|post)\("([^"]+)"', _m76))
+    _uses = set(re.findall(r"(/api/[A-Za-z0-9_/\-]+)", _ix76))
+    _allowed_unused = {"/", "/api/shutdown", "/api/debug/positions",
+                       "/api/budget", "/api/tradelog", "/api/health"}
+    _orphans = sorted(r for r in _routes - _uses if r not in _allowed_unused)
+    check(76, "no working feature is hidden from the screen", not _orphans,
+          str(_orphans))
+    for _id, _ep in (("cDwell", "/api/dwell"), ("cVol", "/api/volume"),
+                     ("cRv", "/api/volatility"), ("cSect", "/api/market")):
+        check(76, "%s is on screen" % _ep, ('id="%s"' % _id) in _ix76
+              and _ep in _ix76)
+    check(76, "and the conditions row refreshes slowly, not per tick",
+          "condTimer=setInterval(refreshConditions,45000)" in _ix76)
+
+    # 8. LOOPS THAT COULD NEVER END.
+    _w76 = io.open("webull_client.py", encoding="utf-8").read()
+    _exp = _w76.split("def _expiry_for", 1)[1].split("\ndef ", 1)[0]
+    check(76, "the expiry search is bounded",
+          "for _ in range(" in _exp and "while not _is_trading_day" not in _exp)
+    _real76 = wb._is_trading_day
+    try:
+        wb._is_trading_day = lambda d: False        # every day a holiday
+        _res = {}
+        _th76 = threading.Thread(
+            target=lambda: _res.setdefault("v", wb._expiry_for("SPX")), daemon=True)
+        _th76.start(); _th76.join(3.0)
+        check(76, "and returns even if no day is ever tradable",
+              _res.get("v") is not None, str(_res))
+    finally:
+        wb._is_trading_day = _real76
+    check(76, "batching cannot recurse forever on a zero batch size",
+          "step = max(1, int(self.BATCH_MAX or 1))" in _w76)
+
+
 print("\n"+"="*68)
 by={}
 for sc,name,ok,_ in results:
     by.setdefault(sc,[0,0]); by[sc][0]+=1; by[sc][1]+= (1 if ok else 0)
-T={75:"A quote is for the contract you asked",74:"The day is a return, not a sum",73:"Speed: pace to the real limit",72:"Clicking CONNECT twice cannot jam it",71:"One 429 must not freeze the app",70:"A rejected exit is not a storm",69:"Sign-in survives a rate limit",68:"Stream cannot blind the app",67:"Restart keeps the position",66:"One-second prices",65:"Journal never loses a trade",64:"Pacing must not stall",63:"Tick velocity",62:"Underlying at fill",61:"Tiered ratchet + anti-clip",60:"SDK audit is honest",59:"Batched option quotes",58:"Option price grid",57:"Webull rate budget",56:"NinjaScript compiles",55:"One-click NT install",54:"Ratchet inside NinjaTrader",53:"Limits die with the app",52:"NinjaTrader delivery check",51:"Futures header + footer",50:"Futures on by default",49:"Toggles + short hints",48:"Futures config stripped",47:"Futures ratchet",46:"NinjaScript in step",45:"Breadth + VIX",44:"Entry telemetry",43:"Trend module",42:"Audio cues",41:"Volatility gauges",40:"Volume gauge",39:"Dwell time",38:"Velocity vs feed artifacts",37:"Desktop icon",36:"Trade log detail",35:"Time value warns not blocks",34:"LOCK/X gone, size warns",33:"Page actually runs",32:"No SAVE / live trade frozen",31:"One switch / still modal",30:"Directional entry levels",29:"Percent only, no cash",28:"Grid/ATM/quality/one-armed",27:"Config screen cleanup",26:"Ratchet stop",25:"Console auto-hide",24:"Options auto-reconcile",23:"Daily trade log",22:"Options phantom clear",21:"Auto-reconcile w/ broker",20:"MY CONFIG always on",19:"Phantom position",18:"Futures hours",17:"Closed market honest",16:"Restart leaves no spinner",15:"One tab only",14:"Git lock self-heal",13:"Broker tabs + tray",12:"Velocity honest when shut",11:"Multi-broker sessions",1:"Futures login survives restart",2:"remember_login default",3:"Options profiles to disk",
+T={76:"Full-app audit: buttons, loops, dead ends",75:"A quote is for the contract you asked",74:"The day is a return, not a sum",73:"Speed: pace to the real limit",72:"Clicking CONNECT twice cannot jam it",71:"One 429 must not freeze the app",70:"A rejected exit is not a storm",69:"Sign-in survives a rate limit",68:"Stream cannot blind the app",67:"Restart keeps the position",66:"One-second prices",65:"Journal never loses a trade",64:"Pacing must not stall",63:"Tick velocity",62:"Underlying at fill",61:"Tiered ratchet + anti-clip",60:"SDK audit is honest",59:"Batched option quotes",58:"Option price grid",57:"Webull rate budget",56:"NinjaScript compiles",55:"One-click NT install",54:"Ratchet inside NinjaTrader",53:"Limits die with the app",52:"NinjaTrader delivery check",51:"Futures header + footer",50:"Futures on by default",49:"Toggles + short hints",48:"Futures config stripped",47:"Futures ratchet",46:"NinjaScript in step",45:"Breadth + VIX",44:"Entry telemetry",43:"Trend module",42:"Audio cues",41:"Volatility gauges",40:"Volume gauge",39:"Dwell time",38:"Velocity vs feed artifacts",37:"Desktop icon",36:"Trade log detail",35:"Time value warns not blocks",34:"LOCK/X gone, size warns",33:"Page actually runs",32:"No SAVE / live trade frozen",31:"One switch / still modal",30:"Directional entry levels",29:"Percent only, no cash",28:"Grid/ATM/quality/one-armed",27:"Config screen cleanup",26:"Ratchet stop",25:"Console auto-hide",24:"Options auto-reconcile",23:"Daily trade log",22:"Options phantom clear",21:"Auto-reconcile w/ broker",20:"MY CONFIG always on",19:"Phantom position",18:"Futures hours",17:"Closed market honest",16:"Restart leaves no spinner",15:"One tab only",14:"Git lock self-heal",13:"Broker tabs + tray",12:"Velocity honest when shut",11:"Multi-broker sessions",1:"Futures login survives restart",2:"remember_login default",3:"Options profiles to disk",
    4:"Browser autofill guard",5:"ITM3 strike math",6:"Preview == Arm",7:"Live-only / dead modes",
    8:"Auto-sync safety",9:"Endpoints alive",10:"UI integrity"}
 for sc in sorted(by):
