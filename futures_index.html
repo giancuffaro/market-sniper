@@ -765,6 +765,11 @@ const FZ = (function(){
     render(r); refreshPrices(); refreshTrend(); refreshVel();
     api('/api/settings',settings);
     syncStrategies();
+    // IDEMPOTENT. This handler is reachable more than once - a failed connect
+    // leaves the button live - and it starts four intervals. A second run
+    // without this would leave the first set going: every poll fires twice and
+    // nothing on screen looks any different.
+    stopTimers();
     poll=setInterval(tick,1000);
     priceTimer=setInterval(refreshPrices,5000);
     trendTimer=setInterval(refreshTrend,20000);
@@ -772,6 +777,11 @@ const FZ = (function(){
     // requests for a number that cannot have changed.
     velTimer=setInterval(refreshVel,15000);
   };
+
+  function stopTimers(){
+    [poll,priceTimer,trendTimer,velTimer].forEach(t=>{ try{ clearInterval(t); }catch(e){} });
+    poll=priceTimer=trendTimer=velTimer=null;
+  }
 
   const TF_LIST=[['1m','1m'],['5m','5m'],['10m','10m'],['15m','15m'],
                  ['20m','20m'],['30m','30m'],['1h','1H'],['2h','2H'],['4h','4H'],['1d','D'],['1w','W']];
