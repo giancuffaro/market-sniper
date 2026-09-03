@@ -4600,9 +4600,16 @@ finally:
             _st = _l.strip()
             if _st.startswith("#") or _st.startswith("//"):
                 _comment_lines.add(_st.lstrip("#/ ").strip())
+    # Flag a needle only when it exists ONLY in comments. A phrase that also
+    # appears in real code - a user-facing message, say - is being asserted
+    # against behaviour even if a comment happens to quote it. "do not hold
+    # that" is exactly that case: it is the phantom message he reads on
+    # screen, and the comment above it explains why.
+    _code_all = "\n".join(_srcs.values())
     _prose = [n for n in _needles
               if re.search(r"[a-z]{3,} [a-z]{3,} [a-z]{3,}", n)
-              and any(n in c for c in _comment_lines)]
+              and any(n in c for c in _comment_lines)
+              and n not in _code_all]
     check(78, "no test asserts a comment instead of behaviour",
           not _prose, str(sorted(_prose)[:4]))
 
