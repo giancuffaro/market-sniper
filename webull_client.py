@@ -73,7 +73,16 @@ def _expiry_for(symbol):
         return _next_trading_day(today).isoformat()
     days = (4 - today.weekday()) % 7          # 4 = Friday
     fri = today + dt.timedelta(days=days)
-    while not _is_trading_day(fri):           # holiday Friday -> Thursday expiry
+    # BOUNDED. This walked backwards one day at a time with no limit: if the
+    # trading-day check ever said "no" to everything - a bad holiday table, a
+    # clock set wrong - it would spin through history forever, inside the
+    # function that builds the contract symbol for every single order. Six
+    # steps covers any real holiday cluster; past that, take the Friday and
+    # let the broker reject an impossible contract, which is a visible error
+    # instead of a hang.
+    for _ in range(6):
+        if _is_trading_day(fri):
+            break
         fri -= dt.timedelta(days=1)
     return fri.isoformat()
 
@@ -910,10 +919,14 @@ class OptionData:
         occs = [str(o) for o in (occs or []) if o]
         if not occs:
             return {}
-        if len(occs) > self.BATCH_MAX:
+        # A batch size of zero would make the chunking below recurse forever
+        # on the same list. It is a constant today, but a constant one edit
+        # away from being a setting.
+        step = max(1, int(self.BATCH_MAX or 1))
+        if len(occs) > step:
             out = {}
-            for i in range(0, len(occs), self.BATCH_MAX):
-                out.update(self.ask_bid_many(occs[i:i + self.BATCH_MAX]))
+            for i in range(0, len(occs), step):
+                out.update(self.ask_bid_many(occs[i:i + step]))
             return out
 
         fns, _holders = self._fns()
