@@ -4289,8 +4289,10 @@ finally:
     _m76 = io.open("main.py", encoding="utf-8").read()
     _routes = set(re.findall(r'@app\.(?:get|post)\("([^"]+)"', _m76))
     _uses = set(re.findall(r"(/api/[A-Za-z0-9_/\-]+)", _ix76))
+    # Only routes with no place on a trading screen may be unused: the
+    # shutdown hook, the raw-row debug view, and the trade-log export.
     _allowed_unused = {"/", "/api/shutdown", "/api/debug/positions",
-                       "/api/budget", "/api/tradelog", "/api/health"}
+                       "/api/tradelog", "/api/health"}
     _orphans = sorted(r for r in _routes - _uses if r not in _allowed_unused)
     check(76, "no working feature is hidden from the screen", not _orphans,
           str(_orphans))
@@ -4300,6 +4302,12 @@ finally:
               and _ep in _ix76)
     check(76, "and the conditions row refreshes slowly, not per tick",
           "condTimer=setInterval(refreshConditions,45000)" in _ix76)
+    # The two numbers that explain a slow screen were invisible.
+    check(76, "the footer shows which feed prices arrive on",
+          'id="footHealth"' in _ix76 and "/api/stream" in _ix76)
+    check(76, "and how much of the rate limit is in use",
+          "/api/budget" in _ix76 and "in_last_minute" in _ix76)
+    check(76, "and warns when it is backing off", "backing off" in _ix76)
 
     # 8. LOOPS THAT COULD NEVER END.
     _w76 = io.open("webull_client.py", encoding="utf-8").read()

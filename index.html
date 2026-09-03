@@ -509,6 +509,7 @@
     <div class="footer">
       <span id="footMode">◦ ◦</span> · <span id="footProf"></span>
       <span id="footMirror"></span> ·
+      <span id="footHealth" title="Where prices are coming from, and how much of this app's share of the Webull rate limit is in use over the last minute. Pushed prices cost nothing; polled prices spend budget.">—</span> ·
       <a onclick="EZ.disconnect()">disconnect / forget</a>
     </div>
   </div>
@@ -637,7 +638,7 @@ const EZ = (function(){
   // Buying power is never shown. It exists to answer one question: can this
   // account cover the number of contracts currently selected?
   let buyingPower=0, lastAsks={CALLS:null, PUTS:null};
-  let sym="QQQ", side="CALLS", qty=1, inTrade=false, poll=null, priceTimer=null, trendTimer=null, velTimer=null, dirTimer=null, quoteTimer=null, condTimer=null;
+  let sym="QQQ", side="CALLS", qty=1, inTrade=false, poll=null, priceTimer=null, trendTimer=null, velTimer=null, dirTimer=null, quoteTimer=null, condTimer=null, healthTimer=null;
   let profiles=[], activeProf=null, mirrorOn=false;
   let settings={strike_mode:"ITM2",ratchet_step_pct:10,tp_enabled:false,tp_value:30,tp_unit:"cents",
                 sl_enabled:false,sl_value:20,sl_unit:"cents",my_enabled:true};
@@ -857,9 +858,37 @@ const EZ = (function(){
   }
 
   function stopTimers(){
-    [poll,priceTimer,quoteTimer,trendTimer,dirTimer,velTimer,condTimer]
+    [poll,priceTimer,quoteTimer,trendTimer,dirTimer,velTimer,condTimer,healthTimer]
       .forEach(t=>{ try{ clearInterval(t); }catch(e){} });
-    poll=priceTimer=quoteTimer=trendTimer=dirTimer=velTimer=condTimer=null;
+    poll=priceTimer=quoteTimer=trendTimer=dirTimer=velTimer=condTimer=healthTimer=null;
+  }
+
+  // The two things that explain a slow screen, and neither was visible
+  // anywhere: which feed prices are arriving on, and how close the shared
+  // rate limit is to its ceiling. When the app feels slow this line is the
+  // first thing to look at.
+  async function refreshHealth(){
+    const el = $('footHealth'); if(!el) return;
+    let feed = 'feed: poll', tone = '';
+    try{
+      const st = await api('/api/stream');
+      if(st && st.connected && st.fresh_symbols > 0){
+        feed = 'feed: live push (' + st.fresh_symbols + ')';
+      }
+    }catch(e){}
+    let api_ = '';
+    try{
+      const b = await api('/api/budget');
+      if(b && b.ok){
+        const used = Number(b.in_last_minute||0), cap = Number(b.our_share||150);
+        api_ = ' · api ' + used + '/' + cap;
+        if(Number(b.rate_limits||0) > 0) api_ += ' · ' + b.rate_limits + ' limited';
+        if(used > cap * 0.8) tone = 'var(--amber)';
+        if(Number(b.blocked_for||0) > 0){ api_ += ' · backing off'; tone = 'var(--red)'; }
+      }
+    }catch(e){}
+    el.textContent = feed + api_;
+    el.style.color = tone || '';
   }
 
   function startDash(state){
@@ -901,6 +930,8 @@ const EZ = (function(){
     // spend budget to redraw an identical string.
     refreshConditions();
     condTimer=setInterval(refreshConditions,45000);
+    refreshHealth();
+    healthTimer=setInterval(refreshHealth,10000);
   }
 
   // AUTO-LOCK IS GONE, INCLUDING ITS TIMER.
