@@ -995,6 +995,20 @@ class BaseFuturesSession:
                                "keeps up." % (hit, e, wait, n))
             print("[EXIT   ] %s" % self.last_event, flush=True)
 
+    def _day_points(self):
+        """The day in POINTS, not dollars.
+
+        The options screen shows percent only, on his instruction - cash
+        figures move his pulse instead of his decisions. Percent is the wrong
+        unit for a future (percent of what? the notional is enormous and the
+        margin is arbitrary), so points is the honest equivalent, and it is
+        already the unit the ratchet is set in: 12.5 points on MNQ.
+        Points times size, so two contracts count double, which is what
+        actually happened.
+        """
+        return round(sum(float(b.get("points") or 0) * int(b.get("qty") or 1)
+                         for b in self.blotter), 2)
+
     def _guard_open(self, qty):
         if qty > MAX_CONTRACTS:
             raise OrderRejected(f"quantity {qty} exceeds MAX_CONTRACTS ({MAX_CONTRACTS})")
@@ -1027,6 +1041,11 @@ class BaseFuturesSession:
                 "buying_power": round(self.buying_power, 2),
                 "position": self.position, "armed": self.armed,
                 "day_realized": round(self.day_realized, 2),
+                "day_points": self._day_points(),
+                "day_wins": sum(1 for b in self.blotter
+                                if float(b.get("points") or 0) > 0),
+                "day_losses": sum(1 for b in self.blotter
+                                  if float(b.get("points") or 0) < 0),
                 "day_fees": round(self.day_fees, 2),
                 "blotter": self.blotter[-20:], "settings": self.settings,
                 "strategies": self.strategies, "event": ev}
@@ -1182,7 +1201,10 @@ class NinjaTraderSession(BaseFuturesSession):
         self.buying_power += pnl
         self.blotter.append({"time": p["opened_at"],
                              "desc": "%s %s x%d (NT)" % (p["symbol"], p["side"], p["qty"]),
-                             "move": "%.2f -> %.2f" % (p["entry"], p["mark"]), "pnl": pnl})
+                             "move": "%.2f -> %.2f" % (p["entry"], p["mark"]),
+                             # POINTS, so the screen never has to show cash.
+                             "points": round(self._points_pnl(), 2),
+                             "qty": int(p["qty"]), "pnl": pnl})
         self.position = None
         self.last_event = "SENT to NinjaTrader: CLOSE %s" % p["symbol"]
         return {"closed": True, "pnl": pnl}
@@ -1420,7 +1442,10 @@ class TopstepSession(BaseFuturesSession):
                         getattr(self, "_exit_reason", "CLOSE"))
         self.blotter.append({"time": p["opened_at"],
                              "desc": "%s %s x%d (TS)" % (p["symbol"], p["side"], p["qty"]),
-                             "move": "%.2f -> %.2f" % (p["entry"], p["mark"]), "pnl": pnl})
+                             "move": "%.2f -> %.2f" % (p["entry"], p["mark"]),
+                             # POINTS, so the screen never has to show cash.
+                             "points": round(self._points_pnl(), 2),
+                             "qty": int(p["qty"]), "pnl": pnl})
         self.position = None
         self.last_event = "Topstep: CLOSE " + p["symbol"]
         return {"closed": True, "pnl": pnl}
@@ -1693,6 +1718,8 @@ class WebullFuturesSession(BaseFuturesSession):
         self.blotter.append({"time": p["opened_at"],
                              "desc": f"{p['symbol']} {p['side']} x{p['qty']}",
                              "move": f"{p['entry']:.2f} -> {p['mark']:.2f}",
+                             "points": round(self._points_pnl(), 2),
+                             "qty": int(p["qty"]),
                              "gross": gross, "fees": fees, "pnl": net})
         self.position = None
         return {"closed": True, "pnl": net, "gross": gross, "fees": fees}
