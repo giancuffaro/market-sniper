@@ -1353,7 +1353,7 @@ const EZ = (function(){
       if(++lostCount >= 2){                    // one blip is not a disconnect
         connected = false;
         clearInterval(poll); clearInterval(priceTimer); clearInterval(quoteTimer);
-        clearInterval(trendTimer); clearInterval(dirTimer); clearInterval(velTimer);
+        clearInterval(trendTimer); clearInterval(dirTimer); clearInterval(velTimer); clearInterval(condTimer);
         $('dash').classList.add('hidden');
         $('connectScreen').classList.remove('hidden');
         const e=$('connectErr'); if(e) e.textContent='The app restarted - connect again.';
@@ -1638,12 +1638,12 @@ const EZ = (function(){
   async function switchAccount(){
     if(inTrade && !confirm('You have an OPEN position. Leave anyway?')) return;
     await api('/api/disconnect',{});
-    clearInterval(poll); clearInterval(priceTimer); clearInterval(quoteTimer); clearInterval(trendTimer); clearInterval(dirTimer); clearInterval(velTimer);
+    clearInterval(poll); clearInterval(priceTimer); clearInterval(quoteTimer); clearInterval(trendTimer); clearInterval(dirTimer); clearInterval(velTimer); clearInterval(condTimer);
     location.reload();
   }
   async function disconnect(){
     localStorage.removeItem(LSP); localStorage.removeItem(LSPA); localStorage.removeItem(LSK);
-    await api('/api/disconnect',{}); clearInterval(poll); clearInterval(priceTimer); clearInterval(quoteTimer); clearInterval(trendTimer); clearInterval(dirTimer); clearInterval(velTimer); location.reload();
+    await api('/api/disconnect',{}); clearInterval(poll); clearInterval(priceTimer); clearInterval(quoteTimer); clearInterval(trendTimer); clearInterval(dirTimer); clearInterval(velTimer); clearInterval(condTimer); location.reload();
   }
   // quitApp removed with the X button. Nothing could reach it, and a
   // half-reachable shutdown path is worse than none: closing the app is the
@@ -1679,6 +1679,7 @@ const EZ = (function(){
         try{ clearInterval(priceTimer); clearInterval(quoteTimer); }catch(e){}
         try{ clearInterval(trendTimer); clearInterval(dirTimer); }catch(e){}
         try{ clearInterval(velTimer); }catch(e){}
+        try{ clearInterval(condTimer); }catch(e){}
         try{ window.close(); }catch(e){}
         setTimeout(function(){
           document.title = 'Market Sniper - old tab';
