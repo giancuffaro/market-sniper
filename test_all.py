@@ -980,11 +980,22 @@ try:
     check(30, "arm() stores ONE level", '"breakout": brk' not in _wc)
     check(30, "the trigger checks ONE level", 'broke = brk is not None' not in _wc)
     check(30, "the trigger is announced to 2dp", "{a['target']:.0f}" not in _wc)
-    # Was: assert a comment explaining the removal. Assert the REMOVAL.
+    # Was: assert a comment explaining the removal. Assert the REMOVAL - and
+    # strip comments first, or this trips on the note explaining WHY it went,
+    # which is the same prose-testing trap one level down.
+    _entry30 = _wc.split("def _maybe_trigger_entry", 1)[1].split("\n    def ", 1)[0]
+    _entry30_code = "\n".join(l for l in _entry30.split("\n")
+                              if not l.strip().startswith("#"))
     for _dead in ("brk", "breakout"):
-        check(30, "no %s remains in the entry logic" % _dead,
-              _dead not in _wc.split("def _maybe_trigger_entry", 1)[1]
-              .split("\n    def ", 1)[0])
+        check(30, "no %s remains in the entry CODE" % _dead,
+              _dead not in _entry30_code, _dead)
+    # And the behaviour it guarantees: one level, and it is the pullback.
+    _z30 = _w4.make_session("LIVE"); _z30._guard_open = lambda q: None
+    _z30._underlying = lambda sym: 713.4
+    _armed30 = _z30.arm("QQQ", "CALLS", 1)
+    check(30, "arming yields exactly one trigger level",
+          set(_armed30) == {"symbol", "side", "qty", "target", "spot_at_arm"},
+          str(sorted(_armed30)))
     _ix30 = io.open("index.html", encoding="utf-8").read()
     check(30, "the screen shows one number", "armed.breakout" not in _ix30
           and "r.breakout" not in _ix30)
