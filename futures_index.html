@@ -335,7 +335,7 @@
       </div>
       <div class="meta">
         <span class="pill" id="modePill">WEBULL LIVE</span>
-        <span>BAL <b id="bp">$0.00</b></span>
+        <span>BAL <b id="bp">—</b></span>
         <span class="setbtn" style="color:var(--green);border-color:var(--green)" onclick="location.href='http://127.0.0.1:8000'">⇄ OPTIONS</span>
         <span class="setbtn" onclick="FZ.openSettings()">CONFIGURATION</span>
         <div class="theme-dots" role="group" aria-label="Theme color"><button class="tdot tdot-white" data-set="light" onclick="FZ.setTheme('light')" aria-label="White theme"></button><button class="tdot tdot-gray" data-set="gray" onclick="FZ.setTheme('gray')" aria-label="Gray theme"></button><button class="tdot tdot-black" data-set="dark" onclick="FZ.setTheme('dark')" aria-label="Black theme"></button></div>
@@ -365,7 +365,7 @@
     </div>
 
     <div id="pnlBlock" class="pnl hidden">
-      <div><span id="pnlN" class="n">+$0.00</span></div>
+      <div><span id="pnlN" class="n">+0.00 pts</span></div>
       <div class="spot" id="pnlPts"></div>
       <div class="spot" id="bracketLine" style="color:var(--amber)"></div>
     </div>
@@ -417,7 +417,7 @@
     </div>
 
     <div class="blotter">
-      <div class="hd"><span>TODAY <span id="dayFees" class="s" style="color:var(--dim)"></span></span><span>DAY NET <b class="net" id="dayNet">$0.00</b></span></div>
+      <div class="hd"><span>TODAY <span id="dayFees" class="s" style="color:var(--dim)"></span></span><span>DAY <b class="net" id="dayNet">+0.00 pts</b></span></div>
       <div id="blotterRows"></div>
     </div>
     <div class="footer" id="footMode">● LIVE — REAL ORDERS ●</div>
@@ -1002,17 +1002,22 @@ const FZ = (function(){
     if(st.settings) settings={...settings,...st.settings};
     $('bp').textContent='$'+Number(st.buying_power||0).toLocaleString(undefined,{minimumFractionDigits:2,maximumFractionDigits:2});
     const dn=Number(st.day_realized||0);
-    const el=$('dayNet'); el.textContent=(dn<0?'−$':'$')+Math.abs(dn).toFixed(2); el.className='net'+(dn<0?' neg':'');
+    const dp=Number(st.day_points||0), w=Number(st.day_wins||0), l=Number(st.day_losses||0);
+    const el=$('dayNet');
+    el.textContent=(dp>=0?'+':'−')+Math.abs(dp).toFixed(2)+' pts'+((w+l)?`  (${w}W/${l}L)`:'');
+    el.className='net'+(dp<0?' neg':'');
     const df=Number(st.day_fees||0);
-    const dfEl=$('dayFees'); if(dfEl) dfEl.textContent = df>0 ? `· −$${df.toFixed(2)} fees` : '';
+    // Fees are real but they are cash, and cash is off this screen. They stay
+    // in the trade log, where reviewing is the point and reacting is not.
+    const dfEl=$('dayFees'); if(dfEl) dfEl.textContent='';
     $('blotterRows').innerHTML=(st.blotter||[]).slice().reverse().map(t=>{
       const up=t.pnl>=0;
       // Newer trades carry gross + fees; older ones only have net (pnl).
       const sub=(t.fees!==undefined)
-        ? ` <span class="s" style="color:var(--dim)">(${t.gross>=0?'+':'−'}$${Math.abs(t.gross).toFixed(2)} − $${Number(t.fees).toFixed(2)})</span>`
+        ? 
         : '';
       return `<div class="trow"><span>${t.time}</span><span class="s">&nbsp;${t.desc}</span>
-        <span>${t.move}${sub}</span><span class="pl ${up?'up':'dn'}">&nbsp;${up?'+':'−'}$${Math.abs(t.pnl).toFixed(2)}</span></div>`;
+        <span>${t.move}${sub}</span><span class="pl ${up?'up':'dn'}">&nbsp;${up?'+':'−'}${Math.abs(Number(t.points||0)).toFixed(2)} pts</span></div>`;
     }).join('');
     paintNinjaWarning(st);
     const pos=st.position, armed=st.armed; inTrade=!!pos;
@@ -1029,10 +1034,15 @@ const FZ = (function(){
       $('flatActions').classList.add('hidden'); $('tradeActions').classList.remove('hidden'); $('pnlBlock').classList.remove('hidden');
       $('heroBig').textContent=pos.side+' '+pos.symbol;
       $('heroSub').textContent=`× ${pos.qty} · IN ${pos.opened_at} @ ${pos.entry.toFixed(2)}`;
-      const pnl=Number(pos.pnl||0);
-      $('pnlN').textContent=(pnl<0?'−$':'+$')+Math.abs(pnl).toFixed(2);
-      $('pnlN').className='n'+(pnl<0?' neg':'');
-      $('pnlPts').textContent=`MARK ${pos.mark.toFixed(2)} · ${(pos.points>=0?'+':'')+(pos.points||0).toFixed(2)} pts`;
+      // POINTS ONLY. Same rule as the options screen, which shows percent and
+      // never cash: the dollar figure moves his pulse instead of his
+      // decisions. Percent is meaningless on a future - percent of a notional
+      // he never puts up - so points is the honest equivalent, and it is
+      // already the unit the ratchet is set in.
+      const pts=Number(pos.points||0);
+      $('pnlN').textContent=(pts>=0?'+':'−')+Math.abs(pts).toFixed(2)+' pts';
+      $('pnlN').className='n'+(pts<0?' neg':'');
+      $('pnlPts').textContent=`MARK ${pos.mark!=null?Number(pos.mark).toFixed(2):'—'} · × ${pos.qty}`;
       const parts=[];
       if(settings.tp_enabled) parts.push('TP +'+settings.tp_points+' pts');
       if(settings.sl_enabled) parts.push('SL −'+settings.sl_points+' pts');
