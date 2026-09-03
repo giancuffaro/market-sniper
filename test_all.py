@@ -4335,11 +4335,130 @@ finally:
           "step = max(1, int(self.BATCH_MAX or 1))" in _w76)
 
 
+    # --- 77. The futures app gets everything the options app got -----------
+    # "i think you have to do EVERYTHING you did the same but for the futures
+    # side" - and then: "Theres no data on the MS for futures, price is stuck".
+    import futures_client as _fc77
+    _fcs = io.open("futures_client.py", encoding="utf-8").read()
+    _fas = io.open("futures_app.py", encoding="utf-8").read()
+    _fis = io.open("futures_index.html", encoding="utf-8").read()
+
+    # 1. THE WORST ONE: it used to INVENT a price when the feed failed -
+    #    base + random.uniform(-1, 1), or a hardcoded 23150.0 seed if there
+    #    had never been a real price. Flagged live:False, but a number that
+    #    drifts a point at a time is indistinguishable from a quiet tape, and
+    #    the brackets and the ratchet computed off it.
+    check(77, "the feed never invents a price",
+          "random.uniform" not in _fcs, "random.uniform still present")
+    _gp = _fcs.split("def get_price", 1)[1].split("\ndef ", 1)[0]
+    check(77, "and no longer falls back to a hardcoded seed",
+          '["seed"]' not in _gp)
+
+    _saved_cache = dict(_fc77._CACHE)
+    import urllib.request as _ur
+    _realopen = _ur.urlopen
+    try:
+        _ur.urlopen = lambda *a, **k: (_ for _ in ()).throw(OSError("feed down"))
+        _fc77._CACHE.clear()
+        _v = _fc77.get_price("MNQ")
+        check(77, "no feed and nothing cached gives no price",
+              _v.get("price") is None and _v.get("live") is False, str(_v))
+        check(77, "price_now says None rather than guessing",
+              _fc77.price_now("MNQ") is None)
+        _refused = False
+        try:
+            _fc77.require_price("MNQ")
+        except _fc77.OrderRejected:
+            _refused = True
+        check(77, "and it REFUSES to size a trade without one", _refused)
+
+        # With a real price cached, hold it and report its age.
+        _fc77._CACHE["MNQ"] = {"ts": time.time() - 42,
+                               "v": {"price": 29311.5, "change": 1.0,
+                                     "change_pct": 0.0, "live": True}}
+        _v2 = _fc77.get_price("MNQ")
+        check(77, "a stale price is held, not redrawn randomly",
+              _v2["price"] == 29311.5 and _v2["live"] is False, str(_v2))
+        check(77, "and its age is reported so the screen can say STALE",
+              round(_v2.get("stale_seconds") or 0) == 42, str(_v2.get("stale_seconds")))
+    finally:
+        _ur.urlopen = _realopen
+        _fc77._CACHE.clear(); _fc77._CACHE.update(_saved_cache)
+
+    # No caller may read ["price"] straight off get_price any more.
+    check(77, "every caller goes through price_now or require_price",
+          'get_price(' not in _fcs.replace("def get_price(", "")
+          .replace("_fc77.get_price(", "").split("def price_now")[0]
+          or 'get_price(symbol)["price"]' not in _fcs)
+
+    # 2. "STUCK PRICE" was usually a throttled background tab. Chrome slows
+    #    setInterval to about once a minute when hidden and can freeze it.
+    for _f, _lbl in ((_fis, "futures"), (io.open("index.html", encoding="utf-8").read(), "options")):
+        check(77, "%s: refreshes when the tab is looked at again" % _lbl,
+              "visibilitychange" in _f)
+        check(77, "%s: and says how STALE a price is" % _lbl, "STALE " in _f)
+
+    # 3. A null price must not crash the screen.
+    check(77, "the futures screen handles a missing price",
+          "q.price==null" in _fis and "'no feed'" in _fis)
+
+    # 4. Phantom clear + the missing position guard.
+    check(77, "futures clears a position the platform denies",
+          "_NO_POSITION_WORDS" in _fcs)
+    _mac = _fcs.split("def _maybe_auto_close", 1)[1].split("\n    def ", 1)[0]
+    check(77, "and never closes when it holds nothing",
+          _mac.index("if not self.position:") < _mac.index("_bracket_hit()"))
+
+    _z77 = _fc77.BaseFuturesSession.__new__(_fc77.BaseFuturesSession)
+    _z77.last_event = ""; _z77.blotter = []
+    _z77.position = {"symbol": "MNQ", "side": "SHORT", "qty": 1}
+    _z77._bracket_hit = lambda: "SL"
+    _n77 = {"c": 0}
+    def _flat():
+        _n77["c"] += 1
+        raise _fc77.OrderRejected("no open position to close")
+    _z77.close = _flat
+    for _ in range(300):
+        _z77._maybe_auto_close()
+    check(77, "300 ticks send ONE close, not 300", _n77["c"] == 1, str(_n77))
+    check(77, "the ghost is cleared", _z77.position is None)
+
+    # 5. NO CASH ON THE LIVE FUTURES SCREEN, same rule as options - in POINTS,
+    #    because percent of a futures notional is meaningless.
+    check(77, "the day is shown in points", "day_points" in _fcs
+          and "day_points" in _fis)
+    check(77, "the open position is shown in points",
+          "pts'" in _fis and "$'+Math.abs(pnl)" not in _fis)
+    check(77, "no dollar figure on the hero line",
+          "'−$':'+$'" not in _fis)
+    check(77, "and none in the blotter rows",
+          "$${Math.abs(t.pnl)" not in _fis)
+    _zp = _fc77.BaseFuturesSession.__new__(_fc77.BaseFuturesSession)
+    _zp.blotter = [{"points": 12.5, "qty": 2}, {"points": -4.0, "qty": 1}]
+    check(77, "points are weighted by size", _zp._day_points() == 21.0,
+          str(_zp._day_points()))
+
+    # 6. Pressing START twice must not queue attempts.
+    check(77, "one start at a time", "_CONNECTING" in _fas)
+    check(77, "released in a finally", 'finally:' in
+          _fas.split("def connect(req: ConnectReq)", 1)[1].split("\n@app.", 1)[0])
+    check(77, "an unexpected error is a 400 with a reason, not a 500",
+          "start failed: %s: %s" in _fas)
+    check(77, "the UI reads the body before parsing it",
+          "const txt=await r.text();" in _fis and "It IS running" in _fis)
+
+    # 7. A raw view of what each broker holds.
+    check(77, "there is a read-only positions debug view",
+          '"/api/debug/positions"' in _fas)
+    _dbg = _fas.split("def debug_positions", 1)[1].split("\n@app.", 1)[0]
+    check(77, "and it sends nothing", "place" not in _dbg and "_order" not in _dbg)
+
+
 print("\n"+"="*68)
 by={}
 for sc,name,ok,_ in results:
     by.setdefault(sc,[0,0]); by[sc][0]+=1; by[sc][1]+= (1 if ok else 0)
-T={76:"Full-app audit: buttons, loops, dead ends",75:"A quote is for the contract you asked",74:"The day is a return, not a sum",73:"Speed: pace to the real limit",72:"Clicking CONNECT twice cannot jam it",71:"One 429 must not freeze the app",70:"A rejected exit is not a storm",69:"Sign-in survives a rate limit",68:"Stream cannot blind the app",67:"Restart keeps the position",66:"One-second prices",65:"Journal never loses a trade",64:"Pacing must not stall",63:"Tick velocity",62:"Underlying at fill",61:"Tiered ratchet + anti-clip",60:"SDK audit is honest",59:"Batched option quotes",58:"Option price grid",57:"Webull rate budget",56:"NinjaScript compiles",55:"One-click NT install",54:"Ratchet inside NinjaTrader",53:"Limits die with the app",52:"NinjaTrader delivery check",51:"Futures header + footer",50:"Futures on by default",49:"Toggles + short hints",48:"Futures config stripped",47:"Futures ratchet",46:"NinjaScript in step",45:"Breadth + VIX",44:"Entry telemetry",43:"Trend module",42:"Audio cues",41:"Volatility gauges",40:"Volume gauge",39:"Dwell time",38:"Velocity vs feed artifacts",37:"Desktop icon",36:"Trade log detail",35:"Time value warns not blocks",34:"LOCK/X gone, size warns",33:"Page actually runs",32:"No SAVE / live trade frozen",31:"One switch / still modal",30:"Directional entry levels",29:"Percent only, no cash",28:"Grid/ATM/quality/one-armed",27:"Config screen cleanup",26:"Ratchet stop",25:"Console auto-hide",24:"Options auto-reconcile",23:"Daily trade log",22:"Options phantom clear",21:"Auto-reconcile w/ broker",20:"MY CONFIG always on",19:"Phantom position",18:"Futures hours",17:"Closed market honest",16:"Restart leaves no spinner",15:"One tab only",14:"Git lock self-heal",13:"Broker tabs + tray",12:"Velocity honest when shut",11:"Multi-broker sessions",1:"Futures login survives restart",2:"remember_login default",3:"Options profiles to disk",
+T={77:"Futures gets everything options got",76:"Full-app audit: buttons, loops, dead ends",75:"A quote is for the contract you asked",74:"The day is a return, not a sum",73:"Speed: pace to the real limit",72:"Clicking CONNECT twice cannot jam it",71:"One 429 must not freeze the app",70:"A rejected exit is not a storm",69:"Sign-in survives a rate limit",68:"Stream cannot blind the app",67:"Restart keeps the position",66:"One-second prices",65:"Journal never loses a trade",64:"Pacing must not stall",63:"Tick velocity",62:"Underlying at fill",61:"Tiered ratchet + anti-clip",60:"SDK audit is honest",59:"Batched option quotes",58:"Option price grid",57:"Webull rate budget",56:"NinjaScript compiles",55:"One-click NT install",54:"Ratchet inside NinjaTrader",53:"Limits die with the app",52:"NinjaTrader delivery check",51:"Futures header + footer",50:"Futures on by default",49:"Toggles + short hints",48:"Futures config stripped",47:"Futures ratchet",46:"NinjaScript in step",45:"Breadth + VIX",44:"Entry telemetry",43:"Trend module",42:"Audio cues",41:"Volatility gauges",40:"Volume gauge",39:"Dwell time",38:"Velocity vs feed artifacts",37:"Desktop icon",36:"Trade log detail",35:"Time value warns not blocks",34:"LOCK/X gone, size warns",33:"Page actually runs",32:"No SAVE / live trade frozen",31:"One switch / still modal",30:"Directional entry levels",29:"Percent only, no cash",28:"Grid/ATM/quality/one-armed",27:"Config screen cleanup",26:"Ratchet stop",25:"Console auto-hide",24:"Options auto-reconcile",23:"Daily trade log",22:"Options phantom clear",21:"Auto-reconcile w/ broker",20:"MY CONFIG always on",19:"Phantom position",18:"Futures hours",17:"Closed market honest",16:"Restart leaves no spinner",15:"One tab only",14:"Git lock self-heal",13:"Broker tabs + tray",12:"Velocity honest when shut",11:"Multi-broker sessions",1:"Futures login survives restart",2:"remember_login default",3:"Options profiles to disk",
    4:"Browser autofill guard",5:"ITM3 strike math",6:"Preview == Arm",7:"Live-only / dead modes",
    8:"Auto-sync safety",9:"Endpoints alive",10:"UI integrity"}
 for sc in sorted(by):
