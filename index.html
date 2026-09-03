@@ -856,7 +856,18 @@ const EZ = (function(){
     await grab('/api/market', 'cSect', 'sectors');
   }
 
+  function stopTimers(){
+    [poll,priceTimer,quoteTimer,trendTimer,dirTimer,velTimer,condTimer]
+      .forEach(t=>{ try{ clearInterval(t); }catch(e){} });
+    poll=priceTimer=quoteTimer=trendTimer=dirTimer=velTimer=condTimer=null;
+  }
+
   function startDash(state){
+    // IDEMPOTENT. This runs from the CONNECT button and again from the account
+    // picker, and it starts seven intervals. Without this line a second call
+    // would leave the first set running: every poll fires twice, the shared
+    // request budget drains twice as fast, and nothing on screen looks wrong.
+    stopTimers();
     connected = true;
     $('connectScreen').classList.add('hidden');
     $('dash').classList.remove('hidden');
