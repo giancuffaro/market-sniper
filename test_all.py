@@ -4589,6 +4589,35 @@ finally:
         check(78, "%s: reads the body before parsing it" % _f,
               "await r.text()" in _t, _f)
 
+    # CLASS 7b - an ORDER whose outcome is swallowed. Decoding the response
+    # body inside try/except is fine - the status code is checked right after.
+    # What must never happen is the send itself disappearing into a bare
+    # except, because then a rejected order looks exactly like a filled one.
+    for _f in ("webull_client.py", "futures_client.py"):
+        _raw = io.open(os.path.join(HERE, _f), encoding="utf-8").read()
+        _ls = _raw.split("\n")
+        _bad_send = []
+        for _i, _l in enumerate(_ls):
+            if not re.search(r"(place_order|_write_oif|self\._order)\(", _l):
+                continue
+            # walk back a few lines: is this send wrapped in a try whose
+            # handler is a bare pass?
+            for _j in range(max(0, _i - 4), _i):
+                if _ls[_j].strip() == "try:":
+                    for _k in range(_i, min(len(_ls), _i + 8)):
+                        if re.match(r"\s*except[^:]*:\s*$", _ls[_k]) and \
+                           _k + 1 < len(_ls) and _ls[_k + 1].strip() == "pass":
+                            _bad_send.append(_i + 1)
+                    break
+        check(78, "%s: no order is sent into a silent except" % _f,
+              not _bad_send, str(_bad_send))
+        # and the outcome is always inspected
+        for _i, _l in enumerate(_ls):
+            if "place_order" in _l and "def " not in _l and "#" not in _l.split("place_order")[0]:
+                _after = "\n".join(_ls[_i:_i + 12])
+                check(78, "%s: the order result is checked (line %d)" % (_f, _i + 1),
+                      "status_code" in _after, _after[:80])
+
     # CLASS 8 - tests that assert my own prose. They pass while the behaviour
     # they name is broken, which is the worst possible test.
     _tsrc = io.open(os.path.join(HERE, "test_all.py"), encoding="utf-8").read()
