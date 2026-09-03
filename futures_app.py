@@ -138,6 +138,16 @@ def connect(req: ConnectReq):
     if mode is None:
         raise HTTPException(400, "mode must be WEBULL, NINJA or TOPSTEP "
                                  "(PAPER and Tradovate were removed in v3.6)")
+    now = time.time()
+    if now < _CONNECTING["until"]:
+        raise HTTPException(400,
+            "Still finishing the last START — give it %d more second(s). "
+            "Pressing it again queues another attempt behind this one, which "
+            "is what makes it look stuck."
+            % max(1, int(_CONNECTING["until"] - now)))
+    _CONNECTING["until"] = now + CONNECT_COOLDOWN_S
+    cooldown = 0.0
+
     s = fc.make_session(mode)
     try:
         if mode == "TOPSTEP":
@@ -149,6 +159,15 @@ def connect(req: ConnectReq):
             state = s.connect(req.app_key.strip(), req.app_secret.strip())
     except fc.OrderRejected as e:
         raise HTTPException(400, str(e))
+    except Exception as e:                                   # noqa: BLE001
+        # Say what happened instead of falling through as a 500. A 500 comes
+        # back as plain text, the page cannot parse it, and it gets reported
+        # as "could not reach the app" while the app is running fine - the
+        # exact confusion that cost half an hour on the options side.
+        raise HTTPException(400, "start failed: %s: %s"
+                                 % (type(e).__name__, str(e)[:200]))
+    finally:
+        _CONNECTING["until"] = cooldown
     SESSIONS[mode] = s
     ACTIVE["mode"] = mode
     state = dict(state or {})
