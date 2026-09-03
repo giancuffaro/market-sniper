@@ -1,3 +1,40 @@
+# THE STANDING RULE — sweep the class, not the instance
+
+> "not only the ones found today but always and make this the new rule..
+> everytime we find an error, run it through beginning to end to be able to
+> catch anything before"  — G, 9/3/26
+
+Fixing the one place a bug showed up is half the job. Every time an error is
+found, the WHOLE codebase gets searched for that pattern — both apps, both
+screens, and the test suite — and every occurrence is fixed in the same pass.
+
+This is not a preference. It is what the record shows:
+
+| fixed once | the copy that was missed |
+|---|---|
+| phantom-position storm, options app | identical fault sat in futures for another day |
+| wrong-contract quote cache in `snapshot_row` | same mistake still live in `ask_bid_many` |
+| rejected-exit backoff, options | futures also never checked it held a position at all |
+| cash removed from the options screen | futures still showed DAY NET in dollars |
+
+**Scenario 78 in `test_all.py` enforces it.** It sweeps every file on each run
+for the classes that have already cost something:
+
+1. fabricated market data (`random.uniform` in a price path)
+2. caches that store call ARGUMENTS instead of the call shape
+3. percentages added together instead of weighted
+4. retries with no ceiling, and exits that fire when flat
+5. `open(...,'w').write(expr)` — truncates before `expr` is evaluated, so a
+   raising expression destroys the file (this emptied `futures_client.py`)
+6. unbounded `while` loops in code that runs during a trade
+7. a server 500 reported to the user as "the app isn't running"
+8. tests asserting a comment instead of behaviour — these pass while the thing
+   they name is broken, which is worse than having no test
+
+When a new bug is found, add its class to scenario 78 before closing it out.
+
+---
+
 # MARKET SNIPER — Project Status
 Current version **v4.0** (renamed from EZEXECUTION → Option Sniper → Market Sniper)
 
