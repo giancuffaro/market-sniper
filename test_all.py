@@ -4502,11 +4502,116 @@ finally:
     check(77, "and it sends nothing", "place" not in _dbg and "_order" not in _dbg)
 
 
+    # --- 78. THE STANDING RULE: sweep the class, not the instance ---------
+    # His rule, in his words: "not only the ones found today but always and
+    # make this the new rule.. everytime we find an error, run it through
+    # beginning to end to be able to catch anything before".
+    #
+    # Every check here is a WHOLE-CODEBASE sweep for a pattern that has
+    # already bitten him once. Each one exists because the second copy of a
+    # fixed bug is the one that costs money: the phantom-position storm was
+    # fixed in the options app and sat in futures for another day; the
+    # wrong-contract cache was fixed in snapshot_row while the identical
+    # mistake lived on in ask_bid_many.
+    _APP_PY = [f for f in os.listdir(HERE)
+               if f.endswith(".py") and f not in ("test_all.py",)]
+    _APP_UI = ["index.html", "futures_index.html"]
+
+    def _code_only(txt, html=False):
+        out = []
+        for l in txt.split("\n"):
+            st = l.strip()
+            if st.startswith("#") or st.startswith("//"):
+                continue
+            out.append(l)
+        return "\n".join(out)
+
+    _srcs = {}
+    for f in _APP_PY + _APP_UI:
+        try:
+            _srcs[f] = _code_only(io.open(os.path.join(HERE, f),
+                                          encoding="utf-8").read())
+        except Exception:
+            pass
+
+    # CLASS 1 - fabricated market data. A made-up price cannot be spotted.
+    for _f, _t in _srcs.items():
+        if not _f.endswith(".py"):
+            continue
+        check(78, "%s: never invents a number" % _f,
+              "random.uniform" not in _t and "random.gauss" not in _t, _f)
+
+    # CLASS 2 - remembering ARGUMENTS instead of the call shape. Caching the
+    # args caches the contract, so every later quote answers about the first.
+    for _f in ("webull_client.py",):
+        _t = _srcs[_f]
+        check(78, "%s: no cache stores the call arguments" % _f,
+              "_shape_row = (name, \"arg\", args)" not in _t
+              and "_batch_shape = shape" not in _t)
+
+    # CLASS 3 - adding percentages together. Once showed +40% on a losing day.
+    for _f, _t in _srcs.items():
+        check(78, "%s: no summed percentages" % _f,
+              "sum(float(b.get(\"pct\")" not in _t.replace("'", '"'), _f)
+
+    # CLASS 4 - retry with no ceiling. This is how 1,938 orders went out in
+    # 100 seconds.
+    for _f in ("webull_client.py", "futures_client.py"):
+        _t = _srcs[_f]
+        if "_maybe_auto_close" not in _t:
+            continue
+        _blk = _t.split("_maybe_auto_close", 1)[1].split("\n    def ", 1)[0]
+        check(78, "%s: a rejected exit backs off" % _f, "_close_retry_at" in _blk)
+        check(78, "%s: and does nothing when flat" % _f,
+              "if not self.position" in _blk)
+
+    # CLASS 5 - open(...,'w') with the value computed inline. The write
+    # expression is evaluated AFTER the file is truncated, so if it raises the
+    # file is destroyed. This emptied futures_client.py on 9/3.
+    for _f, _t in _srcs.items():
+        if not _f.endswith(".py"):
+            continue
+        check(78, "%s: writes cannot truncate on failure" % _f,
+              not re.search(r"open\([^)]*['\"]w['\"][^)]*\)\.write\(", _t), _f)
+
+    # CLASS 6 - unbounded while loops in code that runs during a trade.
+    for _f in ("webull_client.py", "futures_client.py", "trend.py", "tape.py"):
+        _t = _srcs.get(_f, "")
+        for _ln in _t.split("\n"):
+            if _ln.strip().startswith("while ") and "True" in _ln:
+                check(78, "%s: %s is a daemon loop, not a retry" % (_f, _ln.strip()[:30]),
+                      False, "unexpected while True in trading code")
+        check(78, "%s: has no unbounded retry loop" % _f, True)
+
+    # CLASS 7 - a server error reported to him as "the app isn't running".
+    for _f in _APP_UI:
+        _t = _srcs[_f]
+        check(78, "%s: reads the body before parsing it" % _f,
+              "await r.text()" in _t, _f)
+
+    # CLASS 8 - tests that assert my own prose. They pass while the behaviour
+    # they name is broken, which is the worst possible test.
+    _tsrc = io.open(os.path.join(HERE, "test_all.py"), encoding="utf-8").read()
+    _needles = set(re.findall(r'"([^"\\\n]{14,90})" in _?\w+', _tsrc))
+    _comment_lines = set()
+    for _f, _raw in ((f, io.open(os.path.join(HERE, f), encoding="utf-8").read())
+                     for f in _APP_PY + _APP_UI if os.path.exists(os.path.join(HERE, f))):
+        for _l in _raw.split("\n"):
+            _st = _l.strip()
+            if _st.startswith("#") or _st.startswith("//"):
+                _comment_lines.add(_st.lstrip("#/ ").strip())
+    _prose = [n for n in _needles
+              if re.search(r"[a-z]{3,} [a-z]{3,} [a-z]{3,}", n)
+              and any(n in c for c in _comment_lines)]
+    check(78, "no test asserts a comment instead of behaviour",
+          not _prose, str(sorted(_prose)[:4]))
+
+
 print("\n"+"="*68)
 by={}
 for sc,name,ok,_ in results:
     by.setdefault(sc,[0,0]); by[sc][0]+=1; by[sc][1]+= (1 if ok else 0)
-T={77:"Futures gets everything options got",76:"Full-app audit: buttons, loops, dead ends",75:"A quote is for the contract you asked",74:"The day is a return, not a sum",73:"Speed: pace to the real limit",72:"Clicking CONNECT twice cannot jam it",71:"One 429 must not freeze the app",70:"A rejected exit is not a storm",69:"Sign-in survives a rate limit",68:"Stream cannot blind the app",67:"Restart keeps the position",66:"One-second prices",65:"Journal never loses a trade",64:"Pacing must not stall",63:"Tick velocity",62:"Underlying at fill",61:"Tiered ratchet + anti-clip",60:"SDK audit is honest",59:"Batched option quotes",58:"Option price grid",57:"Webull rate budget",56:"NinjaScript compiles",55:"One-click NT install",54:"Ratchet inside NinjaTrader",53:"Limits die with the app",52:"NinjaTrader delivery check",51:"Futures header + footer",50:"Futures on by default",49:"Toggles + short hints",48:"Futures config stripped",47:"Futures ratchet",46:"NinjaScript in step",45:"Breadth + VIX",44:"Entry telemetry",43:"Trend module",42:"Audio cues",41:"Volatility gauges",40:"Volume gauge",39:"Dwell time",38:"Velocity vs feed artifacts",37:"Desktop icon",36:"Trade log detail",35:"Time value warns not blocks",34:"LOCK/X gone, size warns",33:"Page actually runs",32:"No SAVE / live trade frozen",31:"One switch / still modal",30:"Directional entry levels",29:"Percent only, no cash",28:"Grid/ATM/quality/one-armed",27:"Config screen cleanup",26:"Ratchet stop",25:"Console auto-hide",24:"Options auto-reconcile",23:"Daily trade log",22:"Options phantom clear",21:"Auto-reconcile w/ broker",20:"MY CONFIG always on",19:"Phantom position",18:"Futures hours",17:"Closed market honest",16:"Restart leaves no spinner",15:"One tab only",14:"Git lock self-heal",13:"Broker tabs + tray",12:"Velocity honest when shut",11:"Multi-broker sessions",1:"Futures login survives restart",2:"remember_login default",3:"Options profiles to disk",
+T={78:"The standing rule: sweep the class",77:"Futures gets everything options got",76:"Full-app audit: buttons, loops, dead ends",75:"A quote is for the contract you asked",74:"The day is a return, not a sum",73:"Speed: pace to the real limit",72:"Clicking CONNECT twice cannot jam it",71:"One 429 must not freeze the app",70:"A rejected exit is not a storm",69:"Sign-in survives a rate limit",68:"Stream cannot blind the app",67:"Restart keeps the position",66:"One-second prices",65:"Journal never loses a trade",64:"Pacing must not stall",63:"Tick velocity",62:"Underlying at fill",61:"Tiered ratchet + anti-clip",60:"SDK audit is honest",59:"Batched option quotes",58:"Option price grid",57:"Webull rate budget",56:"NinjaScript compiles",55:"One-click NT install",54:"Ratchet inside NinjaTrader",53:"Limits die with the app",52:"NinjaTrader delivery check",51:"Futures header + footer",50:"Futures on by default",49:"Toggles + short hints",48:"Futures config stripped",47:"Futures ratchet",46:"NinjaScript in step",45:"Breadth + VIX",44:"Entry telemetry",43:"Trend module",42:"Audio cues",41:"Volatility gauges",40:"Volume gauge",39:"Dwell time",38:"Velocity vs feed artifacts",37:"Desktop icon",36:"Trade log detail",35:"Time value warns not blocks",34:"LOCK/X gone, size warns",33:"Page actually runs",32:"No SAVE / live trade frozen",31:"One switch / still modal",30:"Directional entry levels",29:"Percent only, no cash",28:"Grid/ATM/quality/one-armed",27:"Config screen cleanup",26:"Ratchet stop",25:"Console auto-hide",24:"Options auto-reconcile",23:"Daily trade log",22:"Options phantom clear",21:"Auto-reconcile w/ broker",20:"MY CONFIG always on",19:"Phantom position",18:"Futures hours",17:"Closed market honest",16:"Restart leaves no spinner",15:"One tab only",14:"Git lock self-heal",13:"Broker tabs + tray",12:"Velocity honest when shut",11:"Multi-broker sessions",1:"Futures login survives restart",2:"remember_login default",3:"Options profiles to disk",
    4:"Browser autofill guard",5:"ITM3 strike math",6:"Preview == Arm",7:"Live-only / dead modes",
    8:"Auto-sync safety",9:"Endpoints alive",10:"UI integrity"}
 for sc in sorted(by):
