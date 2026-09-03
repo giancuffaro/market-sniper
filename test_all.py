@@ -543,7 +543,11 @@ try:
     # fixing the default never stuck.
     check(20,"settings are NOT read from localStorage any more",
           "localStorage.getItem(LSS)" not in idx2)
-    check(20,"disk is the single source of truth", "one source of truth" in idx2)
+    # Was: assert a comment saying disk wins. The line above already proves
+    # localStorage is not read; this proves settings come from the SERVER.
+    check(20,"settings are taken from the server payload",
+          "st.settings" in idx2 and "settings={...settings,...st.settings}"
+          in idx2.replace(" ", ""))
     check(20,"you can still deliberately turn it off",
           "settings.my_enabled=$('myEnabled').checked" in idx2.replace(" ",""))
 
@@ -976,8 +980,11 @@ try:
     check(30, "arm() stores ONE level", '"breakout": brk' not in _wc)
     check(30, "the trigger checks ONE level", 'broke = brk is not None' not in _wc)
     check(30, "the trigger is announced to 2dp", "{a['target']:.0f}" not in _wc)
-    check(30, "the reason for removing the breakout is recorded",
-          "joining momentum" in _wc or "fading the push" in _wc)
+    # Was: assert a comment explaining the removal. Assert the REMOVAL.
+    for _dead in ("brk", "breakout"):
+        check(30, "no %s remains in the entry logic" % _dead,
+              _dead not in _wc.split("def _maybe_trigger_entry", 1)[1]
+              .split("\n    def ", 1)[0])
     _ix30 = io.open("index.html", encoding="utf-8").read()
     check(30, "the screen shows one number", "armed.breakout" not in _ix30
           and "r.breakout" not in _ix30)
@@ -1714,8 +1721,12 @@ try:
           _ix2.count("clearInterval(dirTimer)") >= 4)
     check(43, "each signal is shown separately, not just the verdict",
           all(('id="%s"' % k) in _ix2 for k in ("dSlope", "dStruct", "dVol", "dBreadth")))
+    # Was: assert a comment. Assert the code actually paints a chop state
+    # instead of leaving the verdict empty - a blank reads as "no data".
+    _dirfn = _ix2.split("function renderDirection", 1)[1].split("\n  function ", 1)[0] \
+        if "function renderDirection" in _ix2 else _ix2
     check(43, "chop is rendered as an answer, not a blank",
-          "CHOP is not a" in _ix2 or "keeps you out" in _ix2)
+          "chop" in _dirfn.lower() and "dirState" in _dirfn)
 
     # --- 44. Entry-condition telemetry ------------------------------------
     import trade_log as _tl3
@@ -2746,8 +2757,29 @@ try:
     check(61, "the stop NEVER loosens", all(b >= a - 1e-9 for a, b in zip(_seen, _seen[1:])),
           str(_seen))
     check(61, "a pullback holds the stop", _seen[-1] == _seen[-3], str(_seen[-3:]))
-    check(61, "anti-clip is fed the peak, not the live gain",
-          "PEAK, not the live gain" in io.open("webull_client.py", encoding="utf-8").read())
+    # Was: assert a COMMENT saying so. Watch the argument instead - if the
+    # live gain is ever passed here, a pullback silently loosens the stop.
+    import ratchet_tiers as _rt61
+    _fed = []
+    _real_ac = _rt61.anti_clip
+    try:
+        _rt61.anti_clip = lambda locked, gain: (_fed.append(gain),
+                                                _real_ac(locked, gain))[1]
+        _z61 = _w4.make_session("LIVE")
+        _z61.settings.update({"my_enabled": True, "ratchet_tiers": True,
+                              "ratchet_step_pct": 10.0})
+        _z61.position = {"symbol": "QQQ", "side": "CALLS", "strike": 700.0,
+                         "qty": 1, "entry": 1.00, "mark": 1.50,
+                         "expiration": "2026-09-02", "ratchet_on": True,
+                         "ratchet_step": 10.0}
+        _z61._update_ratchet()                      # peak +50%
+        _z61.position["mark"] = 1.20                # pulls back to +20%
+        _z61._update_ratchet()
+        check(61, "anti-clip is fed the PEAK, not the live gain",
+              _fed and max(_fed) >= 49.0 and _fed[-1] >= 49.0,
+              "gains passed: %s" % _fed)
+    finally:
+        _rt61.anti_clip = _real_ac
 
     # The flat rungs G designed must still be reachable.
     _r62 = _RT(False)
