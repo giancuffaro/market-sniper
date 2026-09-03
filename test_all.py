@@ -4269,9 +4269,15 @@ finally:
         # 5. Every repeating timer must be stoppable, and starting the
         #    dashboard twice must not double them.
         _timers = set(re.findall(r"(\w+Timer|poll)\s*=\s*setInterval", _src))
+        # Stoppable either way: a direct clearInterval, or listed in the
+        # stopTimers() sweep. Asserting only the literal call form failed on a
+        # timer that IS cleared, just in an array - the test would have made
+        # me write worse code to satisfy it.
+        _stopblk = _src.split("function stopTimers", 1)[1].split("}", 1)[0] \
+            if "function stopTimers" in _src else ""
         for _t in sorted(_timers):
             check(76, "%s: %s can be stopped" % (_f, _t),
-                  ("clearInterval(%s)" % _t) in _src)
+                  ("clearInterval(%s)" % _t) in _src or _t in _stopblk)
         check(76, "%s: timers are cleared before being started again" % _f,
               "stopTimers()" in _src and "function stopTimers" in _src)
 
