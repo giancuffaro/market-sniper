@@ -109,6 +109,7 @@
   .pchip .p{font-size:17px;font-weight:700;margin-top:2px}
   .pchip .c{font-size:11.5px;margin-top:1px;color:var(--dim)}
   .pchip.up .c{color:var(--green)} .pchip.dn .c{color:var(--red)}
+  .pchip.stale{border-color:var(--amber)} .pchip.stale .c{color:var(--amber)}
   .pchip{cursor:pointer;font:inherit;transition:border-color .15s,background .15s}
   .pchip:disabled{cursor:default;opacity:.55}
   .pchip.on{border-color:var(--green);background:var(--green-deep)}
@@ -866,6 +867,16 @@ const EZ = (function(){
     poll=priceTimer=quoteTimer=trendTimer=dirTimer=velTimer=condTimer=healthTimer=null;
   }
 
+  // BROWSERS THROTTLE BACKGROUND TABS. Chrome slows setInterval to roughly
+  // once a minute in a hidden tab and can freeze it outright - which looks
+  // exactly like "the price is stuck" while the app is perfectly healthy.
+  // Refresh the moment the tab is looked at again.
+  document.addEventListener('visibilitychange',()=>{
+    if(document.visibilityState!=='visible') return;
+    if($('dash').classList.contains('hidden')) return;
+    try{ refreshPrices(); tick(); refreshHealth(); }catch(e){}
+  });
+
   // The two things that explain a slow screen, and neither was visible
   // anywhere: which feed prices are arriving on, and how close the shared
   // rate limit is to its ceiling. When the app feels slow this line is the
@@ -1227,7 +1238,17 @@ const EZ = (function(){
       el.classList.toggle('dn', !up);
       el.querySelector('.p').textContent=q.price.toLocaleString(undefined,{minimumFractionDigits:2,maximumFractionDigits:2});
       el.querySelector('.c').textContent=`${up?'+':'−'}${Math.abs(q.change).toFixed(2)} (${up?'+':'−'}${Math.abs(q.change_pct).toFixed(2)}%)`;
-      if(!q.live) el.querySelector('.c').textContent+=' ·delayed';
+      // SAY HOW OLD IT IS. "·delayed" read the same at four seconds and four
+      // minutes, and those are opposite situations: a quiet tape versus a dead
+      // feed. A price that has quietly stopped moving is the one failure you
+      // cannot spot by looking at it.
+      const age=Number(q.age||q.stale_seconds||0);
+      el.classList.toggle('stale', !q.live);
+      if(!q.live){
+        el.querySelector('.c').textContent += age>=1
+          ? '  ·  STALE '+(age<90?Math.round(age)+'s':Math.round(age/60)+'m')
+          : '  ·  delayed';
+      }
     });
   }
 
