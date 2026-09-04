@@ -4658,6 +4658,7 @@ finally:
     _z79.position = None
     check(79, "flat means nothing to warn about", _z79.exit_coverage() is None)
 
+    import datetime as dt
     _today79 = wb._now_et().date()
     _z79.position = {"symbol": "QQQ", "expiration": _today79.isoformat()}
     _c0 = _z79.exit_coverage()
