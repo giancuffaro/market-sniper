@@ -237,6 +237,15 @@
   .footer a{color:var(--dim);cursor:pointer;text-decoration:underline}
   /* fixed, not absolute: the dark area must cover the WHOLE window, otherwise
      clicking the page background beside the app column wouldn't close the popup */
+  .cover{display:flex;gap:8px;align-items:baseline;flex-wrap:wrap;
+         border:1px solid var(--line);border-radius:9px;
+         padding:8px 10px;margin-top:10px;background:var(--panel2)}
+  .cover .ct{font-size:9.5px;letter-spacing:.09em;font-weight:700;color:var(--dim);
+             border:1px solid var(--line);border-radius:5px;padding:2px 6px;white-space:nowrap}
+  .cover .cs{font-size:10.5px;color:var(--dim);line-height:1.45}
+  .cover.swing{border-color:var(--amber);background:rgba(255,176,32,.07)}
+  .cover.swing .ct{color:var(--amber);border-color:var(--amber)}
+  .cover.swing .cs{color:var(--amber)}
   .adopt{border:1px solid var(--amber);background:rgba(255,176,32,.09);
          border-radius:10px;padding:11px 13px;margin-top:11px}
   .adopt .t{color:var(--amber);font-weight:700;font-size:11px;letter-spacing:.6px}
@@ -455,6 +464,10 @@
       <div><span id="pnlPct" class="n">+0.0%</span></div>
       <div class="spot" id="pnlSpot"></div>
       <div class="spot" id="bracketLine"></div>
+      <div id="coverBand" class="cover hidden">
+        <span class="ct" id="coverTag">UNPROTECTED IF CLOSED</span>
+        <span class="cs" id="coverMsg"></span>
+      </div>
       <div id="adoptBand" class="adopt hidden">
         <div class="t">FOUND AT THE BROKER — NOT BEING MANAGED</div>
         <div class="s" id="adoptSub"></div>
@@ -1636,6 +1649,20 @@ const EZ = (function(){
       }
       // RATCHET readout wins the line when it is running - it IS the exit,
       // so showing the old TP/SL next to it would just be noise.
+      // WHO IS WATCHING THIS TRADE. Every exit in this app runs in the app -
+      // there is no stop resting at the broker - and that was never said
+      // anywhere. It matters most on a swing, which he now holds.
+      const cov = st.coverage;
+      if(cov){
+        $('coverBand').classList.remove('hidden');
+        $('coverBand').classList.toggle('swing', !!cov.is_swing);
+        $('coverTag').textContent = cov.is_swing
+          ? ('SWING · ' + (cov.days_out===1?'1 DAY':(cov.days_out+' DAYS')))
+          : 'NO BROKER STOP';
+        $('coverMsg').textContent = cov.warning;
+      }else{
+        $('coverBand').classList.add('hidden');
+      }
       if(pos.needs_manage_ok){
         $('adoptBand').classList.remove('hidden');
         $('adoptSub').textContent =
@@ -1665,6 +1692,7 @@ const EZ = (function(){
       $('hero').className='hero in'+(pnl<0?' loss':'');
     }else{
       $('flatActions').classList.remove('hidden'); $('tradeActions').classList.add('hidden'); $('pnlBlock').classList.add('hidden');
+      $('coverBand').classList.add('hidden');
       if(armed){ $('heroBig').textContent='ARMED'; $('heroSub').textContent=armed.symbol+' → '+Number(armed.target).toFixed(0)+' · '+armed.side+' at ask'; }
       else { $('heroBig').textContent='FLAT'; $('heroSub').textContent='No open position'; }
       $('hero').className='hero';
