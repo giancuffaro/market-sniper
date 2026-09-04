@@ -2120,6 +2120,8 @@ class BaseSession:
                 "account_type": self.account_type,
                 "buying_power": round(self.buying_power, 2),
                 "position": self.position, "armed": self.armed,
+                # WHO IS WATCHING THIS TRADE. None when flat.
+                "coverage": self.exit_coverage(),
                 "day_realized": round(self.day_realized, 2),
                 # Percent view of the day: every trade's return added up. With a
                 # constant position size this is the number that matters, and it
@@ -2848,6 +2850,46 @@ class LiveSession(BaseSession):
         except Exception:
             pass
         return self.position
+
+    def exit_coverage(self, p=None):
+        """WHO is actually protecting this trade, and when nobody is.
+
+        Market Sniper rests NO stop at the broker. The ratchet, the take-profit
+        and the stop-loss all run in this process, on a poll. That is fine for
+        a 0DTE scalp watched for twenty minutes; it is a real exposure for
+        anything held longer. Close the app, sleep the laptop, lose power, and
+        nothing is managing the position - the broker was never told about the
+        stop, so there is nothing left behind to catch it.
+
+        He held a SPY 767C expiring 9/9 under this tool: five days, no resting
+        stop, protected only while a window happened to be open. The app knew
+        that and did not say so, which is the part worth fixing first.
+        """
+        p = p or self.position
+        if not p:
+            return None
+        today = _now_et().date()
+        expiry = str(p.get("expiration") or "")[:10]
+        days_out = None
+        if expiry:
+            try:
+                days_out = (dt.date.fromisoformat(expiry) - today).days
+            except ValueError:
+                days_out = None
+        is_swing = bool(days_out and days_out > 0)
+        return {
+            "broker_stop_resting": False,      # stated plainly, not implied
+            "managed_by": "this app, while it is open",
+            "is_swing": is_swing,
+            "expiry": expiry or None,
+            "days_out": days_out,
+            "warning": (
+                ("SWING - expires %s. Exits run in this app only; no stop is "
+                 "resting at Webull. If this app is closed overnight, nothing "
+                 "manages this trade." % expiry) if is_swing else
+                "Exits run in this app only - no stop is resting at Webull. "
+                "Close the app and nothing manages this trade."),
+        }
 
     @staticmethod
     def _track_excursion(p):
