@@ -4646,11 +4646,67 @@ finally:
           not _prose, str(sorted(_prose)[:4]))
 
 
+    # --- 79. The app must say when it cannot protect a trade --------------
+    # From re-reading the handoff: items 2, 4 and 6 all assume a stop RESTING
+    # at the broker. Market Sniper rests none - every exit runs in this
+    # process, on a poll. For a 0DTE scalp watched for twenty minutes that is
+    # fine. He then held a SPY 767C expiring 9/9: five days, no resting stop,
+    # protected only while a window happened to be open, and nothing on the
+    # screen said so. That silence is the gap, not the missing replace_option.
+    _z79 = wb.LiveSession.__new__(wb.LiveSession)
+
+    _z79.position = None
+    check(79, "flat means nothing to warn about", _z79.exit_coverage() is None)
+
+    _today79 = wb._now_et().date()
+    _z79.position = {"symbol": "QQQ", "expiration": _today79.isoformat()}
+    _c0 = _z79.exit_coverage()
+    check(79, "a 0DTE trade is not called a swing", _c0["is_swing"] is False,
+          str(_c0))
+    check(79, "but it still says no stop rests at the broker",
+          _c0["broker_stop_resting"] is False
+          and "no stop is resting" in _c0["warning"].lower(), _c0["warning"][:60])
+
+    _far = (_today79 + dt.timedelta(days=5)).isoformat()
+    _z79.position = {"symbol": "SPY", "expiration": _far}
+    _c5 = _z79.exit_coverage()
+    check(79, "a multi-day hold IS a swing", _c5["is_swing"] is True, str(_c5))
+    check(79, "with the days counted", _c5["days_out"] == 5, str(_c5["days_out"]))
+    check(79, "and it names the overnight risk",
+          "overnight" in _c5["warning"].lower(), _c5["warning"][:70])
+    check(79, "and the expiry it is measured from", _far in _c5["warning"])
+
+    # A malformed expiry must not throw - it is broker data.
+    _z79.position = {"symbol": "SPY", "expiration": "not-a-date"}
+    check(79, "a bad expiry degrades quietly",
+          _z79.exit_coverage()["days_out"] is None)
+    _z79.position = {"symbol": "SPY"}
+    check(79, "and a missing one too",
+          _z79.exit_coverage()["is_swing"] is False)
+
+    # It has to reach the screen, or it is a fact nobody sees.
+    _w79 = io.open("webull_client.py", encoding="utf-8").read()
+    check(79, "coverage is sent with the state",
+          '"coverage": self.exit_coverage(),' in _w79)
+    _ix79 = io.open("index.html", encoding="utf-8").read()
+    check(79, "the position card shows it", 'id="coverBand"' in _ix79
+          and "st.coverage" in _ix79)
+    check(79, "a swing is called out differently",
+          "classList.toggle('swing'" in _ix79.replace('"', "'"))
+    check(79, "and it is hidden when flat",
+          _ix79.count("$('coverBand').classList.add('hidden')") >= 1)
+
+    # The handoff items that assume a resting stop are N/A while none rests -
+    # record WHY, so the next session does not port them blind.
+    check(79, "no broker stop is rested anywhere",
+          "place_stop" not in _w79 and "STOP_LOSS" not in _w79)
+
+
 print("\n"+"="*68)
 by={}
 for sc,name,ok,_ in results:
     by.setdefault(sc,[0,0]); by[sc][0]+=1; by[sc][1]+= (1 if ok else 0)
-T={78:"The standing rule: sweep the class",77:"Futures gets everything options got",76:"Full-app audit: buttons, loops, dead ends",75:"A quote is for the contract you asked",74:"The day is a return, not a sum",73:"Speed: pace to the real limit",72:"Clicking CONNECT twice cannot jam it",71:"One 429 must not freeze the app",70:"A rejected exit is not a storm",69:"Sign-in survives a rate limit",68:"Stream cannot blind the app",67:"Restart keeps the position",66:"One-second prices",65:"Journal never loses a trade",64:"Pacing must not stall",63:"Tick velocity",62:"Underlying at fill",61:"Tiered ratchet + anti-clip",60:"SDK audit is honest",59:"Batched option quotes",58:"Option price grid",57:"Webull rate budget",56:"NinjaScript compiles",55:"One-click NT install",54:"Ratchet inside NinjaTrader",53:"Limits die with the app",52:"NinjaTrader delivery check",51:"Futures header + footer",50:"Futures on by default",49:"Toggles + short hints",48:"Futures config stripped",47:"Futures ratchet",46:"NinjaScript in step",45:"Breadth + VIX",44:"Entry telemetry",43:"Trend module",42:"Audio cues",41:"Volatility gauges",40:"Volume gauge",39:"Dwell time",38:"Velocity vs feed artifacts",37:"Desktop icon",36:"Trade log detail",35:"Time value warns not blocks",34:"LOCK/X gone, size warns",33:"Page actually runs",32:"No SAVE / live trade frozen",31:"One switch / still modal",30:"Directional entry levels",29:"Percent only, no cash",28:"Grid/ATM/quality/one-armed",27:"Config screen cleanup",26:"Ratchet stop",25:"Console auto-hide",24:"Options auto-reconcile",23:"Daily trade log",22:"Options phantom clear",21:"Auto-reconcile w/ broker",20:"MY CONFIG always on",19:"Phantom position",18:"Futures hours",17:"Closed market honest",16:"Restart leaves no spinner",15:"One tab only",14:"Git lock self-heal",13:"Broker tabs + tray",12:"Velocity honest when shut",11:"Multi-broker sessions",1:"Futures login survives restart",2:"remember_login default",3:"Options profiles to disk",
+T={79:"Say when the app cannot protect you",78:"The standing rule: sweep the class",77:"Futures gets everything options got",76:"Full-app audit: buttons, loops, dead ends",75:"A quote is for the contract you asked",74:"The day is a return, not a sum",73:"Speed: pace to the real limit",72:"Clicking CONNECT twice cannot jam it",71:"One 429 must not freeze the app",70:"A rejected exit is not a storm",69:"Sign-in survives a rate limit",68:"Stream cannot blind the app",67:"Restart keeps the position",66:"One-second prices",65:"Journal never loses a trade",64:"Pacing must not stall",63:"Tick velocity",62:"Underlying at fill",61:"Tiered ratchet + anti-clip",60:"SDK audit is honest",59:"Batched option quotes",58:"Option price grid",57:"Webull rate budget",56:"NinjaScript compiles",55:"One-click NT install",54:"Ratchet inside NinjaTrader",53:"Limits die with the app",52:"NinjaTrader delivery check",51:"Futures header + footer",50:"Futures on by default",49:"Toggles + short hints",48:"Futures config stripped",47:"Futures ratchet",46:"NinjaScript in step",45:"Breadth + VIX",44:"Entry telemetry",43:"Trend module",42:"Audio cues",41:"Volatility gauges",40:"Volume gauge",39:"Dwell time",38:"Velocity vs feed artifacts",37:"Desktop icon",36:"Trade log detail",35:"Time value warns not blocks",34:"LOCK/X gone, size warns",33:"Page actually runs",32:"No SAVE / live trade frozen",31:"One switch / still modal",30:"Directional entry levels",29:"Percent only, no cash",28:"Grid/ATM/quality/one-armed",27:"Config screen cleanup",26:"Ratchet stop",25:"Console auto-hide",24:"Options auto-reconcile",23:"Daily trade log",22:"Options phantom clear",21:"Auto-reconcile w/ broker",20:"MY CONFIG always on",19:"Phantom position",18:"Futures hours",17:"Closed market honest",16:"Restart leaves no spinner",15:"One tab only",14:"Git lock self-heal",13:"Broker tabs + tray",12:"Velocity honest when shut",11:"Multi-broker sessions",1:"Futures login survives restart",2:"remember_login default",3:"Options profiles to disk",
    4:"Browser autofill guard",5:"ITM3 strike math",6:"Preview == Arm",7:"Live-only / dead modes",
    8:"Auto-sync safety",9:"Endpoints alive",10:"UI integrity"}
 for sc in sorted(by):
