@@ -2732,7 +2732,11 @@ try:
     # contract is 2.5%, so "breakeven" there sits inside the spread.
     import ratchet_tiers as _rt
     _rt = importlib.reload(_rt)
-    for _fill, _want in ((0.50, (25.0, 10.0)), (1.50, (15.0, 0.0)), (5.00, (10.0, 5.0))):
+    # 9/4/26: the price tiers are RETIRED. G restored one ladder for every
+    # premium — arm +10%, first lock breakeven, +10% rungs. These used to
+    # assert (25,10) / (15,0) / (10,5) and were the reason a sub-$1.00 0DTE
+    # had to run +25% before its stop moved at all.
+    for _fill, _want in ((0.50, (10.0, 0.0)), (1.50, (10.0, 0.0)), (5.00, (10.0, 0.0))):
         _a, _f, _st = _rt.ratchet_plan(_fill)
         check(61, "$%.2f arms +%g%% and first-locks %+g%%" % (_fill, _want[0], _want[1]),
               _a == _want[0] and _f == _want[1], str((_a, _f, _st)))
@@ -2740,12 +2744,15 @@ try:
     # ticks, too tight, so the step widens.
     check(61, "the tick floor widens a too-tight rung",
           _rt.ratchet_plan(3.00)[2] > 5.0, str(_rt.ratchet_plan(3.00)[2]))
-    check(61, "and leaves a wide-enough one alone", _rt.ratchet_plan(5.00)[2] == 5.0)
+    check(61, "and leaves a wide-enough one alone", _rt.ratchet_plan(5.00)[2] == 10.0,
+          str(_rt.ratchet_plan(5.00)[2]))
     check(61, "tick size flips at $3", _rt.tick_size(2.99) == 0.01 and _rt.tick_size(3.00) == 0.05)
 
     # Nothing locks before the arm level.
     check(61, "below the arm, nothing is locked", _rt.ratchet_locked_pct(5, 3.00) is None)
-    check(61, "at the arm, the first lock applies", _rt.ratchet_locked_pct(10, 3.00) == 5.0)
+    check(61, "at the arm, the first lock is BREAKEVEN",
+          _rt.ratchet_locked_pct(10, 3.00) == 0.0,
+          str(_rt.ratchet_locked_pct(10, 3.00)))
 
     # ANTI-CLIP: the stop may never sit closer than 40% of the gain made.
     check(61, "anti-clip does nothing on a small gain",
@@ -2773,7 +2780,8 @@ try:
         _r61._update_ratchet()
         _seen.append(_r61.position["ratchet"]["stop_pct"])
     check(61, "the opening stop is the flat step", _seen[0] == -10.0, str(_seen[0]))
-    check(61, "it arms at +10% on a $3 contract", _seen[2] == 5.0, str(_seen[2]))
+    check(61, "it arms at +10% to BREAKEVEN on a $3 contract", _seen[2] == 0.0,
+          str(_seen[2]))
     check(61, "the stop NEVER loosens", all(b >= a - 1e-9 for a, b in zip(_seen, _seen[1:])),
           str(_seen))
     check(61, "a pullback holds the stop", _seen[-1] == _seen[-3], str(_seen[-3:]))
@@ -2790,7 +2798,14 @@ try:
                               "ratchet_step_pct": 10.0})
         _z61.position = {"symbol": "QQQ", "side": "CALLS", "strike": 700.0,
                          "qty": 1, "entry": 1.00, "mark": 1.50,
-                         "expiration": "2026-09-02", "ratchet_on": True,
+                         # 14 DTE, computed not hardcoded: anti-clip is now
+                         # OFF on 0/1DTE, so a past/near expiry would skip it
+                         # and this probe would see an empty list. A hardcoded
+                         # date also rots — this one cannot.
+                         "expiration": (__import__("datetime").date.today()
+                                        + __import__("datetime").timedelta(days=14)
+                                        ).isoformat(),
+                         "ratchet_on": True,
                          "ratchet_step": 10.0}
         _z61._update_ratchet()                      # peak +50%
         _z61.position["mark"] = 1.20                # pulls back to +20%
