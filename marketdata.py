@@ -264,8 +264,8 @@ class Feed:
     def stock_price(self, symbol):
         """A price and WHERE it came from, or None. Never a guess.
 
-        Returns None rather than inventing anything: the futures feed once
-        returned `last + random.uniform(-1, 1)` when its source failed, and a
+        Returns None rather than inventing anything. The futures feed once
+        answered a failed fetch with a jittered copy of the last price, and a
         number that drifts a point at a time is indistinguishable from a quiet
         tape while the brackets compute off it.
         """
