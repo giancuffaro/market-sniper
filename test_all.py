@@ -4703,11 +4703,97 @@ finally:
           "place_stop" not in _w79 and "STOP_LOSS" not in _w79)
 
 
+    # --- 80. Market data OFF Webull (handoff section 0, added 9/4) --------
+    # The only new item in the 9/4 handoff, and the biggest: orders stay on
+    # Webull, quotes move to tastytrade/Tradier. Quotes are the bulk of the
+    # call volume against a key three processes share, so every quote served
+    # elsewhere is budget handed back to the bot's stops. On 9/4 the bridge
+    # logged 1,052 throttle events and its ratchet ran a burst on fallback
+    # quotes; on 9/2-9/3 this app made 65 Webull calls and dropped 203 more.
+    import marketdata as _md
+    _mdsrc = io.open("marketdata.py", encoding="utf-8").read()
+
+    # A DATA feed that can trade is a data feed that can lose money.
+    for _w in ("place_order", "cancel_order", "/orders", "submit_order"):
+        check(80, "the data feed cannot %s" % _w.strip("/"), _w not in _mdsrc)
+
+    # No pip install, ever. The last streaming SDK put into a broker's Python
+    # broke its pins badly enough that FIX SDK DEPS.bat exists to undo it.
+    import sys as _sys
+    for _f in ("marketdata.py", "dxlink.py"):
+        _txt = io.open(_f, encoding="utf-8").read()
+        _mods = {m.split(".")[0] for m in
+                 re.findall(r"^\s*(?:import|from)\s+([A-Za-z_][\w.]*)", _txt, re.M)}
+        _extra = sorted(m for m in _mods
+                        if m not in _sys.stdlib_module_names and m != "dxlink")
+        check(80, "%s uses the standard library only" % _f, not _extra, str(_extra))
+
+    # NOTHING CONFIGURED IS NORMAL. Absent credentials must leave the app
+    # exactly as it was, never break it.
+    _f80 = _md.from_settings({})
+    check(80, "no credentials is not an error", _f80 is not None)
+    check(80, "and nothing claims to be configured",
+          _f80.status()["tastytrade"] is False and _f80.status()["tradier"] is False)
+    check(80, "a price request returns None, never a guess",
+          _f80.stock_price("SPY") is None)
+    check(80, "and an option quote says 'ask the broker'",
+          _f80.option_quote("SPY260909C00767000") is None)
+    check(80, "arming the stream without credentials just declines",
+          _f80.start_stream() is False)
+
+    # One shape out, whichever feed answered - callers must not learn which.
+    _row = _md._row_to_price({"last": "770.19", "prevclose": "767.00",
+                              "bid": "770.10", "ask": "770.28"})
+    check(80, "a Tradier row normalises", _row["price"] == 770.19
+          and abs(_row["change"] - 3.19) < 0.001, str(_row))
+    _row2 = _md._row_to_price({"last-price": "1.35", "close-price": "1.20"})
+    check(80, "a tastytrade row normalises too", _row2["price"] == 1.35, str(_row2))
+    _row3 = _md._row_to_price({"bid": 1.00, "ask": 1.10})
+    check(80, "bid/ask alone gives the mid", _row3["price"] == 1.05, str(_row3))
+    _threw = False
+    try:
+        _md._row_to_price({"symbol": "SPY"})
+    except _md.FeedError:
+        _threw = True
+    check(80, "a row with no price is refused, not defaulted", _threw)
+
+    # OAuth tokens live 15 MINUTES. Treating them as daily means a 401 in the
+    # middle of managing a position.
+    _tt = _md.Tastytrade(client_secret="x", refresh_token="y")
+    check(80, "oauth mode is detected", _tt.oauth is True and _tt.configured())
+    _tt._tok, _tt._tok_at, _tt._tok_ttl = "cached", time.time(), 840.0
+    check(80, "a fresh token is reused", _tt.session() == "cached")
+    _tt._tok_at = time.time() - 900
+    check(80, "an expired one is not", _tt._tok_ttl < 900.0)
+    check(80, "and the margin is under the 15-minute life",
+          "max(60.0, ttl - 60.0)" in _mdsrc)
+
+    # Delayed data must never be served as live - a stop moved off stale
+    # gamma is a real loss.
+    _dx = io.open("dxlink.py", encoding="utf-8").read()
+    check(80, "demo/delayed feeds are refused", "def live_level" in _dx)
+    check(80, "and the handshake waits for each step", "_await" in _dx)
+
+    # The wiring: free feeds first, Webull last, and never blocking.
+    _m80 = io.open("main.py", encoding="utf-8").read()
+    _pr80 = _m80.split("def prices()", 1)[1].split("@app.get", 1)[0]
+    check(80, "prices try the free feeds before Webull",
+          _pr80.index("f.stock_prices") < _pr80.index("stock_snapshot"))
+    check(80, "a feed failure falls through instead of blocking",
+          "must never block prices" in _pr80)
+    check(80, "there is a feeds status endpoint", '"/api/feeds"' in _m80)
+    check(80, "credentials are saved to my-settings.json, not git",
+          'uc.save("feeds"' in _m80)
+    _sf80 = _m80.split("def set_feeds", 1)[1].split("@app.get", 1)[0]
+    check(80, "only market-data keys are accepted",
+          "tradier_token" in _sf80 and "account_id" not in _sf80)
+
+
 print("\n"+"="*68)
 by={}
 for sc,name,ok,_ in results:
     by.setdefault(sc,[0,0]); by[sc][0]+=1; by[sc][1]+= (1 if ok else 0)
-T={79:"Say when the app cannot protect you",78:"The standing rule: sweep the class",77:"Futures gets everything options got",76:"Full-app audit: buttons, loops, dead ends",75:"A quote is for the contract you asked",74:"The day is a return, not a sum",73:"Speed: pace to the real limit",72:"Clicking CONNECT twice cannot jam it",71:"One 429 must not freeze the app",70:"A rejected exit is not a storm",69:"Sign-in survives a rate limit",68:"Stream cannot blind the app",67:"Restart keeps the position",66:"One-second prices",65:"Journal never loses a trade",64:"Pacing must not stall",63:"Tick velocity",62:"Underlying at fill",61:"Tiered ratchet + anti-clip",60:"SDK audit is honest",59:"Batched option quotes",58:"Option price grid",57:"Webull rate budget",56:"NinjaScript compiles",55:"One-click NT install",54:"Ratchet inside NinjaTrader",53:"Limits die with the app",52:"NinjaTrader delivery check",51:"Futures header + footer",50:"Futures on by default",49:"Toggles + short hints",48:"Futures config stripped",47:"Futures ratchet",46:"NinjaScript in step",45:"Breadth + VIX",44:"Entry telemetry",43:"Trend module",42:"Audio cues",41:"Volatility gauges",40:"Volume gauge",39:"Dwell time",38:"Velocity vs feed artifacts",37:"Desktop icon",36:"Trade log detail",35:"Time value warns not blocks",34:"LOCK/X gone, size warns",33:"Page actually runs",32:"No SAVE / live trade frozen",31:"One switch / still modal",30:"Directional entry levels",29:"Percent only, no cash",28:"Grid/ATM/quality/one-armed",27:"Config screen cleanup",26:"Ratchet stop",25:"Console auto-hide",24:"Options auto-reconcile",23:"Daily trade log",22:"Options phantom clear",21:"Auto-reconcile w/ broker",20:"MY CONFIG always on",19:"Phantom position",18:"Futures hours",17:"Closed market honest",16:"Restart leaves no spinner",15:"One tab only",14:"Git lock self-heal",13:"Broker tabs + tray",12:"Velocity honest when shut",11:"Multi-broker sessions",1:"Futures login survives restart",2:"remember_login default",3:"Options profiles to disk",
+T={80:"Market data off Webull",79:"Say when the app cannot protect you",78:"The standing rule: sweep the class",77:"Futures gets everything options got",76:"Full-app audit: buttons, loops, dead ends",75:"A quote is for the contract you asked",74:"The day is a return, not a sum",73:"Speed: pace to the real limit",72:"Clicking CONNECT twice cannot jam it",71:"One 429 must not freeze the app",70:"A rejected exit is not a storm",69:"Sign-in survives a rate limit",68:"Stream cannot blind the app",67:"Restart keeps the position",66:"One-second prices",65:"Journal never loses a trade",64:"Pacing must not stall",63:"Tick velocity",62:"Underlying at fill",61:"Tiered ratchet + anti-clip",60:"SDK audit is honest",59:"Batched option quotes",58:"Option price grid",57:"Webull rate budget",56:"NinjaScript compiles",55:"One-click NT install",54:"Ratchet inside NinjaTrader",53:"Limits die with the app",52:"NinjaTrader delivery check",51:"Futures header + footer",50:"Futures on by default",49:"Toggles + short hints",48:"Futures config stripped",47:"Futures ratchet",46:"NinjaScript in step",45:"Breadth + VIX",44:"Entry telemetry",43:"Trend module",42:"Audio cues",41:"Volatility gauges",40:"Volume gauge",39:"Dwell time",38:"Velocity vs feed artifacts",37:"Desktop icon",36:"Trade log detail",35:"Time value warns not blocks",34:"LOCK/X gone, size warns",33:"Page actually runs",32:"No SAVE / live trade frozen",31:"One switch / still modal",30:"Directional entry levels",29:"Percent only, no cash",28:"Grid/ATM/quality/one-armed",27:"Config screen cleanup",26:"Ratchet stop",25:"Console auto-hide",24:"Options auto-reconcile",23:"Daily trade log",22:"Options phantom clear",21:"Auto-reconcile w/ broker",20:"MY CONFIG always on",19:"Phantom position",18:"Futures hours",17:"Closed market honest",16:"Restart leaves no spinner",15:"One tab only",14:"Git lock self-heal",13:"Broker tabs + tray",12:"Velocity honest when shut",11:"Multi-broker sessions",1:"Futures login survives restart",2:"remember_login default",3:"Options profiles to disk",
    4:"Browser autofill guard",5:"ITM3 strike math",6:"Preview == Arm",7:"Live-only / dead modes",
    8:"Auto-sync safety",9:"Endpoints alive",10:"UI integrity"}
 for sc in sorted(by):
