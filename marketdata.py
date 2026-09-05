@@ -291,6 +291,12 @@ class Feed:
                 for k, v in got.items():
                     v["source"] = "tradier"
                     out[k] = v
+                    # RECORD IT. The batch path filled prices correctly but
+                    # never updated _last_source, so /api/feeds reported an
+                    # empty "last_source" while Tradier was serving every
+                    # quote - a status panel that cannot say which feed is
+                    # working is worth very little.
+                    self._last_source[k] = "tradier"
                 if len(out) == len(symbols):
                     self._errors.pop("tradier", None)
                     return out
