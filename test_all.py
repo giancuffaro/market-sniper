@@ -2813,6 +2813,37 @@ try:
         check(61, "anti-clip is fed the PEAK, not the live gain",
               _fed and max(_fed) >= 49.0 and _fed[-1] >= 49.0,
               "gains passed: %s" % _fed)
+
+        # THE 0/1DTE GATE (9/4/26). G: "my rule on 0 and 1dte and anticlip on
+        # later expirations." A 0DTE has no tomorrow — theta eats whatever the
+        # stop does not lock — so his uncapped ladder takes the gain. From 2
+        # days out, the 40%-of-gain cushion applies so a runner is not
+        # strangled by a rung.
+        #
+        # Behavioural, not a comment check: run the SAME trade at +80% on two
+        # expiries and watch the stop land in two different places. The raw
+        # ladder locks +70; anti-clip caps it at 60% of the gain = +48. If the
+        # gate ever stops working these two collapse to one number.
+        def _stop_at(_days):
+            _g = _w4.make_session("LIVE")
+            _g.settings.update({"my_enabled": True, "ratchet_tiers": True,
+                                "ratchet_step_pct": 10.0})
+            _d = (__import__("datetime").date.today()
+                  + __import__("datetime").timedelta(days=_days)).isoformat()
+            _g.position = {"symbol": "QQQ", "side": "CALLS", "strike": 700.0,
+                           "qty": 1, "entry": 0.50, "mark": 0.90,
+                           "expiration": _d, "ratchet_on": True,
+                           "ratchet_step": 10.0}
+            _g._update_ratchet()
+            return _g.position["ratchet"]["stop_pct"]
+        _zero = _stop_at(0)
+        _far = _stop_at(14)
+        check(61, "0DTE runs the UNCAPPED ladder (anti-clip off)",
+              _zero == 70.0, str(_zero))
+        check(61, "14DTE is capped by anti-clip at 60%% of the gain",
+              _far == 48.0, str(_far))
+        check(61, "so the gate actually changes the stop", _zero != _far,
+              "0DTE %s vs 14DTE %s" % (_zero, _far))
     finally:
         _rt61.anti_clip = _real_ac
 
