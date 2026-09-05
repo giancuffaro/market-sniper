@@ -573,6 +573,7 @@
           <input id="tastyRefresh" type="password" placeholder="OAuth refresh token"
                  style="flex:1" onchange="EZ.saveFeeds()">
         </div>
+        <div class="shint myfont" id="feedTest" style="margin-top:6px"></div>
         <div class="shint myfont">Streams option quotes <b>and greeks</b> — Webull cannot
         stream options at any price. Needs a funded account: an unfunded one returns
         delayed data, and the app refuses to treat that as live.</div>
@@ -1790,6 +1791,24 @@ const EZ = (function(){
 
   async function loadFeeds(){
     try{ paintFeedState(await api('/api/feeds')); }catch(e){}
+    // Then PROVE it. "Configured" only means a string was pasted in.
+    try{
+      const t=await api('/api/feeds/test');
+      const bits=[];
+      if(t.tradier) bits.push(t.tradier.ok ? ('Tradier ok '+t.tradier.ms+'ms')
+                                           : ('Tradier FAILED: '+t.tradier.error));
+      if(t.tastytrade) bits.push(t.tastytrade.ok
+            ? ('tastytrade '+(t.tastytrade.realtime?'REAL-TIME':'DELAYED')
+               +' ('+(t.tastytrade.level||'?')+')')
+            : ('tastytrade FAILED: '+t.tastytrade.error));
+      if(bits.length){
+        const el=$('feedTest');
+        el.textContent=bits.join('  ·  ');
+        const bad=(t.tradier&&!t.tradier.ok)||(t.tastytrade&&!t.tastytrade.ok)
+                  ||(t.tastytrade&&t.tastytrade.ok&&!t.tastytrade.realtime);
+        el.style.color = bad ? 'var(--amber)' : 'var(--green)';
+      }
+    }catch(e){}
   }
 
   async function forgetPosition(){

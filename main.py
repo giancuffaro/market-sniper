@@ -157,6 +157,53 @@ def feeds():
     return st
 
 
+@app.get("/api/feeds/test")
+def feeds_test():
+    """Prove each feed actually answers. Read-only: quotes and a token, no orders.
+
+    "Configured" only means a string was pasted in. This is the difference
+    between a saved credential and a working one - and for tastytrade it also
+    reports the LEVEL, because an unfunded account returns delayed data and
+    delayed greeks moving a stop is a real loss.
+    """
+    f = _feed()
+    if f is None:
+        return {"ok": False, "reason": "market-data module unavailable"}
+    out = {"ok": True, "tradier": None, "tastytrade": None}
+
+    if f.tradier and f.tradier.configured():
+        t0 = time.time()
+        try:
+            got = f.tradier.quotes(["SPY"])
+            row = got.get("SPY") or {}
+            out["tradier"] = {"ok": True, "ms": int((time.time() - t0) * 1000),
+                              "spy": row.get("price")}
+        except Exception as e:                               # noqa: BLE001
+            out["tradier"] = {"ok": False, "error": str(e)[:160]}
+
+    if f.tasty and f.tasty.configured():
+        t0 = time.time()
+        try:
+            tok = f.tasty.quote_token() or {}
+            level = str(tok.get("level") or "")
+            url = str(tok.get("dxlink-url") or "")
+            live = bool(mdmod and getattr(mdmod, "dxlink", None)
+                        and mdmod.dxlink.live_level(level, url))
+            out["tastytrade"] = {
+                "ok": True, "ms": int((time.time() - t0) * 1000),
+                "level": level or None,
+                "realtime": live,
+                # Say what it means, not just what it is.
+                "note": ("real-time — option quotes and greeks can stream"
+                         if live else
+                         "DELAYED/demo — this account is not funded for live "
+                         "data, so the stream will refuse to serve it"),
+            }
+        except Exception as e:                               # noqa: BLE001
+            out["tastytrade"] = {"ok": False, "error": str(e)[:160]}
+    return out
+
+
 @app.post("/api/feeds")
 def set_feeds(body: dict):
     """Save feed credentials. They live in my-settings.json, never in git.
