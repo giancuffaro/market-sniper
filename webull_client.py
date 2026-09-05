@@ -1198,7 +1198,7 @@ class BaseSession:
             try:
                 _exp = str(p.get("expiration") or "")[:10]
                 if len(_exp) == 10:
-                    _dte = (datetime.date.fromisoformat(_exp)
+                    _dte = (dt.date.fromisoformat(_exp)
                             - _now_et().date()).days
             except Exception:                            # noqa: BLE001
                 _dte = None          # unreadable expiry -> behave as before
