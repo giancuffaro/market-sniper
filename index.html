@@ -1768,9 +1768,15 @@ const EZ = (function(){
   }
 
   async function saveFeeds(){
-    const body={ tradier_token:$('tradierToken').value.trim(),
-                 tasty_client_secret:$('tastySecret').value.trim(),
-                 tasty_refresh_token:$('tastyRefresh').value.trim() };
+    // Only send boxes he actually typed in. These are password fields and
+    // never show the saved value back, so posting the empty ones used to
+    // delete perfectly good credentials sitting next to the one being edited.
+    const body={};
+    const put=(id,key)=>{ const v=$(id).value.trim(); if(v) body[key]=v; };
+    put('tradierToken','tradier_token');
+    put('tastySecret','tasty_client_secret');
+    put('tastyRefresh','tasty_refresh_token');
+    if(!Object.keys(body).length){ loadFeeds(); return; }
     try{
       const r=await api('/api/feeds', body);
       paintFeedState(r && r.status);

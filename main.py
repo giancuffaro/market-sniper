@@ -215,13 +215,22 @@ def set_feeds(body: dict):
     allowed = ("tasty_client_secret", "tasty_refresh_token", "tasty_username",
                "tasty_password", "tasty_remember_token",
                "tradier_token", "tradier_account")
+    # A BLANK BOX MEANS "LEAVE IT ALONE", NOT "DELETE IT".
+    #
+    # These are password inputs, so they never repopulate with the saved
+    # value - showing a secret back is worse. But the panel posts all three
+    # fields, so treating blank as a delete meant typing into ONE box wiped
+    # the others. That is exactly what happened: a working Tradier token was
+    # destroyed by editing the tastytrade fields next to it.
+    #
+    # Clearing is now explicit and deliberate: send {"clear": ["tradier_token"]}.
     for k in allowed:
-        if k in (body or {}):
-            v = (body or {}).get(k)
-            if v:
-                cur[k] = v
-            else:
-                cur.pop(k, None)
+        v = (body or {}).get(k)
+        if v:                               # only a real value ever writes
+            cur[k] = v
+    for k in (body or {}).get("clear") or []:
+        if k in allowed:
+            cur.pop(k, None)
     uc.save("feeds", cur)
     FEED["f"] = None                       # rebuild with the new credentials
     f = _feed()
