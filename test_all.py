@@ -4846,6 +4846,31 @@ finally:
     finally:
         _md._http = _real_http
 
+    # AN API ERROR THAT NAMES NEITHER FIELD IS NOT AN ANSWER. Working these
+    # out live cost two round trips he had to sit through: "Invalid JWT" (the
+    # refresh token is not a token) then "Client secret mismatch" (the token
+    # is real but came from a different OAuth app). Different fixes; the API
+    # distinguishes neither.
+    import importlib.util as _ilu80
+    _sp80 = _ilu80.spec_from_file_location("_mh80", os.path.join(HERE, "main.py"))
+    _mh80 = _ilu80.module_from_spec(_sp80)
+    _sp80.loader.exec_module(_mh80)
+    _h = _mh80._tasty_hint
+    check(80, "'client secret mismatch' points at the SECRET",
+          "different OAuth application" in (_h("Client secret mismatch") or ""),
+          str(_h("Client secret mismatch"))[:60])
+    check(80, "'invalid jwt' points at the REFRESH TOKEN",
+          "ACCESS token" in (_h("Invalid JWT") or ""), str(_h("Invalid JWT"))[:60])
+    check(80, "the two hints are different advice",
+          _h("Client secret mismatch") != _h("Invalid JWT"))
+    check(80, "a generic invalid_grant still says something useful",
+          _h("invalid_grant") is not None)
+    check(80, "and an unknown error is not given a made-up meaning",
+          _h("connection reset by peer") is None)
+    _ix80h = io.open("index.html", encoding="utf-8").read()
+    check(80, "the panel shows the meaning, not the raw API text",
+          "t.tastytrade.meaning" in _ix80h)
+
     # Delayed data must never be served as live - a stop moved off stale
     # gamma is a real loss.
     _dx = io.open("dxlink.py", encoding="utf-8").read()
