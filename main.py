@@ -132,6 +132,55 @@ def _sess():
 def index():
     return (HERE / "index.html").read_text(encoding="utf-8")
 
+def _feed():
+    """The market-data feed, built once from whatever he has set up."""
+    if FEED["f"] is None and mdmod is not None:
+        try:
+            FEED["f"] = mdmod.from_settings(uc.load("feeds", {}) or {},
+                                            log=lambda m: print("[FEED   ] %s" % m,
+                                                                flush=True))
+        except Exception as e:                               # noqa: BLE001
+            print("[FEED   ] could not build (%s)" % str(e)[:90], flush=True)
+    return FEED["f"]
+
+
+@app.get("/api/feeds")
+def feeds():
+    """Which price sources are set up, and which one last answered."""
+    f = _feed()
+    if f is None:
+        return {"ok": False, "reason": "market-data module unavailable"}
+    st = f.status()
+    st["ok"] = True
+    # Say plainly what is still costing Webull budget.
+    st["quotes_off_webull"] = bool(st.get("tradier") or st.get("tastytrade"))
+    return st
+
+
+@app.post("/api/feeds")
+def set_feeds(body: dict):
+    """Save feed credentials. They live in my-settings.json, never in git.
+
+    This endpoint takes keys for MARKET DATA only. It cannot place an order,
+    and the modules behind it have no order code at all.
+    """
+    cur = dict(uc.load("feeds", {}) or {})
+    allowed = ("tasty_client_secret", "tasty_refresh_token", "tasty_username",
+               "tasty_password", "tasty_remember_token",
+               "tradier_token", "tradier_account")
+    for k in allowed:
+        if k in (body or {}):
+            v = (body or {}).get(k)
+            if v:
+                cur[k] = v
+            else:
+                cur.pop(k, None)
+    uc.save("feeds", cur)
+    FEED["f"] = None                       # rebuild with the new credentials
+    f = _feed()
+    return {"ok": True, "status": (f.status() if f else None)}
+
+
 @app.get("/api/health")
 def health():
     return {"ok": True, "version": getattr(config, "APP_VERSION", "old"),
@@ -159,6 +208,16 @@ def prices():
                 streamed[x] = row
         if len(streamed) == len(syms):
             return streamed
+
+    # 2) THE FREE FEEDS. Same prices, none of the shared Webull budget.
+    f = _feed()
+    if f is not None:
+        try:
+            got = f.stock_prices(syms)
+            if got and len(got) == len(syms):
+                return got
+        except Exception:                                    # noqa: BLE001
+            pass          # fall through - a data feed must never block prices
 
     e = SESSION.get("s")
     if e is not None and hasattr(e, "stock_snapshot"):
