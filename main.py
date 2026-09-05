@@ -13,6 +13,20 @@ from pydantic import BaseModel
 import config
 import user_config as uc
 import webull_client as wb
+
+# MARKET DATA, SEPARATE FROM MONEY.
+# Orders, positions and balances stay on Webull. Quotes are the bulk of the
+# call volume against a 300-per-minute key shared with the discord-sniper
+# bridge and the Fill Announcer, so every quote served from somewhere else is
+# budget handed back to the bot's stops. Absent credentials are not an error -
+# the app simply keeps using Webull and Yahoo as before.
+try:
+    import marketdata as mdmod
+except Exception as _e:                                      # noqa: BLE001
+    mdmod = None
+    print("[FEED   ] marketdata unavailable (%s) - staying on Webull/Yahoo"
+          % str(_e)[:90], flush=True)
+FEED = {"f": None}
 try:
     import quotes
 except Exception:
