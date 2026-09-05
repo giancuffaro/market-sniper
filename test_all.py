@@ -1,7 +1,16 @@
 """Market Sniper v3.7 — 10-scenario regression suite."""
 import io, json, os, re, shutil, subprocess, sys, tempfile, threading, time, urllib.request, urllib.error
 
-HERE = "/sessions/stoic-brave-ritchie/mnt/Market Sniper"
+# THE SUITE MUST RUN WHEREVER THE FOLDER IS (fixed 9/4/26).
+# This was hardcoded to "/sessions/stoic-brave-ritchie/mnt/Market Sniper" —
+# one Claude session's temporary sandbox path, baked in and long dead. The
+# whole suite died on `PermissionError` at import, on G's own machine and
+# everywhere else. That means scenario 78 — the "sweep the class, not the
+# instance" enforcer that PROJECT-STATUS.md calls the standing rule — has
+# not actually run in who knows how long. A test that cannot run is worse
+# than no test: it is a green light nobody ever checked.
+# Use this file's own directory. It is correct on every machine, always.
+HERE = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, HERE); os.chdir(HERE)
 SETTINGS = os.path.join(HERE, "my-settings.json")
 # Scratch dir for the backup + temp logs. Created here so the suite runs on a
