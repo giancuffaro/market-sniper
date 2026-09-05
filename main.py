@@ -150,6 +150,16 @@ def feeds():
     f = _feed()
     if f is None:
         return {"ok": False, "reason": "market-data module unavailable"}
+    # Arm the stream the first time anyone asks. It is an accelerator, so a
+    # failure here must never surface as a broken feed.
+    if not f.status().get("stream"):
+        try:
+            if f.start_stream():
+                wb.OPTION_QUOTE_HOOK = f.option_quote
+                print("[FEED   ] DXLink armed - option quotes cost no Webull budget",
+                      flush=True)
+        except Exception:                                    # noqa: BLE001
+            pass
     st = f.status()
     st["ok"] = True
     # Say plainly what is still costing Webull budget.

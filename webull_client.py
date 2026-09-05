@@ -386,6 +386,10 @@ def _is_futures_account(aid, raw_account):
 # So: every call through this gate, spaced, and a hard stop after a 429.
 # =========================================================================
 
+# Set by main.py to a streamed-quote reader. None means "no stream, poll the
+# broker" - the app works exactly as before when it is not set.
+OPTION_QUOTE_HOOK = None
+
 MIN_CALL_INTERVAL = 0.20
 
 # Webull allows 300 requests per ROLLING 60 seconds per app key, shared with
@@ -1033,6 +1037,29 @@ class OptionData:
         return out
 
     def ask_bid_mark(self, occ, max_age=None):
+        # A STREAMED QUOTE COSTS NO WEBULL BUDGET AT ALL.
+        #
+        # tastytrade pushes option quotes and greeks over DXLink; Webull
+        # cannot stream options at any price, which is the only reason this
+        # app ever polled them. When the stream has a FRESH value for this
+        # contract, use it and make no request. When it does not - stale, not
+        # subscribed, not connected - fall through and ask the broker, because
+        # a stale quote is worse than a slow one.
+        hook = OPTION_QUOTE_HOOK
+        if hook is not None:
+            try:
+                got = hook(occ)
+            except Exception:                                # noqa: BLE001
+                got = None
+            if got:
+                a_, b_ = got.get("ask"), got.get("bid")
+                m_ = got.get("price") or got.get("mark")
+                if m_ is None and a_ and b_:
+                    m_ = (float(a_) + float(b_)) / 2.0
+                if m_ or a_ or b_:
+                    return (float(a_) if a_ else None,
+                            float(b_) if b_ else None,
+                            float(m_) if m_ else None, got)
         row = self.snapshot_cached(occ, max_age=max_age)
         def f(*names):
             v = _find_key(row, *names)
