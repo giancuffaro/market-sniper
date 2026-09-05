@@ -1183,7 +1183,27 @@ class BaseSession:
             # the resting order; there is no resting order here.
             peak = p["peak_pct"]
             locked = rt.ratchet_locked_pct(peak, p["entry"])
-            locked = rt.anti_clip(locked, peak)
+            # ANTI-CLIP IS OFF ON 0/1DTE (9/4/26). G's rule, in one line:
+            # "my rule on 0 and 1dte and anticlip on later expirations."
+            # A 0DTE has no tomorrow — theta eats whatever the stop does not
+            # lock, so his uncapped ladder takes the gain: +10% -> BE,
+            # +20% -> +10%, +30% -> +20%. From 2 days out the trade has room
+            # to breathe and the 40%-of-gain cushion keeps a runner from
+            # being strangled by a rung.
+            #
+            # This gate has been in Discord Sniper's auto_ratchet since 9/3
+            # and was missing here, so anti-clip was capping nearly every
+            # trade this app takes — most of his manual scalps are 0DTE.
+            _dte = None
+            try:
+                _exp = str(p.get("expiration") or "")[:10]
+                if len(_exp) == 10:
+                    _dte = (datetime.date.fromisoformat(_exp)
+                            - _now_et().date()).days
+            except Exception:                            # noqa: BLE001
+                _dte = None          # unreadable expiry -> behave as before
+            if _dte is None or _dte >= 2:
+                locked = rt.anti_clip(locked, peak)
             arm, first, tier_step = rt.ratchet_plan(p["entry"])
             if locked is None:
                 # Not armed yet: the opening stop stands.
