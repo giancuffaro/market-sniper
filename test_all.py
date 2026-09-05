@@ -4757,6 +4757,34 @@ finally:
         _threw = True
     check(80, "a row with no price is refused, not defaulted", _threw)
 
+    # The status panel must be able to say WHICH feed is serving. The batch
+    # path filled prices correctly but never recorded it, so /api/feeds showed
+    # an empty last_source while Tradier answered every quote live.
+    class _FakeTr80:
+        def configured(self): return True
+        def quotes(self, syms):
+            return {s: {"price": 1.0, "change": 0.0, "change_pct": 0.0,
+                        "live": True} for s in syms}
+    _fb80 = _md.Feed(tradier=_FakeTr80())
+    _got80 = _fb80.stock_prices(["SPY", "QQQ"])
+    check(80, "a batched fetch fills every symbol", len(_got80) == 2, str(_got80))
+    check(80, "and each row says where it came from",
+          all(v.get("source") == "tradier" for v in _got80.values()))
+    check(80, "and the status panel can name the live feed",
+          _fb80.status()["last_source"] == {"SPY": "tradier", "QQQ": "tradier"},
+          str(_fb80.status()["last_source"]))
+
+    # A dead feed must fall through, not blank the screen.
+    class _DeadTr80:
+        def configured(self): return True
+        def quotes(self, syms): raise _md.FeedError("tradier down")
+        def stock_price(self, s): raise _md.FeedError("tradier down")
+    _fb81 = _md.Feed(tradier=_DeadTr80())
+    check(80, "a dead feed returns nothing rather than raising",
+          _fb81.stock_prices(["SPY"]) == {})
+    check(80, "and records why, for the status panel",
+          "tradier" in _fb81.status()["errors"], str(_fb81.status()["errors"]))
+
     # OAuth tokens live 15 MINUTES. Treating them as daily means a 401 in the
     # middle of managing a position.
     _tt = _md.Tastytrade(client_secret="x", refresh_token="y")
