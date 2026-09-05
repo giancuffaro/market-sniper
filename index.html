@@ -1806,7 +1806,8 @@ const EZ = (function(){
       if(t.tastytrade) bits.push(t.tastytrade.ok
             ? ('tastytrade '+(t.tastytrade.realtime?'REAL-TIME':'DELAYED')
                +' ('+(t.tastytrade.level||'?')+')')
-            : ('tastytrade FAILED: '+t.tastytrade.error));
+            : ('tastytrade FAILED — '
+               + (t.tastytrade.meaning || t.tastytrade.error)));
       if(bits.length){
         const el=$('feedTest');
         el.textContent=bits.join('  ·  ');

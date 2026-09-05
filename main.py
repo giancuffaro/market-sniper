@@ -200,8 +200,35 @@ def feeds_test():
                          "data, so the stream will refuse to serve it"),
             }
         except Exception as e:                               # noqa: BLE001
-            out["tastytrade"] = {"ok": False, "error": str(e)[:160]}
+            out["tastytrade"] = {"ok": False, "error": str(e)[:160],
+                                 "meaning": _tasty_hint(str(e))}
     return out
+
+
+def _tasty_hint(err):
+    """Turn tastytrade's OAuth errors into the thing to actually go and fix.
+
+    The raw text names neither field. Working through them live cost two
+    round trips he had to sit through: `Invalid JWT` (the refresh token is not
+    a token at all) then `Client secret mismatch` (the token is real, but it
+    came from a different OAuth application than the secret). Those are
+    different fixes, and the API says neither.
+    """
+    e = (err or "").lower()
+    if "client secret mismatch" in e:
+        return ("The refresh token is VALID, but the client secret belongs to a "
+                "different OAuth application. Copy BOTH from the same app at "
+                "my.tastytrade.com -> Manage -> API Access -> OAuth Applications.")
+    if "invalid jwt" in e:
+        return ("That refresh token is not a token — usually the ACCESS token "
+                "got pasted instead. The refresh token is the longer value "
+                "shown once when the OAuth app is created.")
+    if "invalid_grant" in e:
+        return ("The pair was rejected. Regenerate the refresh token and copy "
+                "the client secret from the same OAuth application.")
+    if "401" in e or "unauthorized" in e:
+        return "Credentials rejected outright — regenerate the OAuth pair."
+    return None
 
 
 @app.post("/api/feeds")
