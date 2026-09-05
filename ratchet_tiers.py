@@ -35,10 +35,33 @@ it earns the room for a better one.
 """
 
 # premium ceiling -> (arm_pct, first_lock_pct, step_pct)
+#
+# 9/4/26 — THE PRICE TIERS ABOVE THIS LINE ARE RETIRED. G restored his own
+# ladder on 9/3 and Discord Sniper has been running it since; this copy was
+# missed, so for a day the two tools managed the SAME Webull account by
+# DIFFERENT rules. (That is the "sweep the class, not the instance" rule in
+# PROJECT-STATUS.md catching its own miss.)
+#
+# His words:
+#   "It was supposed to start all along from -10% and +10%. When it touched
+#    +10% the new stop becomes automatically 0%, and the next target is 20%.
+#    When 20% is touched the new stop is +10% and the new target is +30%.
+#    When +30% is touched the new stop is +20%, and so on and so forth."
+#
+# So: ONE ladder for every premium — arm at +10%, first lock breakeven, then
+# a rung every +10%. The retired tiers were:
+#     <$1.00  (25.0, 10.0, 15.0)      $1-2  (15.0, 0.0, 10.0)
+#     >=$2.00 (10.0,  5.0,  5.0)
+# Their reasoning (a tick on a $0.40 contract is 2.5%, so a breakeven stop
+# there sits inside the spread) is kept in the docstring above as history,
+# and the two FLOORS below still enforce it in practice: a rung must clear
+# 4 ticks and a stop never rests inside the spread. The floors say so in the
+# log when they move one of his numbers.
+#
+# Practical effect of this change: a sub-$1.00 0DTE used to need +25% before
+# its stop moved AT ALL. It now goes to breakeven at +10%.
 TIERS = (
-    (1.00, (25.0, 10.0, 15.0)),      # premium  <  $1.00
-    (2.00, (15.0,  0.0, 10.0)),      # $1.00 <= premium < $2.00
-    (None, (10.0,  5.0,  5.0)),      # premium >= $2.00
+    (None, (10.0, 0.0, 10.0)),       # every premium: arm +10%, lock BE, +10% rungs
 )
 
 MIN_RUNG_TICKS = 4.0                 # floor 1
