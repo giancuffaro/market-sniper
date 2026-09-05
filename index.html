@@ -545,6 +545,39 @@
 
       <div class="panes">
       <div id="paneConfig" class="pane">
+      <!-- PRICE FEEDS. Orders never move - only quotes. Webull allows 300
+           requests a minute for the whole app key, shared with the Discord
+           bot and the Fill Announcer, and quotes are most of that volume.
+           Every quote served from here is budget handed back to the bot's
+           stops. Leave it blank and nothing changes. -->
+      <div class="sgroup">
+        <div class="glbl">PRICE FEEDS <span id="feedState" class="s"
+             style="color:var(--dim);letter-spacing:0"></span></div>
+        <div class="shint myfont">Quotes only — <b>orders, positions and your balance
+        stay on Webull</b> and cannot move. Filling either box takes the quote load off
+        the API key you share with the Discord bot, which is what starves its stops.
+        Leave both blank to keep things exactly as they are.</div>
+        <div class="srow" style="margin-top:8px">
+          <span class="lbl" style="width:112px">TRADIER TOKEN</span>
+          <input id="tradierToken" type="password" placeholder="production access token"
+                 style="flex:1" onchange="EZ.saveFeeds()">
+        </div>
+        <div class="shint myfont">Stock prices, no published request cap. The simplest win.</div>
+        <div class="srow" style="margin-top:8px">
+          <span class="lbl" style="width:112px">TASTY SECRET</span>
+          <input id="tastySecret" type="password" placeholder="OAuth client secret"
+                 style="flex:1" onchange="EZ.saveFeeds()">
+        </div>
+        <div class="srow">
+          <span class="lbl" style="width:112px">TASTY REFRESH</span>
+          <input id="tastyRefresh" type="password" placeholder="OAuth refresh token"
+                 style="flex:1" onchange="EZ.saveFeeds()">
+        </div>
+        <div class="shint myfont">Streams option quotes <b>and greeks</b> — Webull cannot
+        stream options at any price. Needs a funded account: an unfunded one returns
+        delayed data, and the app refuses to treat that as live.</div>
+      </div>
+
       <div class="sgroup mine myfont">
         <div class="glbl">★ ABSOLUTE ENTRY with RATCHET TRAILING</div>
         <div class="srow">
@@ -977,6 +1010,7 @@ const EZ = (function(){
     $('setScrim').classList.add('show');
     try{
     showTab('config'); cancelStrategyEdit(); renderStrategies();
+    loadFeeds();
     paintStrikeMode(settings.strike_mode);
     paintActiveMode();
     $('ratchetStep').value=settings.ratchet_step_pct||10;
@@ -1732,6 +1766,32 @@ const EZ = (function(){
     catch(e){ showReject(String((e&&e.message)||e)); }
   }
 
+  async function saveFeeds(){
+    const body={ tradier_token:$('tradierToken').value.trim(),
+                 tasty_client_secret:$('tastySecret').value.trim(),
+                 tasty_refresh_token:$('tastyRefresh').value.trim() };
+    try{
+      const r=await api('/api/feeds', body);
+      paintFeedState(r && r.status);
+    }catch(e){ $('feedState').textContent=' · could not save'; }
+  }
+
+  function paintFeedState(st){
+    const el=$('feedState'); if(!el) return;
+    if(!st){ el.textContent=''; return; }
+    const on=[];
+    if(st.tradier) on.push('Tradier');
+    if(st.tastytrade) on.push('tastytrade');
+    if(st.stream) on.push('streaming');
+    el.textContent = on.length ? ' · ' + on.join(' + ') + ' — quotes are off Webull'
+                               : ' · not set up — quotes still cost Webull budget';
+    el.style.color = on.length ? 'var(--green)' : 'var(--dim)';
+  }
+
+  async function loadFeeds(){
+    try{ paintFeedState(await api('/api/feeds')); }catch(e){}
+  }
+
   async function forgetPosition(){
     if(!confirm("Only do this if you've checked the Webull app and you are NOT holding "
                +"these contracts.\n\nThis sends NO order. It just clears the position off "
@@ -1802,7 +1862,7 @@ const EZ = (function(){
     }catch(e){ /* no BroadcastChannel - harmless, tabs just do not auto-close */ }
   })();
 
-  return {step,buy,close,disarm,hideReject,forgetPosition,managePosition,disconnect,switchAccount,setTheme,
+  return {step,buy,close,disarm,hideReject,forgetPosition,managePosition,saveFeeds,disconnect,switchAccount,setTheme,
           openSettings,closeSettings,applySettings,setStrikeMode,hideEvent,toggleSound,
           mirrorToggle,selectProfile,saveProfile,deleteProfile,pickAccount,
           showTab,toggleStrategy,newStrategy,editStrategy,saveStrategy,deleteStrategy,cancelStrategyEdit,stTypeChanged};
