@@ -4809,7 +4809,7 @@ finally:
     _ix80b = io.open("index.html", encoding="utf-8").read()
     _sfjs = _ix80b.split("async function saveFeeds", 1)[1].split("\n  }", 1)[0]
     check(80, "the panel only sends boxes he typed in",
-          "if(v) body[key]=v" in _sfjs.replace(" ", ""))
+          "if(v)body[key]=v" in _sfjs.replace(" ", ""), _sfjs[:90])
 
     # SWAPPED CREDENTIALS. A client secret and a refresh token are both opaque
     # strings of similar length in adjacent boxes, and tastytrade rejects the
