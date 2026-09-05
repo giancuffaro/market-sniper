@@ -118,13 +118,37 @@ class Tastytrade:
             raise FeedError("tastytrade is not set up")
 
         if self.oauth:
-            out = _http("POST", TASTY_API + "/oauth/token", body={
-                "grant_type": "refresh_token",
-                "client_secret": self._secret,
-                "refresh_token": self._refresh})
+            # THE TWO VALUES LOOK IDENTICAL AND GO IN ADJACENT BOXES.
+            # A client secret and a refresh token are both opaque strings of
+            # similar length, so swapping them is the obvious mistake - and
+            # tastytrade answers it with `invalid_grant: Invalid JWT`, which
+            # names neither field. Rather than making him guess, try the pair
+            # the other way round once, and if THAT works, keep it that way
+            # and say so.
+            out, swapped = None, False
+            try:
+                out = _http("POST", TASTY_API + "/oauth/token", body={
+                    "grant_type": "refresh_token",
+                    "client_secret": self._secret,
+                    "refresh_token": self._refresh})
+            except FeedError as first:
+                if "invalid_grant" not in str(first).lower():
+                    raise
+                try:
+                    out = _http("POST", TASTY_API + "/oauth/token", body={
+                        "grant_type": "refresh_token",
+                        "client_secret": self._refresh,
+                        "refresh_token": self._secret})
+                    swapped = True
+                except FeedError:
+                    raise first          # report the ORIGINAL error, not the retry
             tok = (out or {}).get("access_token")
             if not tok:
                 raise FeedError("tastytrade OAuth refresh failed: %s" % str(out)[:140])
+            if swapped:
+                # Correct them for good, so this costs one extra call once.
+                self._secret, self._refresh = self._refresh, self._secret
+                self.swapped_fix = True
             try:
                 ttl = float((out or {}).get("expires_in") or 900)
             except (TypeError, ValueError):
