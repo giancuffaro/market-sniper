@@ -4796,6 +4796,56 @@ finally:
     check(80, "and the margin is under the 15-minute life",
           "max(60.0, ttl - 60.0)" in _mdsrc)
 
+    # A BLANK BOX MUST NOT DELETE A WORKING CREDENTIAL. These are password
+    # inputs, so they never show the saved value back - and the panel posted
+    # all three fields, so editing the tastytrade boxes silently destroyed a
+    # Tradier token that was serving every quote on the screen.
+    _m80b = io.open("main.py", encoding="utf-8").read()
+    _sf80b = _m80b.split("def set_feeds", 1)[1].split("@app.get", 1)[0]
+    check(80, "an empty field never deletes", "cur.pop(k, None)" not in
+          _sf80b.split("clear", 1)[0])
+    check(80, "only a real value writes", 'if v:' in _sf80b)
+    check(80, "and clearing is explicit", '"clear"' in _sf80b)
+    _ix80b = io.open("index.html", encoding="utf-8").read()
+    _sfjs = _ix80b.split("async function saveFeeds", 1)[1].split("\n  }", 1)[0]
+    check(80, "the panel only sends boxes he typed in",
+          "if(v) body[key]=v" in _sfjs.replace(" ", ""))
+
+    # SWAPPED CREDENTIALS. A client secret and a refresh token are both opaque
+    # strings of similar length in adjacent boxes, and tastytrade rejects the
+    # mix-up with `invalid_grant: Invalid JWT`, naming neither field.
+    _calls80 = []
+    _real_http = _md._http
+    try:
+        def _fake80(method, url, headers=None, body=None, timeout=8.0):
+            _calls80.append(dict(body or {}))
+            _b = body or {}
+            if _b.get("client_secret") == "S" and _b.get("refresh_token") == "R":
+                return {"access_token": "tok", "expires_in": 900}
+            raise _md.FeedError('HTTP 400: {"error_code":"invalid_grant"}')
+        _md._http = _fake80
+        _sw = _md.Tastytrade(client_secret="R", refresh_token="S")   # swapped
+        check(80, "swapped credentials still authenticate", _sw.session() == "tok")
+        check(80, "at the cost of exactly one extra call", len(_calls80) == 2,
+              str(len(_calls80)))
+        check(80, "and they are corrected so it happens once",
+              getattr(_sw, "swapped_fix", False) is True)
+
+        _calls80.clear()
+        _bad = _md.Tastytrade(client_secret="X", refresh_token="Y")
+        _err = None
+        try:
+            _bad.session()
+        except _md.FeedError as e:
+            _err = str(e)
+        check(80, "genuinely bad credentials still fail", _err is not None)
+        check(80, "reporting the FIRST error, not the retry's",
+              "invalid_grant" in (_err or ""), str(_err)[:60])
+        check(80, "and it does not retry forever", len(_calls80) == 2,
+              str(len(_calls80)))
+    finally:
+        _md._http = _real_http
+
     # Delayed data must never be served as live - a stop moved off stale
     # gamma is a real loss.
     _dx = io.open("dxlink.py", encoding="utf-8").read()
